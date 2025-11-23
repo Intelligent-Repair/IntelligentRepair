@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+// Now it will work
 export default function NotFound() {
   return (
     <div>
