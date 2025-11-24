@@ -1,0 +1,21 @@
+<svg width="800" height="320" viewBox="0 0 800 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="320" fill="#F9F7F1"/>
+  <g transform="translate(140 90)">
+    <g transform="translate(0 40)">
+      <path d="M160 80H60L40 40C34 27 22 18 8 16L0 15V0H220V16L212 17C200 19 190 26 184 36L160 80Z" fill="#1D2F3A"/>
+      <rect x="28" y="0" width="72" height="36" rx="8" fill="#F9F7F1"/>
+      <rect x="120" y="0" width="72" height="36" rx="8" fill="#F9F7F1"/>
+      <circle cx="58" cy="104" r="24" fill="#1D2F3A"/>
+      <circle cx="162" cy="104" r="24" fill="#1D2F3A"/>
+      <circle cx="58" cy="104" r="10" fill="#F9F7F1"/>
+      <circle cx="162" cy="104" r="10" fill="#F9F7F1"/>
+    </g>
+    <g transform="translate(220)">
+      <path d="M120 0C101 -1 86 14 86 33C86 45 92 55 101 60L44 117L60 133L117 76C122 85 132 91 144 91C163 91 178 76 178 57C178 38 163 23 144 23C138 23 132 24 127 27L112 12L120 4L120 0Z" fill="#1D2F3A"/>
+    </g>
+  </g>
+  <text x="140" y="250" fill="#1D2F3A" font-size="72" font-weight="600" font-family="'Segoe UI','Inter','Helvetica Neue',sans-serif">
+    IntelligentRepair
+  </text>
+</svg>
+
