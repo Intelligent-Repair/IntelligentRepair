@@ -1,4 +1,6 @@
 import Image from "next/image";
+import Link from "next/link";
+import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
 const userBenefits = [
   {
@@ -58,54 +60,38 @@ export default function Home() {
         dir="rtl"
         className="relative mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pb-16 pt-16 sm:px-10 lg:px-12"
       >
+        <div className="flex justify-center items-center mt-8 mb-6 w-full">
+          <div className="flex justify-center items-center w-auto">
+            <Image
+              src={Logo}
+              alt="IntelligentRepair Logo"
+              className="w-[460px] max-w-none drop-shadow-[0_0_18px_rgba(255,255,255,0.45)] animate-fadeIn"
+              priority
+            />
+          </div>
+        </div>
+
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center text-center gap-3">
-          <Image
-            src="/AppLogo2.png"
-            alt="IntelligentRepair"
-            width={520}
-            height={270}
-            priority
-            className="w-[380px] md:w-[520px] h-auto translate-x-2 md:translate-x-4 drop-shadow-[0_0_36px_rgba(0,140,255,0.55)] mix-blend-screen opacity-0"
-            style={{
-              maskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,0.95) 50%, rgba(0,0,0,0.1) 72%, transparent 100%)",
-              WebkitMaskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,0.95) 50%, rgba(0,0,0,0.1) 72%, transparent 100%)",
-              animation: "heroLogoReveal 1.8s cubic-bezier(0.22, 0.9, 0.3, 1) forwards",
-            }}
-          />
-          <p className="mt-3 text-sm tracking-[0.65em] text-slate-300">
-            INTELLIGENTREPAIR • AI-FIRST AUTOMOTIVE SERVICE CLOUD
-          </p>
-          <h1
-            className="mt-4 max-w-3xl text-[1.55rem] font-semibold leading-snug text-white sm:text-[2.35rem] lg:text-[2.45rem]"
-            style={{
-              WebkitTextStroke: "1.4px #7dd3ff",
-              WebkitTextFillColor: "#ffffff",
-              color: "#ffffff",
-            }}
-          >
-            העוזר הדיגיטלי שמעניק לנהגים אבחון מיידי, מחבר אותם למוסכים המתאימים
-            ומפשט את כל מסע התיקון בלחיצת כפתור
+          <h1 className="text-4xl font-bold text-center text-white mt-2">
+            Welcome to IntelligentRepair
           </h1>
-          <p className="mt-3 max-w-3xl text-lg text-slate-200">
-            פלטפורמת IntelligentRepair מספקת ניתוח תקלות אוטומטי, אבחון מהיר ותיעוד
-            מלא — כך שכל צד יודע בדיוק מה קורה בכל רגע.
+          <p className="text-center text-white/70 mt-2 text-lg">
+            A smart automotive service platform for modern repair centers
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <button
-              type="button"
-              className="rounded-full bg-gradient-to-r from-sky-400 via-cyan-300 to-sky-500 px-12 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-sky-500/40 transition hover:-translate-y-0.5 hover:shadow-sky-500/60"
+            <Link
+              href="/auth/register"
+              className="rounded-full bg-gradient-to-r from-sky-400 via-cyan-300 to-sky-500 px-12 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-sky-500/40 transition hover:-translate-y-0.5 hover:shadow-sky-500/60 text-center"
             >
               הרשמה
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-white/20 bg-white/5 px-12 py-3 text-base font-semibold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/10"
+            </Link>
+            <Link
+              href="/auth/login"
+              className="rounded-full border border-white/20 bg-white/5 px-12 py-3 text-base font-semibold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/10 text-center"
             >
               התחברות
-            </button>
+            </Link>
           </div>
         </section>
 
