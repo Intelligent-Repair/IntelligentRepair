@@ -6,15 +6,11 @@ export async function POST() {
     const supabase = createServerClient();
     await supabase.auth.signOut();
 
-    return NextResponse.json({
-      success: true,
-      message: "Logged out successfully",
-    });
+    return NextResponse.json({ message: "Logged out successfully" });
   } catch (err) {
     return NextResponse.json(
-      { success: false, message: "Logout error", details: String(err) },
+      { error: "Logout error", details: String(err) },
       { status: 500 }
     );
   }
 }
-

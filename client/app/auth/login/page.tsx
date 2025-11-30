@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
@@ -9,7 +8,6 @@ import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 type UserType = "driver" | "garage";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [userType, setUserType] = useState<UserType>("driver");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,22 +29,16 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
+      console.log(data); // Debug backend response
 
-      if (!data.success) {
-        setError(data.message || "שגיאה בהתחברות");
+      if (!response.ok || !data.redirect || typeof data.redirect !== "string") {
+        setError(data.error || data.message || "שגיאה בהתחברות");
         setLoading(false);
         return;
       }
 
-      // Redirect based on role
-      if (data.role === "driver") {
-        router.push("/user");
-      } else if (data.role === "garage") {
-        router.push("/garage");
-      } else {
-        setError("סוג משתמש לא מזוהה");
-        setLoading(false);
-      }
+      // Redirect using window.location.href
+      window.location.href = data.redirect;
     } catch (err) {
       setError("שגיאה בחיבור לשרת");
       setLoading(false);
