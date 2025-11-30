@@ -65,16 +65,13 @@ export default function Home() {
             <Image
               src={Logo}
               alt="IntelligentRepair Logo"
-              className="w-[460px] max-w-none drop-shadow-[0_0_18px_rgba(255,255,255,0.45)] animate-fadeIn"
+              className="w-[600px] max-w-[90%] drop-shadow-[0_0_18px_rgba(255,255,255,0.45)] animate-fadeIn"
               priority
             />
           </div>
         </div>
 
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center text-center gap-3">
-          <h1 className="text-4xl font-bold text-center text-white mt-2">
-            Welcome to IntelligentRepair
-          </h1>
           <p className="text-center text-white/70 mt-2 text-lg">
             A smart automotive service platform for modern repair centers
           </p>

@@ -1,30 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@/lib/supabaseServer";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export async function POST(req: Request) {
+export async function POST() {
   try {
-    // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    // Sign out
-    const { error: signOutError } = await supabase.auth.signOut();
-
-    if (signOutError) {
-      return NextResponse.json(
-        { success: false, message: "שגיאה בהתנתקות", error: signOutError.message },
-        { status: 500 }
-      );
-    }
+    const supabase = createServerClient();
+    await supabase.auth.signOut();
 
     return NextResponse.json({
       success: true,
+      message: "Logged out successfully",
     });
-  } catch (err: any) {
+  } catch (err) {
     return NextResponse.json(
-      { success: false, message: "שגיאה בשרת", error: err.message },
+      { success: false, message: "Logout error", details: String(err) },
       { status: 500 }
     );
   }

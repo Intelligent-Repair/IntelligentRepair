@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
 type UserType = "driver" | "garage";
 
@@ -53,6 +55,16 @@ export default function LoginPage() {
 
   return (
     <>
+      {/* Logo */}
+      <div className="flex justify-center mb-4 mt-2">
+        <Image
+          src={Logo}
+          alt="IntelligentRepair Logo"
+          className="w-[280px] drop-shadow-[0_0_12px_rgba(255,255,255,0.3)] animate-fadeIn"
+          priority
+        />
+      </div>
+
       <h1 className="text-3xl font-semibold text-white text-center mb-8">
         התחברות למערכת
       </h1>
