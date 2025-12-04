@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { Plus, Car, Calendar, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // חובה בשביל המעבר דפים
+import { Plus, Car, Calendar, ArrowLeft, Home } from 'lucide-react';
 
 interface Vehicle {
     id: string;
@@ -16,6 +17,7 @@ interface Vehicle {
 }
 
 export default function MaintenancePage() {
+    const router = useRouter(); // הראוטר שיעזור לנו לזרוק משתמשים לא מחוברים
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
@@ -23,10 +25,19 @@ export default function MaintenancePage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // 1. בדיקת משתמש מחובר
                 const { data: { user } } = await supabase.auth.getUser();
 
+                // --- בדיקת אבטחה ---
+                if (!user) {
+                    // אם אין משתמש, תעיף אותו לדף ההתחברות
+                    router.push('/login');
+                    return;
+                }
+                // -------------------
+
                 if (user) {
-                    // שליפת שם המשתמש
+                    // שליפת פרופיל
                     const { data: profile } = await supabase
                         .from('profiles')
                         .select('first_name')
@@ -39,15 +50,16 @@ export default function MaintenancePage() {
                         setUserName(user.email.split('@')[0]);
                     }
 
-                    // שליפת הרכבים
+                    // שליפת רכבים
                     const { data: vehiclesData } = await supabase
                         .from('vehicles')
                         .select('*')
                         .eq('user_id', user.id)
-                        .order('created_at', { ascending: false })
-                        .returns<Vehicle[]>();
+                        .order('created_at', { ascending: false });
 
-                    if (vehiclesData) setVehicles(vehiclesData);
+                    if (vehiclesData) {
+                        setVehicles(vehiclesData as Vehicle[]);
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -57,110 +69,97 @@ export default function MaintenancePage() {
         };
 
         fetchData();
-    }, []);
+    }, [router]);
+
+    // אם עדיין טוען, נציג רק ספינר (כדי לא להראות סתם דף ריק לפני המעבר ללוגין)
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-900">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
 
     return (
-        // הרקע הכללי (כהה/שקוף)
-        <div dir="rtl" className="min-h-screen p-8 text-white">
+        <div dir="rtl" className="min-h-screen p-8 text-white relative">
 
-            {/* כותרת יפה ונקייה */}
-            <header className="max-w-5xl mx-auto mb-10 mt-4 text-center">
-                <h1 className="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-l from-blue-400 to-white">
+            {/* כפתור חזרה לאזור האישי */}
+            <div className="absolute top-6 right-6">
+                <Link href="/user" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 hover:bg-white/20">
+                    <Home className="w-4 h-4" />
+                    <span>חזרה לאזור האישי</span>
+                </Link>
+            </div>
+
+            {/* כותרת */}
+            <header className="max-w-6xl mx-auto mb-10 mt-16 pr-2">
+                <h1 className="text-5xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-l from-blue-400 to-white leading-tight">
                     המוסך שלי 🚗
                 </h1>
-                <p className="text-white/60 text-lg">
-                    שלום <span className="text-blue-300 font-bold">{userName || 'אורח'}</span>, הנה הרכבים שלך.
+                <p className="text-white/60 text-xl font-light">
+                    שלום <span className="text-blue-300 font-medium">{userName}</span>, כאן מנהלים את התחזוקה בראש שקט.
                 </p>
             </header>
 
-            <main className="max-w-5xl mx-auto pb-20">
+            <main className="max-w-6xl mx-auto pb-24">
 
-                {loading && (
-                    <div className="flex justify-center mt-10 mb-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                    </div>
-                )}
-
-                {/* --- 1. רשימת הרכבים (עכשיו למעלה) --- */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-10">
+                {/* רשימת הרכבים */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
                     {vehicles.map((vehicle) => (
                         <Link key={vehicle.id} href={`/maintenance/${vehicle.id}`}>
                             <div className="
-                group
-                relative
-                overflow-hidden
-                rounded-2xl
-                border border-white/10
-                bg-white/5
-                backdrop-blur-md
-                p-6
-                hover:border-blue-500/50
-                hover:shadow-[0_0_30px_-10px_rgba(59,130,246,0.5)]
-                transition-all duration-300
-                shadow-xl cursor-pointer
+                group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
+                hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
               ">
-
-                                {/* אפקט רקע עדין בהובר */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/0 to-blue-600/0 group-hover:to-blue-600/10 transition-all" />
-
-                                <div className="relative z-10 flex justify-between items-start">
+                                <div className="flex justify-between items-start mb-8">
                                     <div>
-                                        <h2 className="text-2xl font-bold text-white mb-2">
+                                        <h2 className="text-3xl font-bold text-white mb-3 group-hover:text-blue-300 transition-colors">
                                             {vehicle.manufacturer} {vehicle.model}
                                         </h2>
-                                        <div className="inline-block bg-black/30 border border-white/10 px-3 py-1 rounded-lg text-white/80 font-mono text-sm tracking-wider">
+                                        <div className="inline-block bg-black/40 px-3 py-1.5 rounded-xl text-white/80 font-mono text-sm border border-white/5 shadow-inner tracking-widest">
                                             {vehicle.license_plate} 🇮🇱
                                         </div>
                                     </div>
-                                    <div className="bg-white/10 p-2 rounded-lg">
-                                        {/* הוספתי פה בסוף את scale-x-[-1] כדי להפוך את המכונית */}
-                                        <Car className="w-8 h-8 text-blue-400 scale-x-[-1]" />
+                                    <div className="bg-white/5 p-3 rounded-2xl group-hover:bg-blue-600/20 transition-colors">
+                                        <Car className="w-9 h-9 text-white/70 group-hover:text-blue-400 scale-x-[-1]" />
                                     </div>
                                 </div>
 
-                                <div className="relative z-10 mt-8 pt-4 border-t border-white/10 flex justify-between items-center text-sm text-white/60">
+                                <div className="border-t border-white/10 pt-5 flex justify-between items-center text-sm text-white/50">
                                     <div className="flex items-center gap-2">
-                                        <Calendar className="w-4 h-4 ml-1" />
-                                        <span>שנת {vehicle.year}</span>
+                                        <Calendar className="w-4 h-4" />
+                                        <span>מודל {vehicle.year}</span>
                                     </div>
-                                    <div className="flex items-center text-blue-400 font-medium group-hover:text-blue-300 group-hover:translate-x-1 transition-all">
-                                        כניסה לרכב
+                                    <div className="flex items-center text-blue-400 font-medium opacity-80 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                                        לפרטים ותחזוקה
                                         <ArrowLeft className="w-4 h-4 mr-1" />
                                     </div>
                                 </div>
-
                             </div>
                         </Link>
                     ))}
                 </div>
 
-                {/* הודעה אם אין רכבים (רק למקרה חירום) */}
-                {!loading && vehicles.length === 0 && (
-                    <div className="text-center py-8 mb-8 rounded-2xl bg-white/5 border border-white/10">
-                        <p className="text-white/50 text-lg">המוסך שלך ריק כרגע.</p>
+                {/* הודעה אם אין רכבים */}
+                {vehicles.length === 0 && (
+                    <div className="text-center py-16 mb-8 rounded-3xl bg-white/5 border border-white/5 border-dashed">
+                        <Car className="w-16 h-16 text-white/20 mx-auto mb-4 scale-x-[-1]" />
+                        <p className="text-white/40 text-xl">החניה ריקה. זה הזמן להוסיף רכב!</p>
                     </div>
                 )}
 
-                {/* --- 2. כפתור הוספת רכב (עכשיו למטה) --- */}
+                {/* כפתור הוספה למטה */}
                 <Link href="/maintenance/add">
                     <div className="
-            group
-            p-6
-            rounded-2xl
-            border border-dashed border-white/20
-            bg-white/5 hover:bg-white/10
-            backdrop-blur-sm
-            transition-all duration-300
-            cursor-pointer
-            flex items-center justify-center
-            gap-4
-            hover:border-blue-400/50
+            group p-8 rounded-3xl border border-dashed border-white/20 bg-gradient-to-r from-white/5 to-white/0
+            hover:bg-white/10 hover:border-blue-400/40 backdrop-blur-sm transition-all duration-300 cursor-pointer
+            flex flex-col items-center justify-center gap-4
           ">
-                        <div className="bg-blue-600/20 p-3 rounded-full group-hover:bg-blue-500 group-hover:scale-110 transition-all shadow-lg">
-                            <Plus className="w-6 h-6 text-blue-400 group-hover:text-white" />
+                        <div className="bg-blue-600/20 p-4 rounded-full group-hover:bg-blue-500 group-hover:scale-110 group-hover:rotate-90 transition-all duration-500 shadow-lg">
+                            <Plus className="w-8 h-8 text-blue-400 group-hover:text-white" />
                         </div>
-                        <span className="text-xl font-medium text-white/80 group-hover:text-white">
-                            הוסף רכב חדש לאוסף
+                        <span className="text-xl font-medium text-white/70 group-hover:text-white transition-colors">
+                            לחץ להוספת רכב חדש
                         </span>
                     </div>
                 </Link>
