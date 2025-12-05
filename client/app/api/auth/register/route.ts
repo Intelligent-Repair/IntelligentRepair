@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { createServerClient } from "@/lib/supabaseServer";
+import { createServerSupabase } from "@/lib/supabaseServer";
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     } = body;
 
     const admin = createAdminClient();
-    const supabase = createServerClient();
+    const supabase = await createServerSupabase();
 
     if (!email || !password || !role) {
       return NextResponse.json(

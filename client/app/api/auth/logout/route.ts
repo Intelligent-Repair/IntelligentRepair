@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabaseServer";
+import { createServerSupabase } from "@/lib/supabaseServer";
 
 export async function POST() {
   try {
-    const supabase = createServerClient();
+    const supabase = await createServerSupabase();
     await supabase.auth.signOut();
 
     return NextResponse.json({ message: "Logged out successfully" });

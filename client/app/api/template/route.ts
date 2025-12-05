@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabaseServer";
-
-const supabase = createServerClient();
-
+import { createServerSupabase } from "@/lib/supabaseServer";
 
 export async function GET() {
+  const supabase = await createServerSupabase();
+  
   // מנסה להביא משתמש אחד מטבלת users
   const { data, error } = await supabase
     .from("users")
