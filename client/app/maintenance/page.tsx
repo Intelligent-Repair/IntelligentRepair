@@ -22,63 +22,9 @@ export default function MaintenancePage() {
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // 1. בדיקת משתמש מחובר
-                const { data: { user } } = await supabase.auth.getUser();
+    
 
-                // --- בדיקת אבטחה ---
-                if (!user) {
-                    // אם אין משתמש, תעיף אותו לדף ההתחברות
-                    router.push('/login');
-                    return;
-                }
-                // -------------------
-
-                if (user) {
-                    // שליפת פרופיל
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('first_name')
-                        .eq('id', user.id)
-                        .single();
-
-                    if (profile?.first_name) {
-                        setUserName(profile.first_name);
-                    } else if (user.email) {
-                        setUserName(user.email.split('@')[0]);
-                    }
-
-                    // שליפת רכבים
-                    const { data: vehiclesData } = await supabase
-                        .from('vehicles')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .order('created_at', { ascending: false });
-
-                    if (vehiclesData) {
-                        setVehicles(vehiclesData as Vehicle[]);
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [router]);
-
-    // אם עדיין טוען, נציג רק ספינר (כדי לא להראות סתם דף ריק לפני המעבר ללוגין)
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-900">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-        );
-    }
+   
 
     return (
         <div dir="rtl" className="min-h-screen p-8 text-white relative">
