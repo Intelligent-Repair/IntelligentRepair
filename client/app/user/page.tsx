@@ -31,7 +31,7 @@ export default function UserPage() {
       title: "פתיחת ייעוץ חדש",
       subtitle: "קבל ייעוץ מקצועי לתקלות ברכב",
       icon: Lightbulb,
-      link: "/consult",
+      link: "/user/consult",
     },
     {
       title: "האזור האישי",

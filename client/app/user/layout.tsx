@@ -11,6 +11,7 @@ interface UserLayoutProps {
 export default function UserLayout({ children }: UserLayoutProps) {
   const pathname = usePathname();
   const isHomePage = pathname === "/user";
+  const isConsultPage = pathname?.startsWith("/user/consult");
 
   const menu = [
     { name: "היסטוריית פניות", href: "/user/dashboard" },
@@ -19,8 +20,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
     { name: "הגדרות", href: "/user/settings" },
   ];
 
-  // If on home page, render children full-screen without sidebar/header
-  if (isHomePage) {
+  // If on home page or consult pages, render children full-screen without sidebar/header
+  if (isHomePage || isConsultPage) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#0f1a2e] to-[#0a1120]">
         {children}
