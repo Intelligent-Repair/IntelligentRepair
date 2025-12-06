@@ -6,21 +6,40 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Wrench, Bell, Save, Droplets, Wind, Thermometer, Calendar } from 'lucide-react';
 
-// 1. הגדרת המבנה של הרכב (לפי מה שראיתי שאתה משתמש בקוד)
+// 1. הגדרת הממשקים (Interfaces) בצורה מדויקת
+interface CatalogData {
+    manufacturer: string;
+    model: string;
+    year: number;
+}
+
+// המבנה הגולמי שמגיע מ-Supabase ב-Join
+interface RawVehicleData {
+    id: string;
+    license_plate: string;
+    test_date: string | null;
+    service_date: string | null;
+    remind_oil_water: boolean;
+    remind_tires: boolean;
+    remind_winter: boolean;
+    // האובייקט המקושר
+    vehicle_catalog: CatalogData | CatalogData[] | null;
+}
+
+// המבנה הסופי והנוח לשימוש בקומפוננטה
 interface Vehicle {
     id: string;
     manufacturer: string;
     model: string;
     year: number;
     license_plate: string;
-    test_date: string | null;      // יכול להיות ריק
-    service_date: string | null;   // יכול להיות ריק
+    test_date: string | null;
+    service_date: string | null;
     remind_oil_water: boolean;
     remind_tires: boolean;
     remind_winter: boolean;
 }
 
-// 2. הגדרת המבנה של ספר הרכב
 interface Manual {
     id: string;
     car_model: string;
@@ -38,8 +57,6 @@ export default function VehicleDetailsPage() {
     const [activeTab, setActiveTab] = useState<'technical' | 'reminders'>('technical');
     const [loading, setLoading] = useState(true);
 
-    // 3. שימוש בטיפוסים שיצרנו במקום any
-    // אנחנו אומרים: "זה או רכב, או null (אם עדיין לא נטען)"
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [manual, setManual] = useState<Manual | null>(null);
 
@@ -47,44 +64,78 @@ export default function VehicleDetailsPage() {
     useEffect(() => {
         const loadData = async () => {
             try {
-                // 1. שליפת הרכב
-                const { data: vehicleData, error: vehicleError } = await supabase
-                    .from('vehicles') // וודא שזה השם הנכון של הטבלה (אולי people_cars?)
-                    .select('*')
+                if (!id) return;
+
+                // 1. שליפת הרכב מטבלת people_cars (ולא vehicles) + קישור לקטלוג
+                const { data, error: vehicleError } = await supabase
+                    .from('people_cars') // תיקון: הטבלה הנכונה
+                    .select(`
+                        *,
+                        vehicle_catalog (
+                            manufacturer,
+                            model,
+                            year
+                        )
+                    `)
                     .eq('id', id)
                     .single();
 
                 if (vehicleError) throw vehicleError;
 
-                if (vehicleData) {
-                    setVehicle(vehicleData as Vehicle); // המרה בטוחה לטיפוס שלנו
+                if (data) {
+                    // המרה בטוחה לטיפוס שלנו
+                    const rawData = data as unknown as RawVehicleData;
+
+                    // טיפול בנתוני הקטלוג (לפעמים מגיע כמערך)
+                    const catalog = Array.isArray(rawData.vehicle_catalog)
+                        ? rawData.vehicle_catalog[0]
+                        : rawData.vehicle_catalog;
+
+                    const formattedVehicle: Vehicle = {
+                        id: rawData.id,
+                        license_plate: rawData.license_plate,
+                        test_date: rawData.test_date,
+                        service_date: rawData.service_date,
+                        remind_oil_water: rawData.remind_oil_water,
+                        remind_tires: rawData.remind_tires,
+                        remind_winter: rawData.remind_winter,
+                        // נתונים מהקטלוג
+                        manufacturer: catalog?.manufacturer || 'לא ידוע',
+                        model: catalog?.model || '',
+                        year: catalog?.year || 0,
+                    };
+
+                    setVehicle(formattedVehicle);
 
                     // 2. חיפוש ספר רכב תואם
-                    const { data: manualData } = await supabase
-                        .from('manuals')
-                        .select('*')
-                        .eq('car_model', vehicleData.model)
-                        .single();
+                    // הערה: כאן אנחנו משתמשים במודל שהגיע מהקטלוג כדי לחפש את ספר הרכב
+                    if (catalog?.model) {
+                        const { data: manualData } = await supabase
+                            .from('manuals')
+                            .select('*')
+                            .eq('car_model', catalog.model)
+                            .maybeSingle(); // שימוש ב-maybeSingle מונע שגיאה אם אין תוצאות
 
-                    if (manualData) setManual(manualData as Manual);
+                        if (manualData) setManual(manualData as Manual);
+                    }
                 }
             } catch (error) {
-                console.error(error);
+                console.error('Error loading vehicle details:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        if (id) loadData();
+        loadData();
     }, [id]);
 
     // שמירת תזכורות
     const saveReminders = async () => {
-        if (!vehicle) return; // הגנה: אם אין רכב, אי אפשר לשמור
+        if (!vehicle) return;
 
         try {
             const { error } = await supabase
-                .from('vehicles') // וודא שוב את שם הטבלה
+                .from('people_cars') // תיקון: עדכון הטבלה הנכונה
                 .update({
                     test_date: vehicle.test_date,
                     service_date: vehicle.service_date,
@@ -98,14 +149,13 @@ export default function VehicleDetailsPage() {
             alert('ההגדרות נשמרו בהצלחה! ✅');
 
         } catch (error) {
-            // טיפול נכון בשגיאות ב-TypeScript
             const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
             alert('שגיאה: ' + errorMessage);
         }
     };
 
     if (loading) return <div className="text-white text-center mt-20">טוען פרטי רכב...</div>;
-    if (!vehicle) return <div className="text-white text-center mt-20">רכב לא נמצא</div>;
+    if (!vehicle) return <div className="text-white text-center mt-20">רכב לא נמצא במערכת</div>;
 
     return (
         <div dir="rtl" className="min-h-screen p-6 text-white pb-24">
@@ -131,8 +181,8 @@ export default function VehicleDetailsPage() {
                 <button
                     onClick={() => setActiveTab('technical')}
                     className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'technical'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                            : 'text-white/50 hover:bg-white/5'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
+                        : 'text-white/50 hover:bg-white/5'
                         }`}
                 >
                     <Wrench className="w-4 h-4" />
@@ -141,8 +191,8 @@ export default function VehicleDetailsPage() {
                 <button
                     onClick={() => setActiveTab('reminders')}
                     className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'reminders'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                            : 'text-white/50 hover:bg-white/5'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
+                        : 'text-white/50 hover:bg-white/5'
                         }`}
                 >
                     <Bell className="w-4 h-4" />

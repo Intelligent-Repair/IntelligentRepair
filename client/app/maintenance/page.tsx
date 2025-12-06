@@ -6,17 +6,32 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Car, Calendar, ArrowLeft, Home } from 'lucide-react';
 
-// עדכנתי את הממשק שיתאים לנתונים שאנחנו בונים ידנית לאחר השליפה
+// 1. הגדרת המבנה של המידע בטבלת הקטלוג
+interface VehicleCatalog {
+    manufacturer: string;
+    model: string;
+    year: number;
+}
+
+// 2. הגדרת המבנה הגולמי שמגיע מ-Supabase (כולל הקינון)
+// זה מחליף את ה-any ומגדיר בדיוק מה מגיע מהשאילתה
+interface RawDatabaseRow {
+    id: string;
+    license_plate: string;
+    test_date?: string | null;
+    // כאן אנחנו אומרים ל-TS שזה יכול להיות אובייקט (אם נמצא רכב) או null
+    // או מערך (במקרים מסוימים של הגדרות Supabase)
+    vehicle_catalog: VehicleCatalog | VehicleCatalog[] | null;
+}
+
+// 3. הממשק של הרכב הסופי שמוצג באפליקציה (שטוח ונוח לשימוש)
 interface Vehicle {
     id: string;
     manufacturer: string;
     model: string;
     year: number;
     license_plate: string;
-    remind_test?: boolean; // בהתאם לתמונה שלך זה כנראה לא קיים בטבלה, אבל השארתי למקרה הצורך
-    remind_oil?: boolean;
-    // שדות נוספים מהטבלה החדשה שלך אם תרצה להשתמש בהם בעתיד
-    test_date?: string;
+    test_date?: string | null;
 }
 
 export default function MaintenancePage() {
@@ -40,12 +55,13 @@ export default function MaintenancePage() {
                 const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'חבר';
                 setUserName(name);
 
-                // 3. משיכת הרכבים (החלק החדש והמתוקן)
-                // אנחנו שולפים מטבלת הקישור (people_cars) ומבקשים גם את המידע מטבלת הקטלוג
-                const { data: rawVehicles, error: vehiclesError } = await supabase
-                    .from('people_cars') // השם של הטבלה החדשה שלך
+                // 3. משיכת הרכבים
+                const { data, error: vehiclesError } = await supabase
+                    .from('people_cars')
                     .select(`
-                        *,
+                        id,
+                        license_plate,
+                        test_date,
                         vehicle_catalog (
                             manufacturer,
                             model,
@@ -57,19 +73,27 @@ export default function MaintenancePage() {
                 if (vehiclesError) {
                     console.error('Error fetching vehicles:', vehiclesError);
                 } else {
-                    // כאן אנחנו מסדרים את המידע שיתאים למה שהקוד שלך מצפה לקבל
-                    // Supabase מחזיר את המידע המקושר כאובייקט פנימי, אנחנו מוציאים אותו החוצה
-                    const formattedVehicles: Vehicle[] = (rawVehicles || []).map((item: any) => ({
-                        id: item.id,
-                        license_plate: item.license_plate,
-                        // אם יש שדות נוספים בטבלת people_cars שאתה רוצה, תוסיף אותם כאן:
-                        test_date: item.test_date,
+                    // המרה בטוחה: אנחנו אומרים ל-TS להתייחס למידע כרשימה של RawDatabaseRow
+                    // השימוש ב-unknown הוא טכניקה בטוחה יותר מ-any להמרה יזומה
+                    const rawData = data as unknown as RawDatabaseRow[];
 
-                        // כאן אנחנו לוקחים את המידע מהטבלה המקושרת
-                        manufacturer: item.vehicle_catalog?.manufacturer || 'לא ידוע',
-                        model: item.vehicle_catalog?.model || '',
-                        year: item.vehicle_catalog?.year || 0,
-                    }));
+                    const formattedVehicles: Vehicle[] = rawData.map((row) => {
+                        // טיפול במקרה ש-vehicle_catalog הוא מערך (קורה לפעמים ב-Joins)
+                        const catalogItem = Array.isArray(row.vehicle_catalog)
+                            ? row.vehicle_catalog[0]
+                            : row.vehicle_catalog;
+
+                        return {
+                            id: row.id, // זה ה-ID שנשלח לדף הבא
+                            license_plate: row.license_plate,
+                            test_date: row.test_date,
+
+                            // שימוש בנתונים מהקטלוג אם קיימים
+                            manufacturer: catalogItem?.manufacturer || 'לא ידוע',
+                            model: catalogItem?.model || '',
+                            year: catalogItem?.year || 0,
+                        };
+                    });
 
                     setVehicles(formattedVehicles);
                 }
@@ -116,9 +140,9 @@ export default function MaintenancePage() {
                     {vehicles.map((vehicle) => (
                         <Link key={vehicle.id} href={`/maintenance/${vehicle.id}`}>
                             <div className="
-                group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
-                hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
-              ">
+                                group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
+                                hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
+                            ">
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <h2 className="text-3xl font-bold text-white mb-3 group-hover:text-blue-300 transition-colors">
@@ -159,10 +183,10 @@ export default function MaintenancePage() {
                 {/* כפתור הוספה למטה */}
                 <Link href="/maintenance/add">
                     <div className="
-            group p-8 rounded-3xl border border-dashed border-white/20 bg-gradient-to-r from-white/5 to-white/0
-            hover:bg-white/10 hover:border-blue-400/40 backdrop-blur-sm transition-all duration-300 cursor-pointer
-            flex flex-col items-center justify-center gap-4
-          ">
+                        group p-8 rounded-3xl border border-dashed border-white/20 bg-gradient-to-r from-white/5 to-white/0
+                        hover:bg-white/10 hover:border-blue-400/40 backdrop-blur-sm transition-all duration-300 cursor-pointer
+                        flex flex-col items-center justify-center gap-4
+                    ">
                         <div className="bg-blue-600/20 p-4 rounded-full group-hover:bg-blue-500 group-hover:scale-110 group-hover:rotate-90 transition-all duration-500 shadow-lg">
                             <Plus className="w-8 h-8 text-blue-400 group-hover:text-white" />
                         </div>
