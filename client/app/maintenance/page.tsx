@@ -22,10 +22,6 @@ export default function MaintenancePage() {
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
 
-    
-
-   
-
     return (
         <div dir="rtl" className="min-h-screen p-8 text-white relative">
 

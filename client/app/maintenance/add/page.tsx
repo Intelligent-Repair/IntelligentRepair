@@ -1,20 +1,105 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Car, Calendar, Hash, Factory, ArrowRight, Save } from 'lucide-react';
+import { Car, Calendar, Hash, Factory, ArrowRight, Save, AlertCircle } from 'lucide-react';
 
 export default function AddVehiclePage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        manufacturer: '',
-        model: '',
-        year: new Date().getFullYear(),
-        license_plate: '',
-    });
+
+    // רשימות לבחירה (Dropdowns)
+    const [manufacturers, setManufacturers] = useState<string[]>([]);
+    const [models, setModels] = useState<string[]>([]);
+    const [years, setYears] = useState<number[]>([]);
+
+    // הבחירות של המשתמש
+    const [selectedManufacturer, setSelectedManufacturer] = useState('');
+    const [selectedModel, setSelectedModel] = useState('');
+    const [selectedYear, setSelectedYear] = useState<string>('');
+    const [licensePlate, setLicensePlate] = useState('');
+
+    // --- טעינת יצרנים בטעינת הדף ---
+    useEffect(() => {
+        const fetchManufacturers = async () => {
+            console.log("מתחיל טעינת יצרנים..."); // בדיקה
+
+            const { data, error } = await supabase
+                .from('vehicle_catalog')
+                .select('manufacturer');
+
+            if (error) {
+                console.error("שגיאה בשליפת יצרנים:", error.message);
+                return;
+            }
+
+            if (data) {
+                console.log("מספר רשומות שנמצאו:", data.length); // בדיקה כמה שורות חזרו
+                // שימוש ב-Set כדי להסיר כפילויות
+                const uniqueManufacturers = Array.from(new Set(data.map(item => item.manufacturer)))
+                    .filter(item => item !== null && item !== "") // סינון ערכים ריקים
+                    .sort();
+
+                console.log("יצרנים ייחודיים:", uniqueManufacturers); // בדיקה של הרשימה הסופית
+                setManufacturers(uniqueManufacturers);
+            }
+        };
+
+        fetchManufacturers();
+    }, []);
+
+    // --- טעינת דגמים כשיש יצרן ---
+    useEffect(() => {
+        if (!selectedManufacturer) {
+            setModels([]);
+            return;
+        }
+
+        const fetchModels = async () => {
+            const { data, error } = await supabase
+                .from('vehicle_catalog')
+                .select('model')
+                .eq('manufacturer', selectedManufacturer);
+
+            if (error) console.error(error);
+
+            if (data) {
+                const uniqueModels = Array.from(new Set(data.map(item => item.model))).sort();
+                setModels(uniqueModels);
+            }
+        };
+        fetchModels();
+        setSelectedModel('');
+        setSelectedYear('');
+    }, [selectedManufacturer]);
+
+    // --- טעינת שנים כשיש דגם ---
+    useEffect(() => {
+        if (!selectedModel) {
+            setYears([]);
+            return;
+        }
+
+        const fetchYears = async () => {
+            const { data, error } = await supabase
+                .from('vehicle_catalog')
+                .select('year')
+                .eq('manufacturer', selectedManufacturer)
+                .eq('model', selectedModel);
+
+            if (error) console.error(error);
+
+            if (data) {
+                const uniqueYears = Array.from(new Set(data.map(item => item.year))).sort((a, b) => b - a);
+                setYears(uniqueYears);
+            }
+        };
+        fetchYears();
+        setSelectedYear('');
+    }, [selectedModel]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,28 +107,40 @@ export default function AddVehiclePage() {
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('משתמש לא מחובר');
+            if (!user) throw new Error('משתמש לא מחובר, אנא התחבר מחדש');
 
-            const { error } = await supabase
-                .from('vehicles')
+            // מציאת ה-ID של הרכב מהקטלוג
+            const { data: catalogItem, error: catalogError } = await supabase
+                .from('vehicle_catalog')
+                .select('id')
+                .eq('manufacturer', selectedManufacturer)
+                .eq('model', selectedModel)
+                .eq('year', parseInt(selectedYear))
+                .single(); // מחזיר שורה אחת בלבד
+
+            if (catalogError || !catalogItem) {
+                console.error("Catalog Error:", catalogError);
+                throw new Error('לא נמצא רכב מתאים בקטלוג או שיש כפילות בנתונים');
+            }
+
+            // שמירה בטבלת people_cars
+            const { error: insertError } = await supabase
+                .from('people_cars')
                 .insert([
                     {
                         user_id: user.id,
-                        manufacturer: formData.manufacturer,
-                        model: formData.model,
-                        year: Number(formData.year),
-                        license_plate: formData.license_plate,
+                        vehicle_catalog_id: catalogItem.id,
+                        license_plate: licensePlate,
                     }
                 ]);
 
-            if (error) throw error;
+            if (insertError) throw insertError;
 
             alert('הרכב נוסף בהצלחה! 🚗');
             router.push('/maintenance');
             router.refresh();
 
         } catch (error) {
-            // בדיקה בטוחה: האם השגיאה היא באמת מסוג "שגיאה"?
             const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
             alert('שגיאה בשמירה: ' + errorMessage);
         } finally {
@@ -65,31 +162,86 @@ export default function AddVehiclePage() {
                     </h1>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* בחירת יצרן */}
                         <div className="space-y-2">
                             <label className="text-sm text-gray-400 flex items-center gap-2"><Factory className="w-4 h-4" /> יצרן</label>
-                            <input type="text" required className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
-                                value={formData.manufacturer} onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })} placeholder="למשל: טויוטה" />
+                            <select
+                                required
+                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none appearance-none"
+                                value={selectedManufacturer}
+                                onChange={(e) => setSelectedManufacturer(e.target.value)}
+                            >
+                                <option value="" className="text-gray-500 bg-gray-900">בחר יצרן...</option>
+                                {manufacturers.length === 0 && (
+                                    <option disabled className="bg-gray-900">טוען רשימה...</option>
+                                )}
+                                {manufacturers.map((m, idx) => (
+                                    <option key={idx} value={m} className="text-white bg-gray-900">{m}</option>
+                                ))}
+                            </select>
                         </div>
+
+                        {/* בחירת דגם */}
                         <div className="space-y-2">
                             <label className="text-sm text-gray-400 flex items-center gap-2"><Car className="w-4 h-4 scale-x-[-1]" /> דגם</label>
-                            <input type="text" required className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
-                                value={formData.model} onChange={(e) => setFormData({ ...formData, model: e.target.value })} placeholder="למשל: קורולה" />
+                            <select
+                                required
+                                disabled={!selectedManufacturer}
+                                className={`w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none appearance-none ${!selectedManufacturer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                value={selectedModel}
+                                onChange={(e) => setSelectedModel(e.target.value)}
+                            >
+                                <option value="" className="text-gray-500 bg-gray-900">
+                                    {selectedManufacturer ? 'בחר דגם...' : 'קודם בחר יצרן'}
+                                </option>
+                                {models.map((m, idx) => (
+                                    <option key={idx} value={m} className="text-white bg-gray-900">{m}</option>
+                                ))}
+                            </select>
                         </div>
+
+                        {/* בחירת שנה */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm text-gray-400 flex items-center gap-2"><Calendar className="w-4 h-4" /> שנה</label>
-                                <input type="number" required className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
-                                    value={formData.year} onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })} />
+                                <select
+                                    required
+                                    disabled={!selectedModel}
+                                    className={`w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none appearance-none ${!selectedModel ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                >
+                                    <option value="" className="text-gray-500 bg-gray-900">בחר...</option>
+                                    {years.map((y, idx) => (
+                                        <option key={idx} value={y} className="text-white bg-gray-900">{y}</option>
+                                    ))}
+                                </select>
                             </div>
+
+                            {/* לוחית רישוי */}
                             <div className="space-y-2">
                                 <label className="text-sm text-gray-400 flex items-center gap-2"><Hash className="w-4 h-4" /> לוחית רישוי</label>
-                                <input type="text" required className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white text-center font-mono tracking-widest"
-                                    value={formData.license_plate} onChange={(e) => setFormData({ ...formData, license_plate: e.target.value })} />
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white text-center font-mono tracking-widest focus:border-blue-500 outline-none"
+                                    value={licensePlate}
+                                    onChange={(e) => setLicensePlate(e.target.value)}
+                                    placeholder="12-345-67"
+                                />
                             </div>
                         </div>
 
+                        {/* סיכום */}
+                        {selectedManufacturer && selectedModel && selectedYear && (
+                            <div className="text-center text-sm text-green-400 bg-green-900/20 p-2 rounded-lg border border-green-500/20">
+                                נבחר: {selectedManufacturer} {selectedModel} ({selectedYear})
+                            </div>
+                        )}
+
                         <button type="submit" disabled={loading} className="w-full mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold p-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                            {loading ? 'שומר...' : 'שמור רכב'} <Save className="w-5 h-5" />
+                            {loading ? 'שומר נתונים...' : 'שמור רכב'} <Save className="w-5 h-5" />
                         </button>
                     </form>
                 </div>
