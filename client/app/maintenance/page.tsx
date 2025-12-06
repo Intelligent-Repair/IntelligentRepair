@@ -3,24 +3,90 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // חובה בשביל המעבר דפים
+import { useRouter } from 'next/navigation';
 import { Plus, Car, Calendar, ArrowLeft, Home } from 'lucide-react';
 
+// עדכנתי את הממשק שיתאים לנתונים שאנחנו בונים ידנית לאחר השליפה
 interface Vehicle {
     id: string;
     manufacturer: string;
     model: string;
     year: number;
     license_plate: string;
-    remind_test?: boolean;
+    remind_test?: boolean; // בהתאם לתמונה שלך זה כנראה לא קיים בטבלה, אבל השארתי למקרה הצורך
     remind_oil?: boolean;
+    // שדות נוספים מהטבלה החדשה שלך אם תרצה להשתמש בהם בעתיד
+    test_date?: string;
 }
 
 export default function MaintenancePage() {
-    const router = useRouter(); // הראוטר שיעזור לנו לזרוק משתמשים לא מחוברים
+    const router = useRouter();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // 1. קבלת המשתמש הנוכחי
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+                if (authError || !user) {
+                    router.push('/login');
+                    return;
+                }
+
+                // 2. עדכון שם המשתמש
+                const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'חבר';
+                setUserName(name);
+
+                // 3. משיכת הרכבים (החלק החדש והמתוקן)
+                // אנחנו שולפים מטבלת הקישור (people_cars) ומבקשים גם את המידע מטבלת הקטלוג
+                const { data: rawVehicles, error: vehiclesError } = await supabase
+                    .from('people_cars') // השם של הטבלה החדשה שלך
+                    .select(`
+                        *,
+                        vehicle_catalog (
+                            manufacturer,
+                            model,
+                            year
+                        )
+                    `)
+                    .eq('user_id', user.id);
+
+                if (vehiclesError) {
+                    console.error('Error fetching vehicles:', vehiclesError);
+                } else {
+                    // כאן אנחנו מסדרים את המידע שיתאים למה שהקוד שלך מצפה לקבל
+                    // Supabase מחזיר את המידע המקושר כאובייקט פנימי, אנחנו מוציאים אותו החוצה
+                    const formattedVehicles: Vehicle[] = (rawVehicles || []).map((item: any) => ({
+                        id: item.id,
+                        license_plate: item.license_plate,
+                        // אם יש שדות נוספים בטבלת people_cars שאתה רוצה, תוסיף אותם כאן:
+                        test_date: item.test_date,
+
+                        // כאן אנחנו לוקחים את המידע מהטבלה המקושרת
+                        manufacturer: item.vehicle_catalog?.manufacturer || 'לא ידוע',
+                        model: item.vehicle_catalog?.model || '',
+                        year: item.vehicle_catalog?.year || 0,
+                    }));
+
+                    setVehicles(formattedVehicles);
+                }
+
+            } catch (error) {
+                console.error('Unexpected error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [router]);
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center text-white">טוען נתונים...</div>;
+    }
 
     return (
         <div dir="rtl" className="min-h-screen p-8 text-white relative">
@@ -83,7 +149,7 @@ export default function MaintenancePage() {
                 </div>
 
                 {/* הודעה אם אין רכבים */}
-                {vehicles.length === 0 && (
+                {!loading && vehicles.length === 0 && (
                     <div className="text-center py-16 mb-8 rounded-3xl bg-white/5 border border-white/5 border-dashed">
                         <Car className="w-16 h-16 text-white/20 mx-auto mb-4 scale-x-[-1]" />
                         <p className="text-white/40 text-xl">החניה ריקה. זה הזמן להוסיף רכב!</p>
