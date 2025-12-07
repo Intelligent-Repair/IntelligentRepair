@@ -1,0 +1,137 @@
+import { NextResponse } from "next/server";
+import { createServerSupabase } from "@/lib/supabaseServer";
+
+export async function GET(request: Request) {
+  try {
+    const supabase = await createServerSupabase();
+    const { searchParams } = new URL(request.url);
+    const mode = searchParams.get("mode");
+
+    // Authenticate the user (required for both modes)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    let query = supabase
+      .from("repairs")
+      .select(`
+        id,
+        ai_summary,
+        mechanic_notes,
+        created_at,
+        garage_id,
+        request:requests (
+          id,
+          problem_description,
+          description,
+          created_at,
+          car:people_cars (
+            id,
+            plate_number,
+            manufacturer,
+            model,
+            user:users (
+              id,
+              full_name,
+              phone
+            )
+          )
+        ),
+        garage:garages (
+          id,
+          name
+        )
+      `);
+
+    // If mode is not "global", filter by garage_id
+    if (mode !== "global") {
+      // Find the garage record via user_id
+      const { data: garage, error: garageError } = await supabase
+        .from("garages")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (garageError || !garage) {
+        return NextResponse.json(
+          { error: "Garage not found" },
+          { status: 404 }
+        );
+      }
+
+      // Filter by garage_id for local mode
+      query = query.eq("garage_id", garage.id);
+    }
+
+    // Order by created_at descending
+    const { data: repairs, error: repairsError } = await query.order("created_at", { ascending: false });
+
+    if (repairsError) {
+      return NextResponse.json(
+        { error: "Failed to fetch repairs", details: repairsError.message },
+        { status: 500 }
+      );
+    }
+
+    // Transform the data to match the expected structure
+    const transformedRepairs = repairs?.map((repair: any) => {
+      const request = repair.request;
+      const car = request?.car;
+      const user = car?.user;
+      const garage = repair.garage;
+
+      return {
+        id: repair.id,
+        ai_summary: repair.ai_summary,
+        mechanic_notes: repair.mechanic_notes,
+        created_at: repair.created_at,
+        request: request
+          ? {
+              id: request.id,
+              problem_description: request.problem_description || request.description || null,
+              created_at: request.created_at,
+            }
+          : null,
+        car: car
+          ? {
+              id: car.id,
+              plate_number: car.plate_number,
+              manufacturer: car.manufacturer,
+              model: car.model,
+            }
+          : null,
+        user: user
+          ? {
+              id: user.id,
+              full_name: user.full_name,
+              phone: user.phone,
+            }
+          : null,
+        garage: mode === "global" && garage
+          ? {
+              id: garage.id,
+              name: garage.name || null,
+            }
+          : null,
+      };
+    }) || [];
+
+    return NextResponse.json({
+      repairs: transformedRepairs,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Server error", details: String(err) },
+      { status: 500 }
+    );
+  }
+}
+
