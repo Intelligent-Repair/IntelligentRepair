@@ -6,10 +6,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatBubble from "./components/ChatBubble";
 import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
+import YesNoButtons from "./components/YesNoButtons";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
 import { useAIStateMachine } from "./hooks/useAIStateMachine";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "@/lib/ai/types";
 import type { AIQuestionResponse } from "@/lib/ai/types";
+import { withRetry } from "@/lib/ai/retry";
 
 interface Vehicle {
   id: string;
@@ -21,6 +23,8 @@ interface Vehicle {
 
 const MAX_QUESTIONS = 5;
 const SESSION_STORAGE_KEY = "consult_questions_state";
+const RESEARCH_TIMEOUT_MS = 35000; // 35 seconds (within 30-45 range)
+const QUESTIONS_TIMEOUT_MS = 30000; // 30 seconds for questions API
 
 type ResearchPayload = {
   top_causes: string[];
@@ -31,6 +35,114 @@ type ResearchPayload = {
 };
 
 /**
+ * Safe fallback research response that never throws
+ */
+function createSafeResearchFallback(): ResearchPayload {
+  return {
+    top_causes: [],
+    differentiating_factors: [],
+  };
+}
+
+/**
+ * Safe timeout promise that resolves with fallback instead of rejecting
+ */
+function createSafeTimeoutPromise<T>(timeoutMs: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    setTimeout(() => {
+      console.warn(`[Questions Page] Operation timed out after ${timeoutMs}ms, using fallback`);
+      resolve(fallback);
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Fetch research with retry logic and safe timeout fallback
+ */
+async function fetchResearchWithRetry(
+  description: string,
+  vehicle: VehicleInfo,
+  signal?: AbortSignal
+): Promise<ResearchPayload> {
+  const researchFallback = createSafeResearchFallback();
+
+  try {
+    // Wrap fetch in retry logic (max 2 retries with ~1500ms delay)
+    const fetchWithRetry = () =>
+      withRetry(
+        async () => {
+          const response = await fetch("/api/ai/research", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              description,
+              vehicle,
+            }),
+            signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Research API returned ${response.status}`);
+          }
+
+          return response;
+        },
+        {
+          maxRetries: 2,
+          backoffMs: [1500, 1500], // ~1500ms delay between retries
+        }
+      );
+
+    // Race between fetch and safe timeout
+    const researchPromise = fetchWithRetry();
+    const timeoutPromise = createSafeTimeoutPromise<Response>(
+      RESEARCH_TIMEOUT_MS,
+      new Response(
+        JSON.stringify({
+          success: false,
+          message: "Research timed out — using fallback response.",
+          data: {
+            causes: [],
+            suggestions: [],
+            warnings: [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const researchRes = await Promise.race([researchPromise, timeoutPromise]);
+
+    // Parse response
+    try {
+      const researchData = await researchRes.json();
+
+      // Check if this is the timeout fallback response
+      if (researchData.success === false && researchData.message?.includes("timed out")) {
+        console.warn("[Questions Page] Research timed out — using fallback response.");
+        return researchFallback;
+      }
+
+      // Return parsed research data
+      return {
+        top_causes: Array.isArray(researchData.top_causes) ? researchData.top_causes : [],
+        differentiating_factors: Array.isArray(researchData.differentiating_factors)
+          ? researchData.differentiating_factors
+          : [],
+        summary: typeof researchData.summary === "string" ? researchData.summary : undefined,
+        raw: typeof researchData.raw === "string" ? researchData.raw : undefined,
+      };
+    } catch (parseError) {
+      console.error("[Questions Page] Failed to parse research response:", parseError);
+      return researchFallback;
+    }
+  } catch (err) {
+    console.error("[Questions Page] Research fetch failed after retries:", err);
+    return researchFallback;
+  }
+}
+
+/**
  * Convert API response to AIQuestion
  */
 function parseQuestion(data: any): AIQuestion | null {
@@ -39,21 +151,44 @@ function parseQuestion(data: any): AIQuestion | null {
     return null;
   }
 
-  if (!data.next_question || typeof data.next_question !== "string") {
+  // Support both "question" and "next_question" for backward compatibility
+  const questionText = data.question || data.next_question;
+  if (!questionText || typeof questionText !== "string") {
     return null;
   }
 
-  const isMultiChoice = data.options && Array.isArray(data.options) && data.options.length > 2;
-  const options = isMultiChoice && data.options
-    ? data.options.slice(0, 5)
-    : data.options && Array.isArray(data.options) && data.options.length > 0
-    ? data.options
-    : ["כן", "לא"];
+  // Determine type from API response or infer from options
+  let questionType: "yesno" | "multi" = "yesno";
+  let options: string[] = ["כן", "לא"];
+
+  if (data.type === "multi" || data.type === "yesno") {
+    questionType = data.type;
+  } else if (data.options && Array.isArray(data.options)) {
+    // Infer type from options length
+    if (data.options.length >= 3 && data.options.length <= 5) {
+      questionType = "multi";
+    } else if (data.options.length === 2) {
+      questionType = "yesno";
+    }
+  }
+
+  // Set options based on type
+  if (data.options && Array.isArray(data.options) && data.options.length > 0) {
+    const validOptions = data.options.filter((o: any) => typeof o === "string");
+    if (questionType === "yesno" && validOptions.length === 2) {
+      options = validOptions;
+    } else if (questionType === "multi" && validOptions.length >= 3 && validOptions.length <= 5) {
+      options = validOptions.slice(0, 5);
+    } else if (questionType === "yesno") {
+      options = ["כן", "לא"];
+    }
+  }
 
   return {
-    type: isMultiChoice ? "multi" : "yesno",
-    text: data.next_question,
-    options: isMultiChoice ? options : undefined,
+    question: questionText,
+    type: questionType,
+    options: options,
+    shouldStop: typeof data.shouldStop === "boolean" ? data.shouldStop : false,
   };
 }
 
@@ -276,53 +411,24 @@ export default function QuestionsPage() {
         if (!researchRef.current && !isResearchFetchingRef.current) {
           isResearchFetchingRef.current = true;
           try {
-            // Add timeout to research fetch (15 seconds max)
-            const researchPromise = fetch("/api/ai/research", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                description: state.description,
-                vehicle: state.vehicle!,
-              }),
-            });
-
-            const timeoutPromise = new Promise<Response>((_, reject) =>
-              setTimeout(() => reject(new Error("Research timeout")), 15000)
+            // Use safe research fetch with retry and timeout fallback
+            const researchData = await fetchResearchWithRetry(
+              state.description,
+              state.vehicle!,
+              undefined // No abort signal needed here
             );
-
-            const researchRes = await Promise.race([researchPromise, timeoutPromise]);
 
             if (cancelled) {
               isResearchFetchingRef.current = false;
               return;
             }
 
-            if (!researchRes.ok) {
-              researchRef.current = {
-                top_causes: [],
-                differentiating_factors: [],
-              };
-            } else {
-              const researchData = await researchRes.json();
-              researchRef.current = {
-                top_causes: Array.isArray(researchData.top_causes)
-                  ? researchData.top_causes
-                  : [],
-                differentiating_factors: Array.isArray(researchData.differentiating_factors)
-                  ? researchData.differentiating_factors
-                  : [],
-                summary: typeof researchData.summary === "string" ? researchData.summary : undefined,
-                raw: typeof researchData.raw === "string" ? researchData.raw : undefined,
-              };
-            }
+            researchRef.current = researchData;
           } catch (err) {
             if (!cancelled) {
               console.error("Error during research phase:", err);
               // Always set fallback research data to continue flow
-              researchRef.current = {
-                top_causes: [],
-                differentiating_factors: [],
-              };
+              researchRef.current = createSafeResearchFallback();
             }
           } finally {
             isResearchFetchingRef.current = false;
@@ -357,15 +463,25 @@ export default function QuestionsPage() {
           isRestoringFromSession: initializedFromSessionRef.current,
         });
         
-        // Add timeout to questions fetch (20 seconds max)
+        // Fetch questions with safe timeout fallback
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         });
 
-        const timeoutPromise = new Promise<Response>((_, reject) =>
-          setTimeout(() => reject(new Error("Questions API timeout")), 20000)
+        const questionsFallback = new Response(
+          JSON.stringify({
+            should_finish: false,
+            next_question: "האם יש תסמינים נוספים?",
+            options: ["כן", "לא"],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+
+        const timeoutPromise = createSafeTimeoutPromise<Response>(
+          QUESTIONS_TIMEOUT_MS,
+          questionsFallback
         );
 
         const response = await Promise.race([questionsPromise, timeoutPromise]);
@@ -410,8 +526,18 @@ export default function QuestionsPage() {
             dispatch.finish(diagnosis);
             storeDiagnosis(diagnosis, data);
           } else {
-            // Fallback if parsing fails
-            dispatch.error("לא התקבל אבחון");
+            // Fallback if parsing fails - use safe fallback diagnosis instead of error
+            console.warn("[Questions Page] Failed to parse diagnosis, using fallback");
+            const fallbackDiagnosis: DiagnosisData = {
+              diagnosis: ["לא ניתן לקבוע אבחון מדויק. מומלץ לבצע בדיקה מקצועית במוסך."],
+              self_checks: ["בדוק אם הבעיה מתרחשת רק בתנאים ספציפיים"],
+              warnings: ["אם יש רעש חריג, עצור נסיעה מיידית"],
+              disclaimer: "מידע זה הוא הערכה ראשונית בלבד ואינו מהווה תחליף לבדיקה מקצועית במוסך.",
+              safety_notice: null,
+              recommendations: ["קבע תור לבדיקה במוסך מוסמך"],
+            };
+            dispatch.finish(fallbackDiagnosis);
+            storeDiagnosis(fallbackDiagnosis, data);
           }
         } else {
           // Parse and dispatch question
@@ -422,9 +548,10 @@ export default function QuestionsPage() {
             // If parsing fails, use a fallback question instead of error
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
+              question: "האם יש תסמינים נוספים?",
               type: "yesno",
-              text: "האם יש תסמינים נוספים?",
               options: ["כן", "לא"],
+              shouldStop: false,
             };
             dispatch.nextQuestion(fallbackQuestion);
           }
@@ -438,9 +565,10 @@ export default function QuestionsPage() {
         console.error("Error fetching first question:", err);
         // Instead of showing error, show a fallback question to keep flow going
         const fallbackQuestion: AIQuestion = {
+          question: "האם יש תסמינים נוספים?",
           type: "yesno",
-          text: "האם יש תסמינים נוספים?",
           options: ["כן", "לא"],
+          shouldStop: false,
         };
         dispatch.nextQuestion(fallbackQuestion);
       } finally {
@@ -477,7 +605,7 @@ export default function QuestionsPage() {
       isProcessingRef.current = true;
       
       // Dispatch answer action (this adds user message)
-      dispatch.answer(answerText, currentQuestion.text);
+      dispatch.answer(answerText, currentQuestion.question);
       dispatch.processing();
       setIsTyping(true);
 
@@ -486,45 +614,17 @@ export default function QuestionsPage() {
         if (!researchRef.current && !isResearchFetchingRef.current) {
           isResearchFetchingRef.current = true;
           try {
-            // Add timeout to research fetch (15 seconds max)
-            const researchPromise = fetch("/api/ai/research", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                description: state.description,
-                vehicle: state.vehicle!,
-              }),
-            });
-
-            const timeoutPromise = new Promise<Response>((_, reject) =>
-              setTimeout(() => reject(new Error("Research timeout")), 15000)
+            // Use safe research fetch with retry and timeout fallback
+            const researchData = await fetchResearchWithRetry(
+              state.description,
+              state.vehicle!,
+              undefined // No abort signal needed here
             );
-
-            const researchRes = await Promise.race([researchPromise, timeoutPromise]);
-
-            if (!researchRes.ok) {
-              researchRef.current = {
-                top_causes: [],
-                differentiating_factors: [],
-              };
-            } else {
-              const researchData = await researchRes.json();
-              researchRef.current = {
-                top_causes: Array.isArray(researchData.top_causes) ? researchData.top_causes : [],
-                differentiating_factors: Array.isArray(researchData.differentiating_factors)
-                  ? researchData.differentiating_factors
-                  : [],
-                summary: typeof researchData.summary === "string" ? researchData.summary : undefined,
-                raw: typeof researchData.raw === "string" ? researchData.raw : undefined,
-              };
-            }
+            researchRef.current = researchData;
           } catch (err) {
             console.error("Error during research phase:", err);
             // Always set fallback research data to continue flow
-            researchRef.current = {
-              top_causes: [],
-              differentiating_factors: [],
-            };
+            researchRef.current = createSafeResearchFallback();
           } finally {
             isResearchFetchingRef.current = false;
           }
@@ -533,14 +633,13 @@ export default function QuestionsPage() {
         // Build new answers array with current answer
         const newAnswers = [
           ...state.answers,
-          { question: currentQuestion.text, answer: answerText },
+          { question: currentQuestion.question, answer: answerText },
         ];
 
         // Save to session
         saveSessionState(state.vehicle, state.description, researchRef.current, newAnswers);
 
-        // Fetch next question or diagnosis
-        // Add timeout to questions fetch (20 seconds max)
+        // Fetch next question or diagnosis with safe timeout fallback
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -552,8 +651,18 @@ export default function QuestionsPage() {
           }),
         });
 
-        const timeoutPromise = new Promise<Response>((_, reject) =>
-          setTimeout(() => reject(new Error("Questions API timeout")), 20000)
+        const questionsFallback = new Response(
+          JSON.stringify({
+            should_finish: false,
+            next_question: "האם יש תסמינים נוספים?",
+            options: ["כן", "לא"],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+
+        const timeoutPromise = createSafeTimeoutPromise<Response>(
+          QUESTIONS_TIMEOUT_MS,
+          questionsFallback
         );
 
         const response = await Promise.race([questionsPromise, timeoutPromise]);
@@ -603,9 +712,10 @@ export default function QuestionsPage() {
             // If parsing fails, use a fallback question instead of error
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
+              question: "האם יש תסמינים נוספים?",
               type: "yesno",
-              text: "האם יש תסמינים נוספים?",
               options: ["כן", "לא"],
+              shouldStop: false,
             };
             dispatch.nextQuestion(fallbackQuestion);
           }
@@ -615,9 +725,10 @@ export default function QuestionsPage() {
         console.error("Error getting next question:", err);
         // Instead of showing error, show a fallback question to keep flow going
         const fallbackQuestion: AIQuestion = {
+          question: "האם יש תסמינים נוספים?",
           type: "yesno",
-          text: "האם יש תסמינים נוספים?",
           options: ["כן", "לא"],
+          shouldStop: false,
         };
         dispatch.nextQuestion(fallbackQuestion);
       } finally {
@@ -703,7 +814,7 @@ export default function QuestionsPage() {
                 }
 
                 // Check if this is the current question
-                const isCurrentQuestion = currentQuestion && msg.text === currentQuestion.text && isLastMessage;
+                const isCurrentQuestion = currentQuestion && msg.text === currentQuestion.question && isLastMessage;
 
                 return (
                   <React.Fragment key={messageKey}>
@@ -735,15 +846,22 @@ export default function QuestionsPage() {
                           transition={{ delay: 0.3 }}
                           className="mb-6"
                         >
-                          <MultiChoiceButtons
-                            options={
-                              currentQuestion.options && currentQuestion.options.length > 0
-                                ? currentQuestion.options.slice(0, 5)
-                                : ["כן", "לא"]
-                            }
-                            onSelect={(option) => handleAnswer(option)}
-                            disabled={isTyping || isProcessingRef.current}
-                          />
+                          {currentQuestion.type === "yesno" ? (
+                            <YesNoButtons
+                              onAnswer={(answer) => handleAnswer(answer)}
+                              disabled={isTyping || isProcessingRef.current}
+                            />
+                          ) : (
+                            <MultiChoiceButtons
+                              options={
+                                currentQuestion.options && currentQuestion.options.length > 0
+                                  ? currentQuestion.options.slice(0, 5)
+                                  : ["כן", "לא"]
+                              }
+                              onSelect={(option) => handleAnswer(option)}
+                              disabled={isTyping || isProcessingRef.current}
+                            />
+                          )}
                         </motion.div>
                       )}
                   </React.Fragment>

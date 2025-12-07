@@ -63,7 +63,7 @@ export function aiStateReducer(state: AIState, action: AIAction): AIState {
       const newMessage = {
         id: generateMessageId(),
         sender: "ai" as const,
-        text: question.text,
+        text: question.question,
         timestamp: Date.now(),
       };
 

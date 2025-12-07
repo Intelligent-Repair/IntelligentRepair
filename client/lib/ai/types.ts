@@ -43,10 +43,13 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type AIQuestionType = "yesno" | "multi";
+
 export interface AIQuestion {
-  type: "yesno" | "multi";
-  text: string;
-  options?: string[];
+  question: string;
+  type: AIQuestionType;
+  options: string[];
+  shouldStop?: boolean;
 }
 
 /**
