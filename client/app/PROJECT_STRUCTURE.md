@@ -137,12 +137,9 @@ client/
 #### 📁 garage/settings/ - Garage Settings
 - **`page.tsx`** - Garage settings page
 
-#### 📁 garage/chat/ - Garage Chat
-- **`[request_id]/page.tsx`** - Individual chat conversation for garage
-
-#### 📁 garage/chats/ - Chat List
+#### 📁 garage/chats/ - Garage Chat
 - **`page.tsx`** - List of all garage chats
-- **`[request_id]/page.tsx`** - Individual chat page
+- **`[request_id]/page.tsx`** - Individual chat conversation for garage
 
 - **`page.tsx`** - Garage landing page
 
