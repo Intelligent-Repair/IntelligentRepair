@@ -27,8 +27,10 @@ interface RequestBody {
 
 interface QuestionResponse {
   should_finish: false;
-  next_question: string;
-  options?: string[];
+  question: string;
+  type: "yesno" | "multi";
+  options: string[];
+  shouldStop: boolean;
 }
 
 interface DiagnosisResponse {
@@ -125,24 +127,35 @@ Return JSON:
     "disclaimer": "..."
   }
 }`
-    : `Ask ONE more diagnostic question to narrow down the issue:
-- Question must be SHORT and CLEAR
-- Question can be yes/no (options: ["כן", "לא"]) OR multi-choice with 3-5 options
-- For multi-choice, provide specific options that help differentiate between causes
-- Question should help differentiate between potential causes
+    : `Ask ONE more diagnostic question to narrow down the issue.
+
+You may generate either:
+- a yes/no question (2 options: ["כן", "לא"]), OR
+- a multi-choice question (3-5 options)
+
+Choose whichever format produces the most diagnostically meaningful next step.
+If the distinction requires nuance, use 3-5 multiple-choice options.
+If the distinction is binary, use yes/no.
+
+Question must be SHORT and CLEAR.
+Question should help differentiate between potential causes.
 
 Return JSON:
 {
-  "next_question": "Question text",
-  "options": ["כן", "לא"] OR ["option1", "option2", "option3", ...]
+  "question": "Question text",
+  "type": "yesno" or "multi",
+  "options": ["כן", "לא"] for yesno OR ["option1", "option2", "option3", ...] for multi (3-5 options),
+  "shouldStop": false or true
 }`}`;
 }
 
 function createFallbackQuestion(): QuestionResponse {
   return {
     should_finish: false,
-    next_question: "האם הבעיה מתרחשת רק בזמן נסיעה?",
+    question: "האם הבעיה מתרחשת רק בזמן נסיעה?",
+    type: "yesno",
     options: ["כן", "לא"],
+    shouldStop: false,
   };
 }
 
@@ -224,19 +237,34 @@ export async function POST(req: Request) {
       researchHasData: !!(research.top_causes?.length || research.differentiating_factors?.length)
     });
     
+    // Retry logic: 2 attempts
     let raw: string;
-    try {
-      const result = await model.generateContent(prompt);
-      raw = result.response.text();
-      
-      console.log("[Questions API] Raw response length:", raw?.length || 0);
-      console.log("[Questions API] Raw response preview:", raw?.substring(0, 200) || "No response");
-    } catch (geminiError: any) {
-      console.error("[Questions API] Gemini API call failed:", geminiError);
-      console.error("[Questions API] Gemini error message:", geminiError?.message);
-      // Use fallback on Gemini API failure
-      const fallback = shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion();
-      return NextResponse.json(fallback, { status: 200 });
+    let lastError: any = null;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        raw = result.response.text();
+        
+        console.log("[Questions API] Raw response length:", raw?.length || 0);
+        console.log("[Questions API] Raw response preview:", raw?.substring(0, 200) || "No response");
+        break; // Success, exit retry loop
+      } catch (geminiError: any) {
+        lastError = geminiError;
+        console.error(`[Questions API] Gemini API call failed (attempt ${attempt}/${maxRetries}):`, geminiError);
+        console.error("[Questions API] Gemini error message:", geminiError?.message);
+        
+        if (attempt === maxRetries) {
+          // Final attempt failed, use fallback
+          console.error("[Questions API] All retry attempts failed, using fallback");
+          const fallback = shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion();
+          return NextResponse.json(fallback, { status: 200 });
+        }
+        
+        // Wait before retry (exponential backoff: 500ms, 1000ms)
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+      }
     }
     
     const extracted = extractJSON(raw);
@@ -275,15 +303,72 @@ export async function POST(req: Request) {
       return NextResponse.json(diagnosis);
     }
 
+    // Extract question text (support both "question" and "next_question" for backward compatibility)
+    const questionText = extracted?.question || extracted?.next_question;
+    const extractedType = extracted?.type;
+    const extractedOptions = extracted?.options;
+    const extractedShouldStop = extracted?.shouldStop;
+
+    // Determine question type and validate options
+    let questionType: "yesno" | "multi" = "yesno";
+    let options: string[] = ["כן", "לא"];
+
+    if (extractedType === "multi" || (Array.isArray(extractedOptions) && extractedOptions.length >= 3 && extractedOptions.length <= 5)) {
+      questionType = "multi";
+      if (Array.isArray(extractedOptions) && extractedOptions.length >= 3 && extractedOptions.length <= 5) {
+        options = extractedOptions.filter((o: any) => typeof o === "string").slice(0, 5);
+      } else {
+        // Invalid multi-choice options, fallback to yes/no
+        questionType = "yesno";
+        options = ["כן", "לא"];
+      }
+    } else if (extractedType === "yesno" || (Array.isArray(extractedOptions) && extractedOptions.length === 2)) {
+      questionType = "yesno";
+      if (Array.isArray(extractedOptions) && extractedOptions.length === 2) {
+        // Use provided options but ensure they're valid strings
+        const validOptions = extractedOptions.filter((o: any) => typeof o === "string");
+        if (validOptions.length === 2) {
+          options = validOptions;
+        } else {
+          options = ["כן", "לא"];
+        }
+      } else {
+        options = ["כן", "לא"];
+      }
+    } else if (Array.isArray(extractedOptions)) {
+      // Infer type from options length
+      const validOptions = extractedOptions.filter((o: any) => typeof o === "string");
+      if (validOptions.length === 2) {
+        questionType = "yesno";
+        options = validOptions;
+      } else if (validOptions.length >= 3 && validOptions.length <= 5) {
+        questionType = "multi";
+        options = validOptions.slice(0, 5);
+      } else {
+        // Invalid length, default to yes/no
+        questionType = "yesno";
+        options = ["כן", "לא"];
+      }
+    }
+
+    // Validate options length
+    if (questionType === "yesno" && options.length !== 2) {
+      console.warn("[Questions API] Invalid yes/no options length, using default");
+      options = ["כן", "לא"];
+    } else if (questionType === "multi" && (options.length < 3 || options.length > 5)) {
+      console.warn("[Questions API] Invalid multi-choice options length, using fallback");
+      questionType = "yesno";
+      options = ["כן", "לא"];
+    }
+
     const question: QuestionResponse = {
       should_finish: false,
-      next_question:
-        typeof extracted?.next_question === "string" && extracted.next_question.trim()
-          ? extracted.next_question
-          : "האם יש תסמינים נוספים?",
-      options: Array.isArray(extracted?.options) && extracted.options.length > 0
-        ? extracted.options.filter((o: any) => typeof o === "string").slice(0, 5)
-        : ["כן", "לא"],
+      question: typeof questionText === "string" && questionText.trim()
+        ? questionText
+        : "האם יש תסמינים נוספים?",
+      type: questionType,
+      options: options,
+      shouldStop: typeof extractedShouldStop === "boolean" ? extractedShouldStop : false,
     };
 
     return NextResponse.json(question);
