@@ -28,6 +28,20 @@ export interface DiagnosisData {
   recommendations?: string[] | null;
 }
 
+/**
+ * Structured diagnosis result with probabilities and optional guidance
+ * (used for ranked final diagnoses).
+ */
+export interface DiagnosisResult {
+  issue: string;
+  probability: number; // keep existing scale (0–1 or 0–100 depending on usage)
+  explanation?: string;
+
+  // Only expected to be populated for the top (most probable) diagnosis
+  self_checks?: string[]; // simple actions user can safely perform
+  do_not?: string[]; // safety warnings / when NOT to continue
+}
+
 export interface AIQuestionResponse {
   should_finish: boolean;
   confidence: number;
@@ -39,7 +53,8 @@ export interface AIQuestionResponse {
 export interface ChatMessage {
   id: string;
   sender: "ai" | "user";
-  text: string;
+  text?: string;
+  images?: string[];
   timestamp: number;
 }
 
@@ -85,5 +100,6 @@ export type AIAction =
   | { type: "PROCESSING" }
   | { type: "FINISH"; payload: DiagnosisData }
   | { type: "ERROR"; payload: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } };
 

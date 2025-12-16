@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import ImageUploader from "./ImageUploader";
 
 interface Vehicle {
   id: string;
@@ -16,11 +17,56 @@ export default function ConsultFormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const vehicleId = searchParams.get("vehicle");
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+
+  // CRITICAL: Reset all draft-related state on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    // Clear description state
+    setDescription("");
+    
+    // Clear images state
+    setImageUrls([]);
+    window.sessionStorage.removeItem("draft_images");
+    
+    console.log("[DRAFT] form state reset - description and images cleared");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem("draft_images", JSON.stringify(imageUrls));
+  }, [imageUrls]);
+
+  // CRITICAL: ALWAYS generate a new draft_id on mount
+  // Remove any "if exists, reuse" logic - every consultation must start fresh
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Clear all draft-related state to ensure fresh start
+    window.sessionStorage.removeItem("draft_description");
+    window.sessionStorage.removeItem("consult_questions_state");
+    
+    // ALWAYS generate a new UUID - never reuse existing
+    const generateId = () => {
+      if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+        return crypto.randomUUID();
+      }
+      return `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    };
+
+    const newId = generateId();
+      window.sessionStorage.setItem("draft_id", newId);
+    setDraftId(newId);
+    console.log("[DRAFT] new draft created in form:", newId);
+  }, []);
 
   // טענת פרטי רכב
   useEffect(() => {
@@ -50,15 +96,55 @@ export default function ConsultFormPage() {
     fetchVehicle();
   }, [vehicleId]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!vehicleId) return;
     if (!description.trim()) {
       setError("אנא תאר את התקלה לפני המשך");
       return;
     }
+    if (!draftId) {
+      setError("חסר מזהה טיוטה. טען מחדש ונסה שוב.");
+      return;
+    }
+    if (!vehicle) {
+      setError("שגיאה בטעינת פרטי רכב. נסה שוב.");
+      return;
+    }
 
-    // ❗❗ פה *לא* קוראים ל־/api/ai/questions
-    // רק מעבירים ל/questions את הרכב + התיאור
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const aiPayload = {
+        request_id: draftId,
+        vehicle: {
+          manufacturer: vehicle.manufacturer,
+          model: vehicle.model,
+          year: vehicle.year,
+        },
+        description: description.trim(),
+        images: imageUrls
+          .filter((url) => typeof url === "string" && url.trim().length > 0)
+          .map((url) => ({ url })),
+        answers: [],
+      };
+
+      const aiResponse = await fetch("/api/ai/consult", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(aiPayload),
+      });
+
+      if (!aiResponse.ok) {
+        throw new Error(`AI consult failed with status ${aiResponse.status}`);
+      }
+    } catch (err) {
+      console.error("Error triggering AI consultation:", err);
+      setError("שגיאה בהפעלת יעוץ AI. נסה שוב.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const encodedDescription = encodeURIComponent(description.trim());
     router.push(
       `/user/consult/questions?vehicle=${vehicleId}&description=${encodedDescription}`
@@ -157,7 +243,9 @@ export default function ConsultFormPage() {
             />
           </div>
 
-          {/* (העלאת תמונות אפשר להשאיר placeholder בשלב הזה) */}
+          <div className="mb-8">
+            <ImageUploader requestId={draftId} onImagesChange={setImageUrls} />
+          </div>
 
           {error && (
             <div className="text-red-400 mb-4 text-sm">{error}</div>
@@ -167,9 +255,10 @@ export default function ConsultFormPage() {
             onClick={handleContinue}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full p-6 bg-gradient-to-r from-[#4A90E2] to-[#5c60ff] hover:from-[#5a9ef0] hover:to-[#6c70ff] text-white font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-[#4A90E2]/30 hover:shadow-xl hover:shadow-[#4A90E2]/50 text-lg"
+            disabled={isSubmitting}
+            className="w-full p-6 bg-gradient-to-r from-[#4A90E2] to-[#5c60ff] hover:from-[#5a9ef0] hover:to-[#6c70ff] text-white font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-[#4A90E2]/30 hover:shadow-xl hover:shadow-[#4A90E2]/50 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            המשך לשאלות אבחון (AI)
+            {isSubmitting ? "מתחיל ייעוץ AI..." : "המשך לשאלות אבחון (AI)"}
           </motion.button>
         </motion.div>
       </div>
