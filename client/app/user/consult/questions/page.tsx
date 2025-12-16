@@ -6,12 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatBubble from "./components/ChatBubble";
 import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
-import YesNoButtons from "./components/YesNoButtons";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
 import { useAIStateMachine } from "./hooks/useAIStateMachine";
-import type { AIQuestion, DiagnosisData, VehicleInfo } from "@/lib/ai/types";
-import type { AIQuestionResponse } from "@/lib/ai/types";
-import { withRetry } from "@/lib/ai/retry";
+import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
+import { withRetry } from "../../../../lib/ai/retry";
+import { supabase } from "@/lib/supabaseClient";
 
 interface Vehicle {
   id: string;
@@ -21,8 +20,8 @@ interface Vehicle {
   license_plate: string;
 }
 
-const MAX_QUESTIONS = 5;
 const SESSION_STORAGE_KEY = "consult_questions_state";
+const DRAFT_IMAGES_KEY = "draft_images";
 const RESEARCH_TIMEOUT_MS = 35000; // 35 seconds (within 30-45 range)
 const QUESTIONS_TIMEOUT_MS = 30000; // 30 seconds for questions API
 
@@ -146,48 +145,24 @@ async function fetchResearchWithRetry(
  * Convert API response to AIQuestion
  */
 function parseQuestion(data: any): AIQuestion | null {
-  // Check if this is a diagnosis response
-  if (data.should_finish === true || data.final_diagnosis) {
+  if (data.type !== "question") {
     return null;
   }
 
-  // Support both "question" and "next_question" for backward compatibility
-  const questionText = data.question || data.next_question;
+  const questionText = data.question || data.next_question || data.text;
   if (!questionText || typeof questionText !== "string") {
     return null;
   }
 
-  // Determine type from API response or infer from options
-  let questionType: "yesno" | "multi" = "yesno";
-  let options: string[] = ["כן", "לא"];
-
-  if (data.type === "multi" || data.type === "yesno") {
-    questionType = data.type;
-  } else if (data.options && Array.isArray(data.options)) {
-    // Infer type from options length
-    if (data.options.length >= 3 && data.options.length <= 5) {
-      questionType = "multi";
-    } else if (data.options.length === 2) {
-      questionType = "yesno";
-    }
-  }
-
-  // Set options based on type
-  if (data.options && Array.isArray(data.options) && data.options.length > 0) {
-    const validOptions = data.options.filter((o: any) => typeof o === "string");
-    if (questionType === "yesno" && validOptions.length === 2) {
-      options = validOptions;
-    } else if (questionType === "multi" && validOptions.length >= 3 && validOptions.length <= 5) {
-      options = validOptions.slice(0, 5);
-    } else if (questionType === "yesno") {
-      options = ["כן", "לא"];
-    }
-  }
+  const options = Array.isArray(data.options)
+    ? data.options.filter((o: any) => typeof o === "string").slice(0, 5)
+    : [];
+  const safeOptions = options.length >= 3 ? options : ["כן", "לא", "לא בטוח"];
 
   return {
     question: questionText,
-    type: questionType,
-    options: options,
+    type: "multi",
+    options: safeOptions,
     shouldStop: typeof data.shouldStop === "boolean" ? data.shouldStop : false,
   };
 }
@@ -196,10 +171,25 @@ function parseQuestion(data: any): AIQuestion | null {
  * Convert API response to DiagnosisData
  */
 function parseDiagnosis(data: any): DiagnosisData | null {
-  if (data.should_finish !== true && !data.final_diagnosis) return null;
+  // New schema: direct diagnosis from /api/ai/questions
+  if (
+    data &&
+    data.type === "diagnosis" &&
+    typeof data.summary === "string" &&
+    Array.isArray(data.results)
+  ) {
+    return {
+      // These fields are used by the UI via FinalDiagnosisCard
+      // and may not exist on the legacy DiagnosisData type,
+      // so we allow them through as-is.
+      ...(data as any),
+    } as any;
+  }
+
+  if (data.type !== "diagnosis" && !data.final_diagnosis && data.should_finish !== true) return null;
 
   // Handle fallback diagnosis structure (when API returns fallback)
-  if (!data.final_diagnosis && data.should_finish) {
+  if (!data.final_diagnosis && (data.should_finish || data.type === "diagnosis")) {
     // This is a fallback diagnosis from the API
     return {
       diagnosis: ["לא ניתן לקבוע אבחון מדויק. מומלץ לבצע בדיקה מקצועית במוסך."],
@@ -210,6 +200,21 @@ function parseDiagnosis(data: any): DiagnosisData | null {
       recommendations: Array.isArray(data.recommendations) && data.recommendations.length > 0 
         ? data.recommendations 
         : ["קבע תור לבדיקה במוסך מוסמך"],
+    };
+  }
+
+  if (!data.final_diagnosis && data.type === "diagnosis" && data.diagnosis) {
+    const diag = data.diagnosis;
+    return {
+      diagnosis: Array.isArray(diag.diagnosis) ? diag.diagnosis : [],
+      self_checks: Array.isArray(diag.self_checks) ? diag.self_checks : [],
+      warnings: Array.isArray(diag.warnings) ? diag.warnings : [],
+      disclaimer:
+        typeof diag.disclaimer === "string"
+          ? diag.disclaimer
+          : "אבחון זה הוא הערכה בלבד ואינו מהווה תחליף לבדיקה מקצועית במוסך.",
+      safety_notice: typeof diag.safety_notice === "string" ? diag.safety_notice : null,
+      recommendations: Array.isArray(diag.recommendations) ? diag.recommendations : null,
     };
   }
 
@@ -299,12 +304,108 @@ export default function QuestionsPage() {
   // Local UI state
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [draftImagesLoaded, setDraftImagesLoaded] = useState(false);
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const researchRef = useRef<ResearchPayload | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
   const hasInitializedRef = useRef(false);
   const initializedFromSessionRef = useRef(false);
   const isResearchFetchingRef = useRef(false);
+  const draftImagesRef = useRef<string[]>([]);
+  const hasPushedDraftMessageRef = useRef(false);
+  const previousDraftIdRef = useRef<string | null>(null);
+  const initialQuestionsRequestedRef = useRef(false);
+  const finalizedRequestIdRef = useRef<string | null>(null);
+
+  // Load draft images FIRST before any reset
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.sessionStorage.getItem(DRAFT_IMAGES_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          draftImagesRef.current = parsed
+            .filter((url: unknown): url is string => typeof url === "string" && url.trim().length > 0)
+            .slice(0, 3);
+        }
+      }
+      setDraftImagesLoaded(true);
+    } catch (err) {
+      console.error("[Questions Page] Failed to load draft images:", err);
+      setDraftImagesLoaded(true);
+    }
+  }, []);
+
+  // Reset draft/session state on fresh entry to avoid stale consultations
+  // NOTE: This runs AFTER draft images are loaded, and does NOT clear draft_images
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      window.sessionStorage.removeItem("consult_diagnosis");
+      researchRef.current = null;
+      hasInitializedRef.current = false;
+      initializedFromSessionRef.current = false;
+      hasPushedDraftMessageRef.current = false;
+      // NOTE: We do NOT clear draft_images here - they are loaded in the previous effect
+    } catch (err) {
+      console.error("[Questions Page] Failed to reset draft/session state:", err);
+    }
+  }, []);
+
+  // CRITICAL: Watch for draft_id changes and clear session state when it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkDraftId = () => {
+      const currentDraftId = window.sessionStorage.getItem("draft_id");
+      
+      // If draft_id changed, clear all session state
+      if (previousDraftIdRef.current !== null && previousDraftIdRef.current !== currentDraftId) {
+        console.log(
+          "[Questions Page] Draft ID changed:",
+          previousDraftIdRef.current,
+          "->",
+          currentDraftId,
+          "- Clearing session state"
+        );
+        // Clear all session state
+        window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        window.sessionStorage.removeItem("draft_images");
+        window.sessionStorage.removeItem("consult_diagnosis");
+        // Reset refs
+        researchRef.current = null;
+        hasInitializedRef.current = false;
+        initializedFromSessionRef.current = false;
+        hasPushedDraftMessageRef.current = false;
+        draftImagesRef.current = [];
+      }
+      
+      previousDraftIdRef.current = currentDraftId;
+    };
+
+    // Check immediately
+    checkDraftId();
+
+    // Set up interval to check for changes
+    const intervalId = setInterval(checkDraftId, 500);
+
+    // Listen to storage events
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "draft_id") {
+        checkDraftId();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -336,6 +437,25 @@ export default function QuestionsPage() {
 
     fetchVehicle();
   }, [vehicleId, vehicle]);
+
+  // Fetch user
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+
+        if (authUser) {
+          setUser({ id: authUser.id });
+        }
+      } catch (err) {
+        console.error("Error getting user:", err);
+      }
+    };
+
+    getUser();
+  }, []);
 
   // Initialize state machine and load from session
   useEffect(() => {
@@ -375,12 +495,33 @@ export default function QuestionsPage() {
     }
   }, [vehicle, description, state.status, state.vehicle]);
 
+  useEffect(() => {
+    if (hasPushedDraftMessageRef.current) return;
+    if (!state.description) return;
+
+    const userImages = draftImagesRef.current;
+    const userText = state.description.trim();
+
+    if (!userText && userImages.length === 0) return;
+
+    dispatch.addMessage({
+      sender: "user",
+      text: userText,
+      images: userImages,
+    });
+
+    hasPushedDraftMessageRef.current = true;
+  }, [state.description, dispatch]);
+
   // Fetch first/next question when initialized
   useEffect(() => {
     // Skip if we don't have the required data
     if (!state.vehicle || !state.description) return;
-    // Skip if already processing
-    if (isProcessingRef.current) return;
+    // Wait until draft images are loaded from sessionStorage (even if empty)
+    if (!draftImagesLoaded) return;
+    // Ensure we only trigger the initial questions request once
+    if (initialQuestionsRequestedRef.current) return;
+    initialQuestionsRequestedRef.current = true;
     // Skip if we already have a current question (waiting for answer)
     if (state.currentQuestion) return;
     // Skip if already finished
@@ -393,10 +534,16 @@ export default function QuestionsPage() {
     const sessionState = initializedFromSessionRef.current ? loadSessionState() : null;
     const answersToUse = sessionState?.answers || [];
     
-    // If we have 5+ answers, we should show diagnosis, not fetch another question
-    if (answersToUse.length >= MAX_QUESTIONS) {
-      // This shouldn't happen if session is valid, but handle it
-      return;
+    // Log draft consultation payload for diagnose endpoint
+    const draftId = typeof window !== "undefined" ? window.sessionStorage.getItem("draft_id") : null;
+    const userImages = draftImagesRef.current;
+    const hasImages = userImages && userImages.length > 0;
+    
+    if (hasImages) {
+      console.log("[DIAGNOSE] draft_id:", draftId);
+      console.log("[DIAGNOSE] description:", state.description);
+      console.log("[DIAGNOSE] image_urls:", userImages, "count=", userImages?.length);
+      console.log("[DIAGNOSE] vehicle:", state.vehicle);
     }
 
     let cancelled = false;
@@ -447,13 +594,36 @@ export default function QuestionsPage() {
         // Save research to session (with current answers)
         saveSessionState(state.vehicle, state.description, researchRef.current, answersToUse);
 
+        const descLen = state.description ? state.description.length : 0;
+        console.log("[QuestionsPage] fetchFirstQuestion start", {
+          descLen,
+          images: draftImagesRef.current.length,
+        });
+
         // Phase 2: questions
+        // Ensure images are sent as array of URLs (max 3)
+        const imageUrls = Array.isArray(draftImagesRef.current) 
+          ? draftImagesRef.current.slice(0, 3).filter(url => typeof url === "string" && url.trim().length > 0)
+          : [];
+        
         const requestBody = {
           research: researchRef.current || { top_causes: [], differentiating_factors: [] },
           description: state.description,
           vehicle: state.vehicle!,
           answers: answersToUse,
+          image_urls: imageUrls,
         };
+        
+        console.log("[QuestionsPage] /api/ai/questions payload", { 
+          imageCount: imageUrls.length, 
+          images: imageUrls 
+        });
+        
+        console.log("START QUESTIONS PAYLOAD", {
+          vehicle: state.vehicle,
+          description: state.description,
+          image_urls: imageUrls,
+        });
         
         console.log("[Questions Page] Calling /api/ai/questions with:", {
           descriptionLength: state.description?.length,
@@ -463,28 +633,29 @@ export default function QuestionsPage() {
           isRestoringFromSession: initializedFromSessionRef.current,
         });
         
-        // Fetch questions with safe timeout fallback
+        // Fetch questions and surface a friendly notice if it takes too long
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         });
 
-        const questionsFallback = new Response(
-          JSON.stringify({
-            should_finish: false,
-            next_question: "האם יש תסמינים נוספים?",
-            options: ["כן", "לא"],
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
+        const timeoutId = window.setTimeout(() => {
+          if (cancelled) return;
+          // Stop typing indicator and inform the user while keeping the request alive
+          setIsTyping(false);
+          dispatch.addMessage({
+            sender: "ai",
+            text: "הבדיקה לוקחת יותר זמן מהרגיל, ממשיך לנתח…",
+          });
+        }, QUESTIONS_TIMEOUT_MS);
 
-        const timeoutPromise = createSafeTimeoutPromise<Response>(
-          QUESTIONS_TIMEOUT_MS,
-          questionsFallback
-        );
-
-        const response = await Promise.race([questionsPromise, timeoutPromise]);
+        let response: Response;
+        try {
+          response = await questionsPromise;
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (cancelled) {
           setIsTyping(false);
@@ -510,17 +681,21 @@ export default function QuestionsPage() {
           return;
         }
 
+        console.log("[QuestionsPage] fetchFirstQuestion done", {
+          type: data.type,
+          hasOptions: !!data.options,
+        });
+
         console.log("[Questions Page] Received response:", {
-          should_finish: data.should_finish,
-          has_next_question: !!data.next_question,
+          type: data.type,
+          has_next_question: !!data.next_question || !!data.question,
           has_final_diagnosis: !!data.final_diagnosis,
           options: data.options,
         });
 
         setIsTyping(false);
 
-        // Check for final diagnosis first (including fallback)
-        if (data.should_finish) {
+        if (data.type === "diagnosis" || data.should_finish) {
           const diagnosis = parseDiagnosis(data);
           if (diagnosis) {
             dispatch.finish(diagnosis);
@@ -549,8 +724,8 @@ export default function QuestionsPage() {
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
               question: "האם יש תסמינים נוספים?",
-              type: "yesno",
-              options: ["כן", "לא"],
+              type: "multi",
+              options: ["כן", "לא", "לא בטוח"],
               shouldStop: false,
             };
             dispatch.nextQuestion(fallbackQuestion);
@@ -566,8 +741,8 @@ export default function QuestionsPage() {
         // Instead of showing error, show a fallback question to keep flow going
         const fallbackQuestion: AIQuestion = {
           question: "האם יש תסמינים נוספים?",
-          type: "yesno",
-          options: ["כן", "לא"],
+          type: "multi",
+          options: ["כן", "לא", "לא בטוח"],
           shouldStop: false,
         };
         dispatch.nextQuestion(fallbackQuestion);
@@ -576,7 +751,6 @@ export default function QuestionsPage() {
         isProcessingRef.current = false;
       }
     };
-
     fetchFirstQuestion();
 
     return () => {
@@ -584,22 +758,22 @@ export default function QuestionsPage() {
       isProcessingRef.current = false;
       isResearchFetchingRef.current = false;
     };
-  }, [state.status, state.vehicle, state.description, state.messages.length]);
+  }, [state.vehicle, state.description, draftImagesLoaded]);
 
   // Handle answer submission
   const handleAnswer = useCallback(
-    async (answer: boolean | string) => {
+    async (answer: string) => {
       // Prevent duplicate submissions
-      if (isProcessingRef.current || isTyping || !helpers.canAnswer(state)) {
+      if (helpers.isFinished(state) || isProcessingRef.current || isTyping || !helpers.canAnswer(state)) {
         return;
       }
 
       const currentQuestion = state.currentQuestion;
-      if (!currentQuestion || state.answers.length >= MAX_QUESTIONS) {
+      if (!currentQuestion) {
         return;
       }
 
-      const answerText = typeof answer === "boolean" ? (answer ? "כן" : "לא") : answer;
+      const answerText = answer;
 
       // Mark as processing immediately
       isProcessingRef.current = true;
@@ -639,7 +813,17 @@ export default function QuestionsPage() {
         // Save to session
         saveSessionState(state.vehicle, state.description, researchRef.current, newAnswers);
 
-        // Fetch next question or diagnosis with safe timeout fallback
+        // Ensure images are sent as array of URLs (max 3)
+        const imageUrls = Array.isArray(draftImagesRef.current) 
+          ? draftImagesRef.current.slice(0, 3).filter(url => typeof url === "string" && url.trim().length > 0)
+          : [];
+
+        console.log("[QuestionsPage] /api/ai/questions payload", { 
+          imageCount: imageUrls.length, 
+          images: imageUrls 
+        });
+
+        // Fetch next question or diagnosis and surface a notice if it takes too long
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -648,24 +832,25 @@ export default function QuestionsPage() {
             description: state.description,
             vehicle: state.vehicle!,
             answers: newAnswers,
+            image_urls: imageUrls,
           }),
         });
 
-        const questionsFallback = new Response(
-          JSON.stringify({
-            should_finish: false,
-            next_question: "האם יש תסמינים נוספים?",
-            options: ["כן", "לא"],
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        );
+        const timeoutId = window.setTimeout(() => {
+          // Stop typing indicator and inform the user while keeping the request alive
+          setIsTyping(false);
+          dispatch.addMessage({
+            sender: "ai",
+            text: "הבדיקה לוקחת יותר זמן מהרגיל, ממשיך לנתח…",
+          });
+        }, QUESTIONS_TIMEOUT_MS);
 
-        const timeoutPromise = createSafeTimeoutPromise<Response>(
-          QUESTIONS_TIMEOUT_MS,
-          questionsFallback
-        );
-
-        const response = await Promise.race([questionsPromise, timeoutPromise]);
+        let response: Response;
+        try {
+          response = await questionsPromise;
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         // API always returns 200 with valid JSON, but handle edge cases
         let data: any;
@@ -683,8 +868,7 @@ export default function QuestionsPage() {
 
         setIsTyping(false);
 
-        // Check if finished (server enforces max questions - including fallback)
-        if (data.should_finish === true) {
+        if (data.type === "diagnosis" || data.should_finish === true) {
           const diagnosis = parseDiagnosis(data);
           if (diagnosis) {
             dispatch.finish(diagnosis);
@@ -713,8 +897,8 @@ export default function QuestionsPage() {
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
               question: "האם יש תסמינים נוספים?",
-              type: "yesno",
-              options: ["כן", "לא"],
+              type: "multi",
+              options: ["כן", "לא", "לא בטוח"],
               shouldStop: false,
             };
             dispatch.nextQuestion(fallbackQuestion);
@@ -726,8 +910,8 @@ export default function QuestionsPage() {
         // Instead of showing error, show a fallback question to keep flow going
         const fallbackQuestion: AIQuestion = {
           question: "האם יש תסמינים נוספים?",
-          type: "yesno",
-          options: ["כן", "לא"],
+          type: "multi",
+          options: ["כן", "לא", "לא בטוח"],
           shouldStop: false,
         };
         dispatch.nextQuestion(fallbackQuestion);
@@ -738,6 +922,122 @@ export default function QuestionsPage() {
     },
     [state, dispatch, helpers, isTyping]
   );
+  // Finalize draft and create request (idempotent-safe)
+  const finalizeDraftAndCreateRequest = useCallback(async (): Promise<string | null> => {
+    if (typeof window === "undefined") return null;
+
+    // If we've already created a request in this session, reuse its ID
+    if (finalizedRequestIdRef.current) {
+      return finalizedRequestIdRef.current;
+    }
+
+    if (isFinalizing) {
+      return null;
+    }
+
+    const draftId = window.sessionStorage.getItem("draft_id");
+
+    if (!draftId) {
+      console.error("[FinalizeDraft] Missing draft_id in sessionStorage");
+      alert("לא נמצאה טיוטה פעילה. נסה להתחיל את הייעוץ מחדש.");
+      return null;
+    }
+
+    if (!state.vehicle || !vehicle) {
+      console.error("[FinalizeDraft] Missing vehicle in consult state");
+      alert("חסרים פרטי רכב לשמירת הפנייה. נסה לחזור ולבחור רכב מחדש.");
+      return null;
+    }
+
+    if (!user?.id) {
+      console.error("[FinalizeDraft] Missing authenticated user");
+      alert("לא הצלחנו לזהות את המשתמש. נסה להתחבר מחדש.");
+      return null;
+    }
+
+    if (!state.diagnosis) {
+      console.error("[FinalizeDraft] Missing AI diagnosis in state");
+      alert("האבחון טרם הושלם. אנא המתן לסיום הניתוח לפני שמירה.");
+      return null;
+    }
+
+    try {
+      setIsFinalizing(true);
+
+      const aiQuestions = state.answers.map((a) => a.question);
+      const aiAnswers = state.answers.map((a) => a.answer);
+
+      const aiDiagnosis =
+        (state.diagnosis as any).summary ||
+        (Array.isArray(state.diagnosis.diagnosis)
+          ? state.diagnosis.diagnosis.join(" | ")
+          : undefined);
+
+      const aiConfidence = (state.diagnosis as any).confidence;
+      const aiRecommendations = state.diagnosis.recommendations ?? null;
+
+      const imageUrls = Array.isArray(draftImagesRef.current)
+        ? draftImagesRef.current
+            .slice(0, 3)
+            .filter((url) => typeof url === "string" && url.trim().length > 0)
+        : [];
+
+      const res = await fetch("/api/requests/from-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft_id: draftId,
+          user_id: user.id,
+          car_id: vehicle.id,
+          ai_diagnosis: aiDiagnosis,
+          ai_confidence: aiConfidence,
+          ai_questions: aiQuestions,
+          ai_answers: aiAnswers,
+          ai_recommendations: aiRecommendations,
+          image_urls: imageUrls,
+        }),
+      });
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        console.error("[FinalizeDraft] Failed to parse response JSON:", parseError);
+      }
+
+      if (!res.ok || !data?.request_id) {
+        console.error("[FinalizeDraft] Failed to finalize draft", {
+          status: res.status,
+          data,
+        });
+        alert("השמירה נכשלה. נסה שוב בעוד רגע.");
+        return null;
+      }
+
+      const requestId: string = data.request_id;
+      finalizedRequestIdRef.current = requestId;
+
+      // Clean up all draft-related data only after successful creation
+      try {
+        window.sessionStorage.removeItem("draft_id");
+        window.sessionStorage.removeItem("draft_images");
+        window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        window.sessionStorage.removeItem("consult_diagnosis");
+      } catch (cleanupError) {
+        console.error("[FinalizeDraft] Failed to clear draft data from sessionStorage", cleanupError);
+      }
+
+      draftImagesRef.current = [];
+
+      return requestId;
+    } catch (err) {
+      console.error("[FinalizeDraft] Unexpected error while finalizing draft:", err);
+      alert("אירעה שגיאה בלתי צפויה בזמן שמירת הפנייה. נסה שוב בעוד רגע.");
+      return null;
+    } finally {
+      setIsFinalizing(false);
+    }
+  }, [isFinalizing, state.answers, state.diagnosis, state.vehicle, user, vehicle]);
 
   // Error state
   if (helpers.hasError(state)) {
@@ -808,8 +1108,23 @@ export default function QuestionsPage() {
               if (msg.sender === "ai") {
                 // Render diagnosis message
                 if (isDiagnosisMessage && state.diagnosis) {
+                  const diagProps =
+                    (state.diagnosis as any).summary && (state.diagnosis as any).results
+                      ? (state.diagnosis as any)
+                      : {
+                          summary: Array.isArray(state.diagnosis.diagnosis)
+                            ? state.diagnosis.diagnosis.slice(0, 1).join(" | ") || "אבחון סופי"
+                            : "אבחון סופי",
+                          results: Array.isArray(state.diagnosis.diagnosis)
+                            ? state.diagnosis.diagnosis.slice(0, 3).map((issue: string) => ({
+                                issue,
+                                probability: 0,
+                              }))
+                            : [],
+                          confidence: 0,
+                        };
                   return (
-                    <FinalDiagnosisCard key={messageKey} diagnosis={state.diagnosis} />
+                    <FinalDiagnosisCard key={messageKey} {...diagProps} />
                   );
                 }
 
@@ -839,29 +1154,22 @@ export default function QuestionsPage() {
 
                     {/* Show buttons for current question */}
                     {isCurrentQuestion &&
-                      helpers.canAnswer(state) && (
+                      helpers.canAnswer(state) && !helpers.isFinished(state) && (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.3 }}
                           className="mb-6"
                         >
-                          {currentQuestion.type === "yesno" ? (
-                            <YesNoButtons
-                              onAnswer={(answer) => handleAnswer(answer)}
-                              disabled={isTyping || isProcessingRef.current}
-                            />
-                          ) : (
-                            <MultiChoiceButtons
-                              options={
-                                currentQuestion.options && currentQuestion.options.length > 0
-                                  ? currentQuestion.options.slice(0, 5)
-                                  : ["כן", "לא"]
-                              }
-                              onSelect={(option) => handleAnswer(option)}
-                              disabled={isTyping || isProcessingRef.current}
-                            />
-                          )}
+                          <MultiChoiceButtons
+                            options={
+                              currentQuestion.options && currentQuestion.options.length > 0
+                                ? currentQuestion.options.slice(0, 5)
+                                : ["כן", "לא"]
+                            }
+                            onSelect={(option) => handleAnswer(option)}
+                            disabled={isTyping || isProcessingRef.current || helpers.isFinished(state)}
+                          />
                         </motion.div>
                       )}
                   </React.Fragment>
@@ -882,7 +1190,7 @@ export default function QuestionsPage() {
                     }}
                     className="mb-4"
                   >
-                    <ChatBubble message={msg.text} isUser={true} />
+                    <ChatBubble message={msg.text} images={msg.images} isUser={true} />
                   </motion.div>
                 );
               }
@@ -911,21 +1219,37 @@ export default function QuestionsPage() {
               dir="rtl"
             >
               <motion.button
-                onClick={() => router.push("/user/consult/send-to-garage")}
+                onClick={async () => {
+                  const requestId = await finalizeDraftAndCreateRequest();
+                  if (requestId) {
+                    router.push(`/user/requests/${requestId}`);
+                  }
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full p-5 bg-gradient-to-r from-[#4A90E2] to-[#6A9CF2] text-white font-bold text-lg rounded-full shadow-[0_4px_20px_rgba(74,144,226,0.35)] hover:shadow-[0_6px_24px_rgba(74,144,226,0.5)] transition-all duration-300"
+                disabled={isFinalizing}
+                className={`w-full p-5 bg-gradient-to-r from-[#4A90E2] to-[#6A9CF2] text-white font-bold text-lg rounded-full shadow-[0_4px_20px_rgba(74,144,226,0.35)] hover:shadow-[0_6px_24px_rgba(74,144,226,0.5)] transition-all duration-300 ${
+                  isFinalizing ? "opacity-60 cursor-not-allowed hover:shadow-none" : ""
+                }`}
               >
-                פתיחת פנייה למוסך
+                {isFinalizing ? "שומר את הפנייה…" : "פתיחת פנייה למוסך"}
               </motion.button>
 
               <motion.button
-                onClick={() => router.push("/user")}
+                onClick={async () => {
+                  const requestId = await finalizeDraftAndCreateRequest();
+                  if (requestId) {
+                    router.push("/user");
+                  }
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full p-5 bg-white/10 hover:bg-white/15 backdrop-blur-md text-white font-bold text-lg rounded-full border border-white/20 hover:border-white/30 shadow-[0_4px_16px_rgba(255,255,255,0.08)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.12)] transition-all duration-300"
+                disabled={isFinalizing}
+                className={`w-full p-5 bg-white/10 hover:bg-white/15 backdrop-blur-md text-white font-bold text-lg rounded-full border border-white/20 hover:border-white/30 shadow-[0_4px_16px_rgba(255,255,255,0.08)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.12)] transition-all duration-300 ${
+                  isFinalizing ? "opacity-60 cursor-not-allowed hover:shadow-none" : ""
+                }`}
               >
-                סיום ייעוץ (חזרה לתפריט)
+                {isFinalizing ? "שומר את הפנייה…" : "סיום ייעוץ (חזרה לתפריט)"}
               </motion.button>
             </motion.div>
           )}

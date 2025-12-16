@@ -40,122 +40,153 @@ export function buildResearchPrompt(
 }
 
 /**
- * Build adaptive follow-up prompt for questions
+ * Build follow-up question prompt (multimodal-aware)
  */
-export function buildAdaptivePrompt(
+export function buildQuestionPrompt(
   vehicle: VehicleInfo,
   description: string,
   researchData: ResearchData,
-  answers: UserAnswer[]
+  answers: UserAnswer[],
+  hasImages: boolean
 ): string {
   const sanitizedManufacturer = sanitizeInput(vehicle.manufacturer);
   const sanitizedModel = sanitizeInput(vehicle.model);
   const sanitizedDescription = sanitizeInput(description);
   const yearStr = vehicle.year ? ` (${vehicle.year})` : "";
+  const imageFact = hasImages
+    ? "בתמונה מופיעה נורת אזהרה בלוח המחוונים; זהו נתון קבוע שאינו פתוח לפרשנות."
+    : "";
 
-  // Build answers context
-  const answersContext = answers.length > 0
-    ? answers
-        .map((a, i) => {
-          const sanitizedQ = sanitizeInput(a.question);
-          const sanitizedA = sanitizeInput(a.answer);
-          return `שאלה ${i + 1}: ${sanitizedQ}\nתשובה: ${sanitizedA}`;
-        })
-        .join("\n\n")
-    : "אין תשובות קודמות.";
+  const answersContext =
+    answers.length > 0
+      ? answers
+          .map((a, i) => {
+            const q = sanitizeInput(a.question);
+            const ans = sanitizeInput(a.answer);
+            return `שאלה ${i + 1}: ${q}\nתשובה: ${ans}`;
+          })
+          .join("\n\n")
+      : "אין תשובות קודמות.";
 
-  return `
-אתה מבצע אבחון רכב.
-
+  return `אתה מכונאי רכב רגוע ומנוסה. עבוד בעברית בלבד, משפטים קצרים.
 רכב: ${sanitizedManufacturer} ${sanitizedModel}${yearStr}
-
-מחקר מקצועי:
-${JSON.stringify(researchData, null, 2)}
-
-תיאור התקלה:
+תיאור תקלה:
 "${sanitizedDescription}"
+
+מחקר:
+${JSON.stringify(researchData, null, 2)}
 
 תשובות קודמות:
 ${answersContext}
 
-מטרה:
-- אם יש מספיק מידע → החזר אבחון סופי should_finish=true
-- אם אין מספיק מידע → צור שאלה חדשה
+${hasImages ? `עובדה מהתמונה (מחייבת): ${imageFact}` : "אין תמונות מצורפות."}
 
-בחירת סוג השאלה:
-אתה יכול ליצור:
-- שאלת כן/לא (2 אפשרויות): ["כן", "לא"] - כאשר ההבחנה היא בינארית
-- שאלה רב-ברירה (3-5 אפשרויות) - כאשר נדרש ניואנס או הבחנה עדינה יותר
+הנחיות חובה:
+- נתח קודם את ${hasImages ? "התמונה המחייבת ואז ה" : ""}תיאור לפני ניסוח השאלה.
+- אסור לשאול איזו נורה דולקת או מה צבעה; ההתייחסות לתמונה היא עובדה בסיסית שאינה ניתנת לערעור.
+- אל תשאל על פרטים שנראים בתמונה; השתמש במידע הוויזואלי כנתון מוצק.
+- אסור לשאול שאלות כן/לא.
+- השאלה חייבת להיות רב-ברירה בלבד עם 3–5 אפשרויות בלעדיות ומשמעותיות.
+- השתמש בתשובות הקודמות כדי לחדד את השאלה הבאה ולמנוע חזרתיות.
+- טון: מכונאי מנוסה, רגוע, ברור.
 
-בחר את הפורמט שמספק את הצעד האבחוני המשמעותי ביותר.
-אם ההבחנה דורשת ניואנס, השתמש ב-3-5 אפשרויות רב-ברירה.
-אם ההבחנה היא בינארית, השתמש בשאלת כן/לא.
-
-השאלה חייבת להיות קצרה, בעברית, ללא שם רכב / דגם.
-
-החזר JSON בלבד:
+פורמט JSON בלבד:
 {
- "should_finish": boolean,
- "confidence": number,
- "question": "שאלה בעברית" | null,
- "type": "yesno" | "multi",
- "options": ["כן", "לא"] | ["אפשרות 1", "אפשרות 2", "אפשרות 3", ...],
- "shouldStop": boolean,
- "final_diagnosis": {
-    "diagnosis":[ "..."],
-    "self_checks":[ "..."],
-    "warnings":[ "..."],
-    "disclaimer":"...",
-    "safety_notice": "..." | null,
-    "recommendations": ["..."] | null
- } | null
+  "type": "question",
+  "question": "שאלה קצרה וברורה",
+  "options": ["אופציה 1", "אופציה 2", "אופציה 3"],
+  "confidence": 0.xx
 }`;
 }
 
 /**
- * Build final diagnosis prompt (if needed separately)
+ * Build diagnosis-only prompt
  */
-export function buildFinalDiagnosisPrompt(
+export function buildDiagnosisPrompt(
   vehicle: VehicleInfo,
   description: string,
   researchData: ResearchData,
-  answers: UserAnswer[]
+  answers: UserAnswer[],
+  hasImages: boolean
 ): string {
   const sanitizedManufacturer = sanitizeInput(vehicle.manufacturer);
   const sanitizedModel = sanitizeInput(vehicle.model);
   const sanitizedDescription = sanitizeInput(description);
   const yearStr = vehicle.year ? ` (${vehicle.year})` : "";
+  const imageFact = hasImages
+    ? "בתמונה מופיעה נורת אזהרה בלוח המחוונים; זהו נתון קבוע שאינו פתוח לפרשנות."
+    : "";
 
-  const answersContext = answers
-    .map((a, i) => {
-      const sanitizedQ = sanitizeInput(a.question);
-      const sanitizedA = sanitizeInput(a.answer);
-      return `שאלה ${i + 1}: ${sanitizedQ}\nתשובה: ${sanitizedA}`;
-    })
-    .join("\n\n");
+  const answersContext =
+    answers.length > 0
+      ? answers
+          .map((a, i) => {
+            const q = sanitizeInput(a.question);
+            const ans = sanitizeInput(a.answer);
+            return `שאלה ${i + 1}: ${q}\nתשובה: ${ans}`;
+          })
+          .join("\n\n")
+      : "אין תשובות קודמות.";
 
-  return `
-אתה מבצע אבחון סופי לרכב.
+  return `אתה מכונאי רכב רגוע ומנוסה. עבוד בעברית בלבד, משפטים קצרים.
+אין לשאול שאלות. החזר רק אבחון סופי מובנה.
 
 רכב: ${sanitizedManufacturer} ${sanitizedModel}${yearStr}
-
-מחקר מקצועי:
-${JSON.stringify(researchData, null, 2)}
-
-תיאור התקלה:
+תיאור תקלה:
 "${sanitizedDescription}"
 
-תשובות המשתמש:
+מחקר:
+${JSON.stringify(researchData, null, 2)}
+
+תשובות קודמות:
 ${answersContext}
 
-החזר אבחון סופי מפורט ב-JSON:
+${hasImages ? `עובדה מהתמונה (מחייבת): ${imageFact}` : "אין תמונות מצורפות."}
+
+הנחיות חובה לאבחון סופי:
+- החזר עד 3 תקלות אפשריות בלבד (לא יותר מ-3), מדורגות לפי הסתברות מהגבוה לנמוך.
+- לכל תקלה חייב להיות שדה "probability" מספרי. ההסתברויות חייבות לסכם ל-100 ולהיות בסדר יורד.
+- השתמש בעברית בלבד, משפטים קצרים, ללא ז'רגון מקצועי.
+- אל תשתמש בקודי תקלה, מספרי שגיאה, שמות חיישנים, מונחים מקצועיים של מוסכים או קיצורים כמו OBD.
+- הסבר את התקלה במילים פשוטות שמתאימות לנהג רגיל ללא ידע ברכב.
+- אל תזכיר לעולם: OBD, חיישנים ספציפיים, ECU, PCM, CAN, קודי P0xxx או דומים.
+
+הנחיות מיוחדות ל-self_checks ול-do_not:
+- רק לתקלה הסבירה ביותר (הראשונה ברשימה) מותר לכלול:
+  - "self_checks": מערך של 3–5 בדיקות פשוטות ובטוחות שנהג רגיל יכול לבצע לבד.
+    (לדוגמה בלבד, לא להעתיק: "בדוק את מפלס השמן במדיד לפי הוראות הרכב")
+  - "do_not": מערך של 2–4 אזהרות קצרות מה לא לעשות.
+    (לדוגמה בלבד, לא להעתיק: "אל תמשיך לנהוג אם הנורה האדומה ממשיכה להבהב")
+- עבור כל שאר התקלות (השנייה והשלישית אם קיימות) אסור להחזיר שדות "self_checks" או "do_not" בכלל.
+- אם אין בדיקות בטוחות שאפשר להמליץ עליהן, החזר עבור התקלה הראשונה:
+  "self_checks": [] ו-"do_not": [] (מבלי להשמיט את השדות).
+
+שפה וסגנון:
+- כל ההסברים חייבים להיות בעברית, במשפטים קצרים וברורים.
+- נא להשתמש במונחים פשוטים של נהגים, לא של מכונאים.
+- אין להשתמש בקודי תקלות, שמות חיישנים, ראשי תיבות טכניים או מושגים של מערכות ניהול מנוע.
+
+פורמט JSON בלבד, ללא טקסט מחוץ ל-JSON:
 {
- "diagnosis": ["אבחון 1", "אבחון 2", ...],
- "self_checks": ["בדיקה 1", "בדיקה 2", ...],
- "warnings": ["אזהרה 1", "אזהרה 2", ...],
- "disclaimer": "אבחון זה אינו תחליף לבדיקה מקצועית.",
- "safety_notice": "הודעה בטיחותית אם נדרש" | null,
- "recommendations": ["המלצה 1", "המלצה 2", ...] | null
+  "type": "diagnosis",
+  "summary": "תקציר קצר בעברית פשוטה",
+  "results": [
+    {
+      "issue": "בעיה 1 בשפה פשוטה",
+      "probability": 0,
+      "self_checks": ["בדיקה פשוטה 1", "בדיקה פשוטה 2", "בדיקה פשוטה 3"],
+      "do_not": ["אזהרה קצרה 1", "אזהרה קצרה 2"]
+    },
+    {
+      "issue": "בעיה 2 בשפה פשוטה",
+      "probability": 0
+    },
+    {
+      "issue": "בעיה 3 בשפה פשוטה",
+      "probability": 0
+    }
+  ],
+  "confidence": 0
 }`;
 }
 

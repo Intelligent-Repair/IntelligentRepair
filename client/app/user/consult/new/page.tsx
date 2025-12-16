@@ -13,6 +13,24 @@ export default function NewConsultationPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // CRITICAL: ALWAYS generate a new draft_id on first render
+    // This ensures every new consultation starts with a fresh draft
+    if (typeof window !== "undefined") {
+      // Clear all existing draft data
+      window.sessionStorage.removeItem("draft_id");
+      window.sessionStorage.removeItem("draft_description");
+      window.sessionStorage.removeItem("draft_images");
+      window.sessionStorage.removeItem("draft_messages");
+      window.sessionStorage.removeItem("consult_questions_state");
+      
+      // ALWAYS generate a new UUID for this consultation
+      const newDraftId = crypto.randomUUID();
+      window.sessionStorage.setItem("draft_id", newDraftId);
+      console.log("[DRAFT] new draft created:", newDraftId);
+    }
+  }, []);
+
+  useEffect(() => {
     // Get current user from Supabase session
     const getUser = async () => {
       try {
@@ -43,9 +61,40 @@ export default function NewConsultationPage() {
     }
   };
 
-  const handleVehicleSelect = (vehicleId: string) => {
-    console.log("Selected vehicle:", vehicleId);
-    router.push(`/user/consult/form?vehicle=${vehicleId}`);
+  const handleVehicleSelect = async (vehicleId: string) => {
+    if (!userId) return;
+
+    try {
+      const response = await fetch("/api/requests/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          car_id: vehicleId,
+          user_id: userId,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to start request");
+        return;
+      }
+
+      const data = await response.json();
+      const requestId = data?.request_id;
+
+      if (!requestId) {
+        console.error("Missing request_id in response");
+        return;
+      }
+
+      router.push(
+        `/user/consult/form?vehicle=${vehicleId}&request_id=${requestId}`,
+      );
+    } catch (error) {
+      console.error("Error starting request:", error);
+    }
   };
 
   const handleAddNew = () => {

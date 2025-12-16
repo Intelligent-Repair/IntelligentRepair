@@ -4,28 +4,31 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 interface ChatBubbleProps {
-  message: string;
+  message?: string;
+  images?: string[];
   isUser: boolean;
   delay?: number;
   typewriter?: boolean; // Enable typewriter effect for AI messages
   typewriterSpeed?: number; // Speed in ms per character
 }
 
-export default function ChatBubble({ 
-  message, 
-  isUser, 
+export default function ChatBubble({
+  message,
+  images,
+  isUser,
   delay = 0,
   typewriter = false,
-  typewriterSpeed = 20
+  typewriterSpeed = 20,
 }: ChatBubbleProps) {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
+  const safeMessage = message ?? "";
 
   // Typewriter effect for AI messages
   useEffect(() => {
     if (!typewriter || isUser) {
-      setDisplayedText(message);
+      setDisplayedText(safeMessage);
       setIsTyping(false);
       return;
     }
@@ -34,7 +37,7 @@ export default function ChatBubble({
     setDisplayedText("");
     setCurrentIndex(0);
 
-    if (message.length === 0) {
+    if (safeMessage.length === 0) {
       setIsTyping(false);
       return;
     }
@@ -43,8 +46,8 @@ export default function ChatBubble({
     
     intervalId = setInterval(() => {
       setCurrentIndex((prev) => {
-        if (prev < message.length) {
-          setDisplayedText(message.slice(0, prev + 1));
+        if (prev < safeMessage.length) {
+          setDisplayedText(safeMessage.slice(0, prev + 1));
           return prev + 1;
         } else {
           setIsTyping(false);
@@ -62,10 +65,11 @@ export default function ChatBubble({
       }
       setIsTyping(false);
     };
-  }, [message, typewriter, isUser, typewriterSpeed]);
+  }, [safeMessage, typewriter, isUser, typewriterSpeed]);
 
   // For user messages or non-typewriter, show full message immediately
-  const displayText = typewriter && !isUser ? displayedText : message;
+  const displayText = typewriter && !isUser ? displayedText : safeMessage;
+  const hasImages = Array.isArray(images) && images.length > 0;
 
   return (
     <motion.div
@@ -89,12 +93,26 @@ export default function ChatBubble({
         }`}
         style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
       >
-        <div className="text-base leading-relaxed whitespace-pre-wrap break-words" dir="rtl">
-          {displayText}
-          {isTyping && (
-            <span className="inline-block w-2 h-4 bg-white/70 mr-1 animate-pulse" />
-          )}
-        </div>
+        {displayText && (
+          <div className="text-base leading-relaxed whitespace-pre-wrap break-words" dir="rtl">
+            {displayText}
+            {isTyping && (
+              <span className="inline-block w-2 h-4 bg-white/70 mr-1 animate-pulse" />
+            )}
+          </div>
+        )}
+        {isUser && hasImages && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {images!.slice(0, 3).map((url) => (
+              <div
+                key={url}
+                className="overflow-hidden rounded-xl border border-white/15 bg-black/10"
+              >
+                <img src={url} alt="תמונה שנשלחה" className="w-full h-24 object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );

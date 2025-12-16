@@ -131,6 +131,27 @@ export function aiStateReducer(state: AIState, action: AIAction): AIState {
       };
     }
 
+    case "ADD_MESSAGE": {
+      const payload = action.payload;
+      const images =
+        payload.images && Array.isArray(payload.images)
+          ? payload.images.filter((url) => typeof url === "string" && url.trim()).slice(0, 3)
+          : [];
+
+      const newMessage = {
+        id: payload.id || generateMessageId(),
+        sender: payload.sender,
+        text: payload.text ?? "",
+        images,
+        timestamp: payload.timestamp || Date.now(),
+      };
+
+      return {
+        ...state,
+        messages: [...state.messages, newMessage],
+      };
+    }
+
     case "RESET": {
       return createInitialState();
     }
