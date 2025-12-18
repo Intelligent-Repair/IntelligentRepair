@@ -1,6 +1,6 @@
 /**
  * Retry logic with exponential backoff
- * Used for Gemini API calls and other async operations
+ * Used for OpenAI API calls and other async operations
  */
 
 export interface RetryOptions {
@@ -26,8 +26,13 @@ function sleep(ms: number): Promise<void> {
  * Check if error is retryable
  */
 function isRetryableError(error: any, retryableStatuses: number[]): boolean {
+  // Timeout errors - these are retryable
+  if (error?.message?.includes("timed out") || error?.message?.includes("timeout") || error?.message?.includes("Operation timed out")) {
+    return true;
+  }
+
   // Network errors
-  if (error?.message?.includes("network") || error?.message?.includes("fetch")) {
+  if (error?.message?.includes("network") || error?.message?.includes("fetch") || error?.message?.includes("ECONNRESET") || error?.message?.includes("ETIMEDOUT")) {
     return true;
   }
 
@@ -37,8 +42,8 @@ function isRetryableError(error: any, retryableStatuses: number[]): boolean {
     return true;
   }
 
-  // Google AI SDK specific errors
-  if (error?.message?.includes("429") || error?.message?.includes("500") || error?.message?.includes("503")) {
+  // HTTP status codes in error messages
+  if (error?.message?.includes("429") || error?.message?.includes("500") || error?.message?.includes("503") || error?.message?.includes("502") || error?.message?.includes("504")) {
     return true;
   }
 
@@ -93,7 +98,7 @@ export async function withRetry<T>(
  */
 export async function withTimeout<T>(
   promise: Promise<T>,
-  timeoutMs: number = 12000
+  timeoutMs: number = 30000
 ): Promise<T> {
   return Promise.race([
     promise,

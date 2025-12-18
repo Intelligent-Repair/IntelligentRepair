@@ -2,6 +2,13 @@
  * Core TypeScript types for AI consultation flow
  */
 
+export interface InlineDataPart {
+  inlineData: {
+    mimeType: string;
+    data: string; // base64 encoded
+  };
+}
+
 export interface VehicleInfo {
   manufacturer: string;
   model: string;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createOpenAIClient } from "@/lib/ai/client";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import { extractJSON } from "../aiUtils";
 
@@ -20,13 +20,13 @@ interface ImagePayload {
   url: string;
 }
 
-interface GeminiQuestion {
+interface OpenAIQuestion {
   id: string;
   text: string;
   options: string[];
 }
 
-interface GeminiDiagnosis {
+interface OpenAIDiagnosis {
   title: string;
   summary: string;
   recommendations: string[];
@@ -35,12 +35,12 @@ interface GeminiDiagnosis {
 interface ConsultationResponse {
   type: "question" | "diagnosis";
   confidence: number;
-  question?: GeminiQuestion;
-  diagnosis?: GeminiDiagnosis;
+  question?: OpenAIQuestion;
+  diagnosis?: OpenAIDiagnosis;
   request_image?: boolean;
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const OPENAI_MODEL = "gpt-4o";
 
 function clampConfidence(value: any): number {
   const num = Number(value);
@@ -240,24 +240,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "description is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      console.error("[Consult API] Missing GEMINI_API_KEY");
+      console.error("[Consult API] Missing OPENAI_API_KEY");
       return NextResponse.json(fallbackResponse(), { status: 200 });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: GEMINI_MODEL,
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: "application/json",
-      },
+    const client = createOpenAIClient(apiKey, OPENAI_MODEL, {
+      temperature: 0,
+      responseFormat: { type: "json_object" },
     });
 
     const prompt = buildPrompt(vehicle, description.trim(), answers, images);
-    const result = await model.generateContent(prompt);
-    const rawText = result.response.text();
+    const rawText = await client.generateContent(prompt);
 
     const parsed = extractJSON(rawText);
     const normalized = normalizeResponse(parsed) || fallbackResponse();

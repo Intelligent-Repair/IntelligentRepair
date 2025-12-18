@@ -57,10 +57,10 @@ function createSafeTimeoutPromise<T>(timeoutMs: number, fallback: T): Promise<T>
 
 /**
  * Fetch research with retry logic and safe timeout fallback
+ * NOTE: New spec - vehicle info NOT sent to API
  */
 async function fetchResearchWithRetry(
   description: string,
-  vehicle: VehicleInfo,
   signal?: AbortSignal
 ): Promise<ResearchPayload> {
   const researchFallback = createSafeResearchFallback();
@@ -75,7 +75,6 @@ async function fetchResearchWithRetry(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               description,
-              vehicle,
             }),
             signal,
           });
@@ -559,9 +558,9 @@ export default function QuestionsPage() {
           isResearchFetchingRef.current = true;
           try {
             // Use safe research fetch with retry and timeout fallback
+            // NOTE: New spec - vehicle info NOT sent to API
             const researchData = await fetchResearchWithRetry(
               state.description,
-              state.vehicle!,
               undefined // No abort signal needed here
             );
 
@@ -606,31 +605,18 @@ export default function QuestionsPage() {
           ? draftImagesRef.current.slice(0, 3).filter(url => typeof url === "string" && url.trim().length > 0)
           : [];
         
+        // New spec: Don't send vehicle info to API (only for DB storage)
         const requestBody = {
-          research: researchRef.current || { top_causes: [], differentiating_factors: [] },
           description: state.description,
-          vehicle: state.vehicle!,
           answers: answersToUse,
           image_urls: imageUrls,
         };
         
         console.log("[QuestionsPage] /api/ai/questions payload", { 
           imageCount: imageUrls.length, 
-          images: imageUrls 
-        });
-        
-        console.log("START QUESTIONS PAYLOAD", {
-          vehicle: state.vehicle,
-          description: state.description,
-          image_urls: imageUrls,
-        });
-        
-        console.log("[Questions Page] Calling /api/ai/questions with:", {
+          images: imageUrls,
           descriptionLength: state.description?.length,
-          vehicle: `${state.vehicle?.manufacturer} ${state.vehicle?.model}`,
-          researchHasData: !!(researchRef.current?.top_causes?.length || researchRef.current?.differentiating_factors?.length),
           answersCount: answersToUse.length,
-          isRestoringFromSession: initializedFromSessionRef.current,
         });
         
         // Fetch questions and surface a friendly notice if it takes too long
@@ -789,9 +775,9 @@ export default function QuestionsPage() {
           isResearchFetchingRef.current = true;
           try {
             // Use safe research fetch with retry and timeout fallback
+            // NOTE: New spec - vehicle info NOT sent to API
             const researchData = await fetchResearchWithRetry(
               state.description,
-              state.vehicle!,
               undefined // No abort signal needed here
             );
             researchRef.current = researchData;
@@ -823,14 +809,13 @@ export default function QuestionsPage() {
           images: imageUrls 
         });
 
+        // New spec: Don't send vehicle info to API (only for DB storage)
         // Fetch next question or diagnosis and surface a notice if it takes too long
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            research: researchRef.current || { top_causes: [], differentiating_factors: [] },
             description: state.description,
-            vehicle: state.vehicle!,
             answers: newAnswers,
             image_urls: imageUrls,
           }),
