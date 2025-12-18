@@ -20,14 +20,15 @@ export async function GET(req: Request) {
     .from("requests")
     .select(`
       id,
-      title,
       description,
       status,
       created_at,
-      vehicle:vehicles (
-        manufacturer,
-        model,
-        license_plate
+      car:people_cars (
+        license_plate,
+        vehicle_catalog:vehicle_catalog_id (
+          manufacturer,
+          model
+        )
       )
     `)
     .eq("user_id", user_id)

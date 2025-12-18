@@ -8,6 +8,14 @@
   --accent: #32a1ff;
   --accent-secondary: #5c60ff;
   --font-sans: var(--font-heebo, "Heebo", system-ui, -apple-system, sans-serif);
+  
+  /* UI Settings Variables */
+  --density-multiplier: 1;
+  --animation-duration: 0.3s;
+  --card-opacity: 0.05;
+  --backdrop-blur: xl;
+  --shadow-intensity: 1;
+  --gradient-opacity: 0.35;
 }
 
 @theme inline {
@@ -21,18 +29,77 @@ body {
   min-height: 100vh;
   background: radial-gradient(
       circle at 10% 20%,
-      rgba(93, 132, 255, 0.35),
+      rgba(93, 132, 255, calc(0.35 * var(--gradient-opacity, 1))),
       transparent 45%
     ),
     radial-gradient(
       circle at 80% 0%,
-      rgba(34, 228, 255, 0.35),
+      rgba(34, 228, 255, calc(0.35 * var(--gradient-opacity, 1))),
       transparent 50%
     ),
     #03070d;
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
+  transition: font-size 0.2s ease;
+}
+
+/* Settings-based classes */
+.no-blur [class*="backdrop-blur"],
+.no-blur [class*="blur"] {
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+.no-shadows [class*="shadow"],
+.no-shadows * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Dark mode styles - only darkens background, text stays bright (like iOS) */
+html.dark {
+  position: relative;
+}
+
+/* Dark overlay that only affects background, not text */
+html.dark::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: darken;
+}
+
+/* Darken the background gradients specifically */
+html.dark body {
+  position: relative;
+  z-index: 1;
+  background: radial-gradient(
+      circle at 10% 20%,
+      rgba(93, 132, 255, calc(0.2 * var(--gradient-opacity, 1))),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 0%,
+      rgba(34, 228, 255, calc(0.2 * var(--gradient-opacity, 1))),
+      transparent 50%
+    ),
+    rgba(3, 7, 13, 0.4);
+}
+
+/* Ensure all content is above the dark overlay and stays bright */
+html.dark body > *,
+html.dark body > * > * {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  color: inherit;
 }
 
 .landing-root {

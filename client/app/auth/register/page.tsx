@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [garageName, setGarageName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [garagePhone, setGaragePhone] = useState("");
+  const [garageAddress, setGarageAddress] = useState("");
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
@@ -69,7 +70,7 @@ export default function RegisterPage() {
       };
 
       if (userType === "driver") {
-        payload.id_number = idNumber;
+        payload.national_id = idNumber;
         payload.first_name = firstName;
         payload.last_name = lastName;
         payload.phone = phone;
@@ -77,6 +78,7 @@ export default function RegisterPage() {
         payload.garage_name = garageName;
         payload.license_number = licenseNumber;
         payload.phone = garagePhone;
+        payload.address = garageAddress;
       }
 
       const response = await fetch("/api/auth/register", {
@@ -358,6 +360,23 @@ export default function RegisterPage() {
                 required
                 className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
                 placeholder="הכנס מספר טלפון"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="garageAddress"
+                className="block text-sm font-medium text-slate-300 mb-2"
+              >
+                כתובת
+              </label>
+              <input
+                id="garageAddress"
+                type="text"
+                value={garageAddress}
+                onChange={(e) => setGarageAddress(e.target.value)}
+                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                placeholder="הכנס כתובת מוסך (אופציונלי)"
               />
             </div>
 

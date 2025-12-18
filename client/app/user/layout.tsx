@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { Home } from "lucide-react";
 
 interface UserLayoutProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface UserLayoutProps {
 
 export default function UserLayout({ children }: UserLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const isHomePage = pathname === "/user";
   const isConsultPage = pathname?.startsWith("/user/consult");
 
@@ -61,15 +63,21 @@ export default function UserLayout({ children }: UserLayoutProps) {
             );
           })}
         </nav>
+
+        {/* Back to Main Menu Button */}
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <button
+            onClick={() => router.push("/user")}
+            className="w-full p-3 rounded-xl bg-[#4A90E2]/20 hover:bg-[#4A90E2]/30 text-white font-medium transition-all duration-300 border border-[#4A90E2]/50 flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-[#4A90E2]/20"
+          >
+            <Home className="w-4 h-4" />
+            <span>חזרה לתפריט הראשי</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main content area */}
       <main className="flex-1 flex flex-col min-h-screen">
-        {/* Sticky Header */}
-        <header className="sticky top-0 z-10 bg-black/10 backdrop-blur-xl border-b border-white/10 shadow-lg px-8 py-4">
-          <h1 className="text-2xl font-bold text-white">האזור האישי</h1>
-        </header>
-
         {/* Content Container */}
         <div className="flex-1 p-6">
           <div className="h-full bg-black/10 backdrop-blur-md rounded-3xl border border-white/15 shadow-2xl p-8 text-white">

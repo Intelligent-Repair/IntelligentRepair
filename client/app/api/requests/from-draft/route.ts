@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { createOpenAIClient } from "@/lib/ai/client";
+import { buildShortDescriptionPrompt } from "@/lib/ai/prompt-builder";
+import { extractJSON } from "../ai/aiUtils";
 
 type RequestBody = {
   draft_id?: string;
@@ -145,13 +148,42 @@ export async function POST(req: Request) {
         ? ai_confidence
         : null;
 
+    // Generate description if missing
+    let finalDescription: string | null = null;
+    if (typeof description === "string" && description.trim().length > 0) {
+      finalDescription = description.trim();
+    } else {
+      // Generate short description using ChatGPT based on diagnosis
+      try {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (apiKey) {
+          const client = createOpenAIClient(apiKey, "gpt-4o", {
+            responseFormat: { type: "json_object" },
+          });
+          const prompt = buildShortDescriptionPrompt(ai_diagnosis.trim());
+          const response = await client.generateContent(prompt, {
+            timeout: 30000,
+            retries: {
+              maxRetries: 2,
+              backoffMs: [1000, 2000],
+            },
+          });
+          const extracted = extractJSON(response);
+          if (extracted && typeof extracted.description === "string" && extracted.description.trim()) {
+            finalDescription = extracted.description.trim();
+            console.log("[from-draft] Generated description:", finalDescription);
+          }
+        }
+      } catch (err) {
+        console.error("[from-draft] Failed to generate description:", err);
+        // Continue without description if generation fails
+      }
+    }
+
     const insertPayload: Record<string, any> = {
       user_id: user_id.trim(),
       car_id: car_id.trim(),
-      description:
-        typeof description === "string" && description.trim().length > 0
-          ? description.trim()
-          : null,
+      description: finalDescription,
       status: "open",
       image_urls: normalizedImages,
       ai_diagnosis: ai_diagnosis.trim(),
