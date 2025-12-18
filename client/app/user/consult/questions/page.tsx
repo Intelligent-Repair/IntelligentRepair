@@ -7,6 +7,7 @@ import ChatBubble from "./components/ChatBubble";
 import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
+import WarningBanner from "./components/WarningBanner";
 import { useAIStateMachine } from "./hooks/useAIStateMachine";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
 import { withRetry } from "../../../../lib/ai/retry";
@@ -141,9 +142,11 @@ async function fetchResearchWithRetry(
 }
 
 /**
- * Convert API response to AIQuestion
+ * Convert API response to AIQuestion and optional safety warning/caution notice
  */
-function parseQuestion(data: any): AIQuestion | null {
+function parseQuestion(
+  data: any
+): { question: AIQuestion; safetyWarning: string | null; cautionNotice: string | null } | null {
   if (data.type !== "question") {
     return null;
   }
@@ -154,15 +157,29 @@ function parseQuestion(data: any): AIQuestion | null {
   }
 
   const options = Array.isArray(data.options)
-    ? data.options.filter((o: any) => typeof o === "string").slice(0, 5)
+    ? data.options.filter((o: any) => typeof o === "string" && o.trim()).slice(0, 5)
     : [];
   const safeOptions = options.length >= 3 ? options : ["כן", "לא", "לא בטוח"];
 
+  const safetyWarning =
+    typeof data.safety_warning === "string" && data.safety_warning.trim()
+      ? data.safety_warning.trim()
+      : null;
+
+  const cautionNotice =
+    typeof data.caution_notice === "string" && data.caution_notice.trim()
+      ? data.caution_notice.trim()
+      : null;
+
   return {
-    question: questionText,
-    type: "multi",
-    options: safeOptions,
-    shouldStop: typeof data.shouldStop === "boolean" ? data.shouldStop : false,
+    question: {
+      question: questionText,
+      type: "multi",
+      options: safeOptions,
+      shouldStop: typeof data.shouldStop === "boolean" ? data.shouldStop : false,
+    },
+    safetyWarning,
+    cautionNotice,
   };
 }
 
@@ -306,6 +323,8 @@ export default function QuestionsPage() {
   const [draftImagesLoaded, setDraftImagesLoaded] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [safetyWarning, setSafetyWarning] = useState<string | null>(null);
+  const [cautionNotice, setCautionNotice] = useState<string | null>(null);
   const researchRef = useRef<ResearchPayload | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
@@ -349,11 +368,17 @@ export default function QuestionsPage() {
       hasInitializedRef.current = false;
       initializedFromSessionRef.current = false;
       hasPushedDraftMessageRef.current = false;
+      warningsShownRef.current = false;
+      setSafetyWarning(null);
+      setCautionNotice(null);
       // NOTE: We do NOT clear draft_images here - they are loaded in the previous effect
     } catch (err) {
       console.error("[Questions Page] Failed to reset draft/session state:", err);
     }
   }, []);
+
+  // Track if we've already shown warnings to avoid duplicates
+  const warningsShownRef = useRef(false);
 
   // CRITICAL: Watch for draft_id changes and clear session state when it changes
   useEffect(() => {
@@ -701,11 +726,22 @@ export default function QuestionsPage() {
             storeDiagnosis(fallbackDiagnosis, data);
           }
         } else {
-          // Parse and dispatch question
-          const question = parseQuestion(data);
-          if (question) {
-            dispatch.nextQuestion(question);
-          } else {
+        // Parse and dispatch question + optional safety warning/caution notice
+        const parsed = parseQuestion(data);
+        if (parsed) {
+          const { question, safetyWarning: warning, cautionNotice: caution } = parsed;
+          // Store warnings in state (only once, on first question)
+          if (!warningsShownRef.current) {
+            if (warning) {
+              setSafetyWarning(warning);
+            }
+            if (caution) {
+              setCautionNotice(caution);
+            }
+            warningsShownRef.current = true;
+          }
+          dispatch.nextQuestion(question);
+        } else {
             // If parsing fails, use a fallback question instead of error
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
@@ -873,11 +909,11 @@ export default function QuestionsPage() {
             dispatch.finish(fallbackDiagnosis);
           }
         } else {
-          // Parse and dispatch next question
-          const question = parseQuestion(data);
-          if (question) {
-            dispatch.nextQuestion(question);
-          } else {
+        // Parse and dispatch next question (warnings are only for first question, so we ignore them here)
+        const parsed = parseQuestion(data);
+        if (parsed) {
+          dispatch.nextQuestion(parsed.question);
+        } else {
             // If parsing fails, use a fallback question instead of error
             console.warn("[Questions Page] Failed to parse question, using fallback");
             const fallbackQuestion: AIQuestion = {
@@ -1081,6 +1117,24 @@ export default function QuestionsPage() {
               </div>
               <div className="text-white/60 text-sm">{vehicle.license_plate}</div>
             </motion.div>
+          )}
+
+          {/* Safety Warning Banner */}
+          {safetyWarning && (
+            <WarningBanner
+              message={safetyWarning}
+              type="danger"
+              onClose={() => setSafetyWarning(null)}
+            />
+          )}
+
+          {/* Caution Notice Banner */}
+          {cautionNotice && (
+            <WarningBanner
+              message={cautionNotice}
+              type="caution"
+              onClose={() => setCautionNotice(null)}
+            />
           )}
 
           {/* Chat Messages - Render from state machine messages */}

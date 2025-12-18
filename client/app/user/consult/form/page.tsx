@@ -111,39 +111,10 @@ export default function ConsultFormPage() {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError(null);
-
-      const aiPayload = {
-        request_id: draftId,
-        vehicle: {
-          manufacturer: vehicle.manufacturer,
-          model: vehicle.model,
-          year: vehicle.year,
-        },
-        description: description.trim(),
-        images: imageUrls
-          .filter((url) => typeof url === "string" && url.trim().length > 0)
-          .map((url) => ({ url })),
-        answers: [],
-      };
-
-      const aiResponse = await fetch("/api/ai/consult", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(aiPayload),
-      });
-
-      if (!aiResponse.ok) {
-        throw new Error(`AI consult failed with status ${aiResponse.status}`);
-      }
-    } catch (err) {
-      console.error("Error triggering AI consultation:", err);
-      setError("שגיאה בהפעלת יעוץ AI. נסה שוב.");
-      setIsSubmitting(false);
-      return;
-    }
+    // Navigate directly to questions page - AI calls are handled there
+    // No need to call /api/ai/consult here - questions/page.tsx handles all AI interactions
+    setIsSubmitting(true);
+    setError(null);
 
     const encodedDescription = encodeURIComponent(description.trim());
     router.push(

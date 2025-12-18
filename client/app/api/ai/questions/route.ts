@@ -3,9 +3,9 @@
  * 
  * Flow:
  * 1. User submits description + optional images
- * 2. AI returns question (or diagnosis if confidence >= 80%)
+ * 2. AI returns question (or diagnosis if confidence >= 90%)
  * 3. User answers (up to 5 questions total)
- * 4. After 5 questions or 80% confidence → final diagnosis
+ * 4. After 5 questions or 90% confidence → final diagnosis
  * 
  * Key changes:
  * - Vehicle info NOT sent to API (only for DB storage)
@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { createOpenAIClient, type OpenAIClient } from "@/lib/ai/client";
 import { fetchImageAsInlineData } from "@/lib/ai/image-utils";
 import { extractJSON } from "../aiUtils";
-import { buildChatPrompt, buildDiagnosisPrompt } from "@/lib/ai/prompt-builder";
+import { buildChatPrompt, buildDiagnosisPrompt, DANGER_KEYWORDS, CAUTION_KEYWORDS } from "@/lib/ai/prompt-builder";
 import type { UserAnswer } from "@/lib/ai/types";
 
 interface RequestBody {
@@ -31,7 +31,9 @@ interface RequestBody {
 }
 
 const MAX_QUESTIONS = 5;
-const CONFIDENCE_THRESHOLD = 0.8; // 80% confidence triggers early diagnosis
+const MIN_ANSWERS_FOR_EARLY_DIAGNOSIS = 3;
+const CONFIDENCE_THRESHOLD = 0.9; // 90% confidence triggers early diagnosis (after MIN_ANSWERS_FOR_EARLY_DIAGNOSIS)
+const MIN_CONFIDENCE_FOR_FINAL_DIAGNOSIS = 0.5; // Minimum confidence to return diagnosis after all questions
 const DIAGNOSIS_DISCLAIMER =
   "האבחון מבוסס על מידע ראשוני בלבד ואינו מהווה תחליף לבדיקה מקצועית. מומלץ לפנות למוסך מוסמך לצורך בדיקה ואבחון מלא.";
 
@@ -93,14 +95,43 @@ function buildDiagnosisResponse(rawDiagnosis: any) {
 
   // Remove duplicates and sort by probability
   const uniqueResults = parsedResults.reduce(
-    (acc: typeof parsedResults, curr) => {
-      const exists = acc.some((r) => r.issue.toLowerCase() === curr.issue.toLowerCase());
+    (
+      acc: {
+        issue: string;
+        probability: number;
+        explanation: string;
+        self_checks: string[];
+        do_not: string[];
+      }[],
+      curr: {
+        issue: string;
+        probability: number;
+        explanation: string;
+        self_checks: string[];
+        do_not: string[];
+      }
+    ) => {
+      const exists = acc.some(
+        (r: {
+          issue: string;
+          probability: number;
+          explanation: string;
+          self_checks: string[];
+          do_not: string[];
+        }) => r.issue.toLowerCase() === curr.issue.toLowerCase()
+      );
       if (!exists) {
         acc.push(curr);
       }
       return acc;
     },
-    []
+    [] as {
+      issue: string;
+      probability: number;
+      explanation: string;
+      self_checks: string[];
+      do_not: string[];
+    }[]
   );
 
   if (!uniqueResults.length) {
@@ -117,10 +148,21 @@ function buildDiagnosisResponse(rawDiagnosis: any) {
     };
   }
 
-  uniqueResults.sort((a, b) => b.probability - a.probability);
+  uniqueResults.sort(
+    (
+      a: { probability: number },
+      b: { probability: number }
+    ) => b.probability - a.probability
+  );
 
   // Take top 3 results
-  const topResults = uniqueResults.slice(0, 3).map((r) => ({
+  const topResults = uniqueResults.slice(0, 3).map((r: {
+    issue: string;
+    probability: number;
+    explanation: string;
+    self_checks: string[];
+    do_not: string[];
+  }) => ({
     issue: r.issue,
     probability: Math.round(r.probability * 100), // Convert to percentage for display
     explanation: r.explanation,
@@ -197,6 +239,35 @@ function createFallbackDiagnosis() {
     disclaimer: DIAGNOSIS_DISCLAIMER,
     confidence: 0.6,
   };
+}
+
+/**
+ * Detect potentially dangerous context (for missing safety_warning)
+ */
+function isDangerousContext(description: string, answers: UserAnswer[], hasImages: boolean): boolean {
+  const lowerDesc = (description || "").toLowerCase();
+  const answersText = answers.map((a) => `${a.question} ${a.answer}` || "").join(" ").toLowerCase();
+  const combined = `${lowerDesc} ${answersText}`;
+
+  const hasDangerKeyword = DANGER_KEYWORDS.some((kw) => combined.includes(kw));
+
+  // אם יש מילות מפתח מסוכנות – מצב רגיש. לא נסיק מסקנה רק מעצם קיום תמונה.
+  return hasDangerKeyword;
+}
+
+/**
+ * Detect caution context (for missing caution_notice)
+ */
+function isCautionContext(description: string, answers: UserAnswer[], hasImages: boolean): boolean {
+  const lowerDesc = (description || "").toLowerCase();
+  const answersText = answers.map((a) => `${a.question} ${a.answer}` || "").join(" ").toLowerCase();
+  const combined = `${lowerDesc} ${answersText}`;
+
+  const hasCautionKeyword = CAUTION_KEYWORDS.some((kw) => combined.includes(kw));
+  const isDanger = isDangerousContext(description, answers, hasImages);
+
+  // רק אם יש מילת מפתח זהירות אבל לא מסוכן
+  return hasCautionKeyword && !isDanger;
 }
 
 /**
@@ -296,18 +367,31 @@ export async function POST(req: Request) {
       return NextResponse.json(createFallbackQuestion(), { status: 200 });
     }
 
-    // Check if AI returned diagnosis (confidence >= 80% trigger)
+    // Check if AI returned diagnosis directly
     if (extracted.type === "diagnosis") {
-      const diagnosisResponse = buildDiagnosisResponse(extracted);
-      return NextResponse.json(diagnosisResponse);
+      // Respect minimum number of answers before accepting diagnosis,
+      // unless we've already hit the max questions limit (handled above)
+      if (answersCount >= MIN_ANSWERS_FOR_EARLY_DIAGNOSIS) {
+        const diagnosisResponse = buildDiagnosisResponse(extracted);
+        return NextResponse.json(diagnosisResponse);
+      } else {
+        // Too early for final diagnosis – keep asking questions
+        console.warn(
+          "[Questions API] Model returned diagnosis too early (answersCount=" +
+            answersCount +
+            "), continuing with questions."
+        );
+        // Fall through to question handling below
+        extracted = {}; // Force using fallback question below
+      }
     }
 
-    // Check confidence level - if >= 80%, trigger early diagnosis
+    // Check confidence level - if >= 90%, trigger early diagnosis (after minimum answers)
     const confidence = typeof extracted?.confidence === "number" && extracted.confidence >= 0 && extracted.confidence <= 1
       ? extracted.confidence
       : 0.5;
 
-    if (confidence >= CONFIDENCE_THRESHOLD && answersCount > 0) {
+    if (confidence >= CONFIDENCE_THRESHOLD && answersCount >= MIN_ANSWERS_FOR_EARLY_DIAGNOSIS) {
       // AI is confident enough, generate diagnosis
       const diagnosis = await generateFinalDiagnosis(description, answers, imageParts, client);
       return NextResponse.json(diagnosis);
@@ -338,9 +422,24 @@ export async function POST(req: Request) {
       confidence,
     };
 
-    // Add safety warning if present
+    // Add safety warning אם המודל החזיר אחת (בדרך כלל בשאלה הראשונה בלבד)
     if (typeof extracted?.safety_warning === "string" && extracted.safety_warning.trim()) {
       responsePayload.safety_warning = extracted.safety_warning.trim();
+    } else if (answers.length === 0 && isDangerousContext(description, answers, hasImages)) {
+      // Safety net: בשאלה הראשונה בלבד, אם מתיאור המשתמש ברור שמדובר בנורה אדומה קריטית
+      // (שמן, מנוע, בלם, חום מנוע, מצבר, כריות אוויר), נוסיף אזהרה ברירת מחדל.
+      responsePayload.safety_warning =
+        "אם אתה נוסע כרגע, עדיף לעצור את הרכב בצד בבטחה ולא להמשיך בנסיעה עד שנבין מה הבעיה.";
+    }
+
+    // Add caution notice אם המודל החזיר אחת (בדרך כלל בשאלה הראשונה בלבד)
+    if (typeof extracted?.caution_notice === "string" && extracted.caution_notice.trim()) {
+      responsePayload.caution_notice = extracted.caution_notice.trim();
+    } else if (answers.length === 0 && isCautionContext(description, answers, hasImages)) {
+      // Safety net: בשאלה הראשונה בלבד, אם מתיאור המשתמש ברור שמדובר בנורה כתומה
+      // (Check Engine, ABS, בקרת יציבות, לחץ אוויר), נוסיף הודעת זהירות ברירת מחדל.
+      responsePayload.caution_notice =
+        "מומלץ להמשיך בנסיעה בזהירות, להימנע מנהיגה מהירה או אגרסיבית, ולפנות למוסך לבדיקה בהקדם.";
     }
 
     return NextResponse.json(responsePayload);
