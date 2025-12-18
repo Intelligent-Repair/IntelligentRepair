@@ -12,8 +12,10 @@ export async function POST(req: Request) {
       first_name,
       last_name,
       phone,
+      national_id,
       garage_name,
       license_number,
+      address,
     } = body;
 
     const admin = createAdminClient();
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
         role,
         first_name: role === "driver" ? first_name : null,
         last_name: role === "driver" ? last_name : null,
+        national_id: role === "driver" ? national_id : null,
       });
 
     if (userInsertError) {
@@ -70,6 +73,7 @@ export async function POST(req: Request) {
           license_number,
           phone,
           email,
+          address: address || null,
         });
 
       if (garageError) {

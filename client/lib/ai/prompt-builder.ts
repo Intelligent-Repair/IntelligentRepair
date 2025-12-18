@@ -309,3 +309,34 @@ export function buildResearchPrompt(
   "reasoning": "הסבר קצר"
 }`;
 }
+
+/**
+ * Build prompt for generating a short description (up to 5 words)
+ * Based on the AI diagnosis summary
+ */
+export function buildShortDescriptionPrompt(
+  aiDiagnosis: string
+): string {
+  const sanitizedDiagnosis = sanitizeInput(aiDiagnosis, 500);
+
+  return `אתה מכונאי רכב מקצועי. על בסיס האבחון הבא, צור תיאור קצר מאוד של הבעיה.
+
+אבחון: "${sanitizedDiagnosis}"
+
+הנחיות:
+1. צור תיאור קצר בעברית - עד 5 מילים בלבד
+2. התיאור צריך לתאר את הבעיה העיקרית במילים פשוטות
+3. השתמש במילים שהמשתמש הממוצע יבין
+4. התמקד בבעיה העיקרית, לא בפרטים טכניים
+
+דוגמאות:
+- "נורת שמן אדומה דולקת"
+- "בעיית לחץ אוויר בצמיגים"
+- "נורת מנוע כתומה"
+- "בעיית בלמים"
+
+החזר JSON בלבד:
+{
+  "description": "תיאור קצר עד 5 מילים"
+}`;
+}
