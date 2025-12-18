@@ -4,79 +4,130 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
-interface DiagnosisData {
-  diagnosis: string[];
-  self_checks: string[];
-  warnings: string[];
-  disclaimer: string;
+// Flexible diagnosis shape to support both legacy and new formats
+interface StoredDiagnosis {
+  // New schema (from /api/ai/questions)
+  type?: string;
+  summary?: string;
+  results?: {
+    issue: string;
+    probability?: number;
+    explanation?: string;
+    self_checks?: string[];
+    do_not?: string[];
+  }[];
+  recommendations?: string[];
+  disclaimer?: string;
+  confidence?: number;
+
+  // Legacy fields (backward compatibility)
+  diagnosis?: string[];
+  self_checks?: string[];
+  warnings?: string[];
 }
 
-interface QuestionsData {
-  explanation?: string;
-  top_causes?: string[];
-  safety_notice?: string;
+interface SummaryViewModel {
+  summary: string | null;
+  topCauses: string[];
+  diyChecks: string[];
+  warnings: string[];
+  disclaimer: string | null;
 }
 
 export default function SummaryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
-  const [questionsData, setQuestionsData] = useState<QuestionsData | null>(null);
+  const [viewModel, setViewModel] = useState<SummaryViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Try to get data from sessionStorage first
+    // Try to get data from sessionStorage first (main path)
     const storedDiagnosis = sessionStorage.getItem("consult_diagnosis");
-    const storedQuestionsData = sessionStorage.getItem("consult_questions_data");
+
+    const buildViewModel = (raw: StoredDiagnosis | null): SummaryViewModel | null => {
+      if (!raw) return null;
+
+      // New schema: summary + results
+      if (raw.results && raw.results.length > 0) {
+        const sorted = [...raw.results].sort(
+          (a, b) => (b.probability ?? 0) - (a.probability ?? 0)
+        );
+        const top = sorted[0];
+
+        const summary =
+          (raw.summary && raw.summary.trim()) ||
+          (top?.issue ? `האבחנה הסבירה ביותר: ${top.issue}` : null);
+
+        const topCauses = sorted.map((r) => r.issue);
+
+        const diyChecks =
+          (top?.self_checks && top.self_checks.length > 0
+            ? top.self_checks
+            : raw.recommendations) || [];
+
+        const warnings = top?.do_not && top.do_not.length > 0 ? top.do_not : [];
+
+        return {
+          summary,
+          topCauses,
+          diyChecks,
+          warnings,
+          disclaimer: raw.disclaimer || null,
+        };
+      }
+
+      // Legacy schema: diagnosis/self_checks/warnings
+      const legacySummary =
+        raw.diagnosis && raw.diagnosis.length > 0
+          ? `האבחנה הסבירה ביותר: ${raw.diagnosis[0]}`
+          : null;
+
+      return {
+        summary: legacySummary,
+        topCauses: raw.diagnosis || [],
+        diyChecks: raw.self_checks || [],
+        warnings: raw.warnings || [],
+        disclaimer: raw.disclaimer || null,
+      };
+    };
+
+    let hasAnyData = false;
 
     if (storedDiagnosis) {
       try {
-        const parsedDiagnosis = JSON.parse(storedDiagnosis);
-        setDiagnosis(parsedDiagnosis);
+        const parsedDiagnosis = JSON.parse(storedDiagnosis) as StoredDiagnosis;
+        const vm = buildViewModel(parsedDiagnosis);
+        if (vm) {
+          setViewModel(vm);
+          hasAnyData = true;
+        }
       } catch (e) {
         console.error("Failed to parse stored diagnosis:", e);
       }
     }
 
-    if (storedQuestionsData) {
-      try {
-        const parsedQuestionsData = JSON.parse(storedQuestionsData);
-        setQuestionsData(parsedQuestionsData);
-      } catch (e) {
-        console.error("Failed to parse stored questions data:", e);
-      }
-    }
-
-    // If no stored data, try URL params (fallback)
-    let diagnosisParam: string | null = null;
-    if (!storedDiagnosis && !storedQuestionsData) {
-      diagnosisParam = searchParams.get("diagnosis");
-      const questionsParam = searchParams.get("questions");
-      
+    // Fallback: try URL param (for backwards compatibility / deep-link)
+    if (!hasAnyData) {
+      const diagnosisParam = searchParams.get("diagnosis");
       if (diagnosisParam) {
         try {
           const decoded = decodeURIComponent(diagnosisParam);
-          setDiagnosis(JSON.parse(decoded));
+          const parsedDiagnosis = JSON.parse(decoded) as StoredDiagnosis;
+          const vm = buildViewModel(parsedDiagnosis);
+          if (vm) {
+            setViewModel(vm);
+            hasAnyData = true;
+          }
         } catch (e) {
           console.error("Failed to parse diagnosis from URL:", e);
-        }
-      }
-
-      if (questionsParam) {
-        try {
-          const decoded = decodeURIComponent(questionsParam);
-          setQuestionsData(JSON.parse(decoded));
-        } catch (e) {
-          console.error("Failed to parse questions data from URL:", e);
         }
       }
     }
 
     setLoading(false);
 
-    // If no data at all, show error
-    if (!storedDiagnosis && !diagnosisParam) {
+    if (!hasAnyData) {
       setError("לא נמצאו נתוני אבחון. אנא חזור ונסה שוב.");
     }
   }, [searchParams]);
@@ -89,7 +140,6 @@ export default function SummaryPage() {
   const handleCloseRequest = () => {
     // Clear sessionStorage
     sessionStorage.removeItem("consult_diagnosis");
-    sessionStorage.removeItem("consult_questions_data");
     router.push("/user");
   };
 
@@ -101,7 +151,7 @@ export default function SummaryPage() {
     );
   }
 
-  if (error || !diagnosis) {
+  if (error || !viewModel) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" dir="rtl">
         <div className="bg-white/10 backdrop-blur-xl border border-red-500/30 rounded-3xl shadow-2xl p-8 max-w-md">
@@ -137,8 +187,8 @@ export default function SummaryPage() {
             <div className="h-1 w-16 bg-gradient-to-r from-[#4A90E2] to-transparent rounded-full"></div>
           </div>
 
-          {/* Section 1: Final Diagnosis Explanation */}
-          {questionsData?.explanation && (
+          {/* Section 1: Final Diagnosis Summary */}
+          {viewModel.summary && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -151,14 +201,14 @@ export default function SummaryPage() {
               </h2>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                 <p className="text-white/90 leading-relaxed text-lg">
-                  {questionsData.explanation}
+                  {viewModel.summary}
                 </p>
               </div>
             </motion.div>
           )}
 
-          {/* Section 2: Top Causes */}
-          {questionsData?.top_causes && questionsData.top_causes.length > 0 && (
+          {/* Section 2: Top Causes (ranked issues) */}
+          {viewModel.topCauses.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -171,7 +221,7 @@ export default function SummaryPage() {
               </h2>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                 <ul className="space-y-3">
-                  {questionsData.top_causes.map((cause, index) => (
+                  {viewModel.topCauses.map((cause, index) => (
                     <li key={index} className="flex items-start gap-3">
                       <span className="text-[#4A90E2] font-bold mt-1">{index + 1}.</span>
                       <span className="text-white/90 leading-relaxed flex-1">{cause}</span>
@@ -182,8 +232,8 @@ export default function SummaryPage() {
             </motion.div>
           )}
 
-          {/* Section 3: Self-Check Recommendations */}
-          {diagnosis.self_checks && diagnosis.self_checks.length > 0 && (
+          {/* Section 3: Self-Check Recommendations (DIY) */}
+          {viewModel.diyChecks.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -196,7 +246,7 @@ export default function SummaryPage() {
               </h2>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                 <ul className="space-y-3">
-                  {diagnosis.self_checks.map((check, index) => (
+                  {viewModel.diyChecks.map((check, index) => (
                     <li key={index} className="flex items-start gap-3">
                       <span className="text-[#4A90E2] font-bold mt-1">{index + 1}.</span>
                       <span className="text-white/90 leading-relaxed flex-1">{check}</span>
@@ -207,8 +257,8 @@ export default function SummaryPage() {
             </motion.div>
           )}
 
-          {/* Section 4: Safety Notice */}
-          {questionsData?.safety_notice && (
+          {/* Section 4: Warnings / Safety Notice */}
+          {viewModel.warnings.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -217,58 +267,13 @@ export default function SummaryPage() {
             >
               <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <span className="text-2xl">⚠️</span>
-                הערת בטיחות
-              </h2>
-              <div className="bg-red-500/10 backdrop-blur-xl border border-red-500/30 rounded-2xl p-6">
-                <p className="text-white/90 leading-relaxed text-lg">
-                  {questionsData.safety_notice}
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Additional Diagnosis Details */}
-          {diagnosis.diagnosis && diagnosis.diagnosis.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mb-8"
-            >
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <span className="text-2xl">🔬</span>
-                סיבות אפשריות נוספות
-              </h2>
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-                <ul className="space-y-3">
-                  {diagnosis.diagnosis.map((cause, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <span className="text-[#4A90E2] font-bold mt-1">{index + 1}.</span>
-                      <span className="text-white/90 leading-relaxed flex-1">{cause}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Warnings */}
-          {diagnosis.warnings && diagnosis.warnings.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mb-8"
-            >
-              <h2 className="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
-                <span className="text-2xl">⚠️</span>
                 אזהרות חשובות
               </h2>
-              <div className="bg-yellow-500/10 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-6">
+              <div className="bg-red-500/10 backdrop-blur-xl border border-red-500/30 rounded-2xl p-6">
                 <ul className="space-y-3">
-                  {diagnosis.warnings.map((warning, index) => (
+                  {viewModel.warnings.map((warning, index) => (
                     <li key={index} className="flex items-start gap-3">
-                      <span className="text-yellow-400 font-bold mt-1">•</span>
+                      <span className="text-red-400 font-bold mt-1">•</span>
                       <span className="text-white/90 leading-relaxed flex-1">{warning}</span>
                     </li>
                   ))}
@@ -278,7 +283,7 @@ export default function SummaryPage() {
           )}
 
           {/* Disclaimer */}
-          {diagnosis.disclaimer && (
+          {viewModel.disclaimer && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -287,7 +292,7 @@ export default function SummaryPage() {
             >
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
                 <p className="text-white/70 leading-relaxed text-sm italic">
-                  {diagnosis.disclaimer}
+                  {viewModel.disclaimer}
                 </p>
               </div>
             </motion.div>

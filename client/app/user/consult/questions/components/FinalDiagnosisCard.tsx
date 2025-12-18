@@ -26,11 +26,6 @@ export default function FinalDiagnosisCard({
   const safeResults = Array.isArray(results) ? results : [];
   const hasResults = safeResults.length > 0;
 
-  const formatPercent = (value: number) => {
-    const clamped = Math.max(0, Math.min(100, Math.round(value)));
-    return `${clamped}%`;
-  };
-
   const dedupedResults: DiagnosisResult[] = React.useMemo(() => {
     const byIssue = new Map<string, DiagnosisResult>();
 
@@ -50,11 +45,9 @@ export default function FinalDiagnosisCard({
   const hasUniqueResults = dedupedResults.length > 0;
 
   const topDiagnosis = hasUniqueResults ? dedupedResults[0] : undefined;
-  const secondDiagnosis = hasUniqueResults ? dedupedResults[1] : undefined;
+  const additionalDiagnoses = hasUniqueResults ? dedupedResults.slice(1) : [];
 
-  const hasClearTopDiagnosis = !!topDiagnosis &&
-    (!secondDiagnosis ||
-      (topDiagnosis.probability ?? 0) >= (secondDiagnosis.probability ?? 0) + 5);
+  const hasClearTopDiagnosis = !!topDiagnosis;
 
   const topExplanation =
     (topDiagnosis?.description || topDiagnosis?.explanation || "").trim();
@@ -79,106 +72,69 @@ export default function FinalDiagnosisCard({
           <p className="text-white/80 leading-relaxed text-sm md:text-base">{summary}</p>
         </div>
 
-        {/* 🧠 למה זו האבחנה הסבירה ביותר */}
+        {/* למה אנחנו חושבים שזוהי הבעיה */}
         {shouldShowWhySection && topDiagnosis && (
           <div className="mt-3 mb-2 rounded-2xl bg-white/5 border border-white/15 px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                <span className="text-base" aria-hidden="true">
-                  🧠
-                </span>
-                <span>למה זו האבחנה הסבירה ביותר</span>
+                <span>למה אנחנו חושבים שזוהי הבעיה?</span>
               </h4>
-              <span className="inline-flex items-center gap-1 rounded-full border border-[#4A90E2]/60 bg-[#4A90E2]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#c4ddff]">
-                האבחנה המובילה
-              </span>
             </div>
             <p className="text-xs text-white/75 leading-relaxed">
-              האבחנה המובילה היא{" "}
-              <span className="font-semibold text-white">
-                {topDiagnosis.issue}
-              </span>{" "}
-              עם הסתברות של{" "}
-              <span className="font-semibold text-white">
-                {formatPercent(topDiagnosis.probability ?? 0)}
-              </span>
-              .{" "}
               {topExplanation
-                ? `ההסבר הטכני שזוהה: ${topExplanation}`
-                : `הסיכום הכללי של הבדיקה מצביע על כך שזו ההתאמה הטובה ביותר לתיאור התקלה שקיבלנו.`}
+                ? topExplanation
+                : summary || "זוהי הבעיה הסבירה ביותר על פי ניתוח המידע מהמשתמש ומהתמונה."}
             </p>
           </div>
         )}
 
-        {/* רשימת אבחנות + הדגשת הסתברות */}
-        {hasUniqueResults && (
-          <div className="mt-4 space-y-3">
-            {dedupedResults.map((item, index) => {
-              const percent = Math.max(0, Math.min(100, Math.round(item.probability)));
-              const isTop = index === 0;
-              const explanation = item.description || item.explanation || "";
-
-              return (
-                <div
-                  key={`${item.issue}-${index}`}
-                  className={`relative rounded-2xl border p-4 bg-white/5 backdrop-blur-sm ${
-                    isTop
-                      ? "border-[#4A90E2]/70 bg-white/10 shadow-[0_8px_24px_rgba(74,144,226,0.35)]"
-                      : "border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
-                  }`}
-                >
-                  {isTop && (
-                    <div className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full bg-[#4A90E2]/90 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
-                      <span aria-hidden="true">⭐</span>
-                      <span>האבחנה המובילה</span>
-                    </div>
+        {/* אבחנה מובילה + אפשרויות נוספות ללא אחוזים */}
+        {hasUniqueResults && topDiagnosis && (
+          <div className="mt-4 space-y-4">
+            {/* כרטיס לאבחנה המובילה ללא אחוזים */}
+            <div className="relative rounded-2xl border p-4 bg-white/10 backdrop-blur-sm border-[#4A90E2]/70 shadow-[0_8px_24px_rgba(74,144,226,0.35)]">
+              <div className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full bg-[#4A90E2]/90 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+                <span aria-hidden="true">⭐</span>
+                <span>האבחנה המובילה</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 pt-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-[#4A90E2]/20 text-[#9ec7ff]">
+                      1
+                    </span>
+                    <span className="text-base font-semibold text-white">{topDiagnosis.issue}</span>
+                  </div>
+                  {topExplanation && (
+                    <p className="text-xs text-white/70 leading-relaxed mt-1">{topExplanation}</p>
                   )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 pt-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            isTop ? "bg-[#4A90E2]/20 text-[#9ec7ff]" : "bg-white/10 text-white/70"
-                          }`}
-                        >
-                          {index + 1}
-                        </span>
-                        <span className="text-base font-semibold text-white">{item.issue}</span>
-                      </div>
-                      {explanation && (
-                        <p className="text-xs text-white/70 leading-relaxed mt-1">{explanation}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end shrink-0">
-                      <span className="text-[11px] text-white/60 mb-0.5">
-                        הסתברות משוערת
-                      </span>
-                      <span
-                        className={`font-bold text-white leading-none ${
-                          isTop ? "text-3xl md:text-4xl" : "text-2xl"
-                        }`}
-                      >
-                        {formatPercent(percent)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1 text-[11px] text-white/55">
-                      <span>0%</span>
-                      <span>100%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          isTop ? "bg-[#4A90E2]" : "bg-white/60"
-                        }`}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* אפשרויות נוספות ללא אחוזים – כל אחת ככרטיס נפרד */}
+            {additionalDiagnoses.length > 0 && (
+              <div className="space-y-3">
+                {additionalDiagnoses.map((item, index) => (
+                  <div
+                    key={`${item.issue}-${index}`}
+                    className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold px-2 py-1 rounded-full bg-white/10 text-white/70">
+                        {index + 2}
+                      </span>
+                      <span className="text-base font-semibold text-white">{item.issue}</span>
+                    </div>
+                    { (item.description || item.explanation) && (
+                      <p className="text-xs text-white/70 leading-relaxed mt-1">
+                        {item.description || item.explanation}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

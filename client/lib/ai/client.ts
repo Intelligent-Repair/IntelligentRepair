@@ -77,10 +77,11 @@ export class OpenAIClient {
         
         // Add system message if response format is JSON
         // Explicitly state this is car diagnostic images only (no people)
+        // Also emphasize combining text description with image analysis
         if (responseFormat?.type === "json_object") {
           messages.push({
             role: "system",
-            content: "You are a car mechanic assistant. Analyze car dashboard warning lights and vehicle diagnostic images. Images show car warning lights, dashboard displays, or vehicle parts only - no people. This is a car diagnostic tool. Respond with valid JSON only.",
+            content: "You are a car mechanic assistant. Analyze car dashboard warning lights and vehicle diagnostic images. Images show car warning lights, dashboard displays, or vehicle parts only - no people. This is a car diagnostic tool. CRITICAL: You must combine the user's text description (symptoms, vehicle behavior, when the problem occurs) with what you see in the image. Do not rely only on the image - use the text description to understand the full problem. Respond with valid JSON only.",
           });
         }
         
