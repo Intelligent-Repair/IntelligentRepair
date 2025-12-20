@@ -28,19 +28,21 @@ export async function POST(req: Request) {
         }
 
         const prompt = `
-אנא החזר לי אובייקט JSON שמתאים לרכב מסוג ${manufacturer} ${model} שנה ${year}
-המבנה צריך להיות:
-{
-  "tire_pressure_front": "xx psi",
-  "tire_pressure_rear": "xx psi",
-  "tire_instructions": "",
-  "oil_type": "",
-  "oil_instructions": "",
-  "coolant_type": ""
-}
-אם אתה לא יודע, שים ערך ריק "".
-החזר אך ורק JSON תקין וללא טקסט נוסף.
+תענה בפורמט JSON בלבד, ללא טקסט נוסף, בלי הסברים, בלי כותרות.
+
+החזר מבנה JSON שמכיל את המאפיינים הבאים עבור רכב מסוג:
+יצרן: ${manufacturer}, דגם: ${model}, שנה: ${year}
+
+- tire_pressure_front (string)
+- tire_pressure_rear (string)
+- tire_instructions (string)
+- oil_type (string)
+- oil_instructions (string)
+- coolant_type (string)
+
+אם אין לך מידע, שים "".
 `;
+
 
         const gpt = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -52,13 +54,20 @@ export async function POST(req: Request) {
 
         let parsed;
         try {
-            parsed = JSON.parse(content);
-        } catch {
+            // חילוץ תוכן שנראה כמו JSON מתוך כל ההודעה שהגיעה מ־GPT
+            const match = content.match(/\{[\s\S]*\}/);
+            const cleaned = match ? match[0] : '';
+
+            parsed = JSON.parse(cleaned);
+        } catch (e) {
+            console.error("❌ שגיאה בפענוח JSON מה-GPT:", content);
             return NextResponse.json(
                 { error: "GPT החזיר תוכן לא תקין", raw: content },
                 { status: 500 }
             );
         }
+
+
 
         const { data: saved } = await supabase
             .from("manuals")
