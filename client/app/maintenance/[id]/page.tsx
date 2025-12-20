@@ -41,8 +41,7 @@ interface Vehicle {
 }
 
 interface Manual {
-    id: string;
-    car_model: string;
+    // car_model?: string; <-- מיותר
     tire_pressure_front: string;
     tire_pressure_rear: string;
     tire_instructions: string;
@@ -50,6 +49,7 @@ interface Manual {
     oil_instructions: string;
     coolant_type: string;
 }
+
 
 export default function VehicleDetailsPage() {
     const { id } = useParams();
@@ -66,27 +66,24 @@ export default function VehicleDetailsPage() {
             try {
                 if (!id) return;
 
-                // 1. שליפת הרכב מטבלת people_cars (ולא vehicles) + קישור לקטלוג
                 const { data, error: vehicleError } = await supabase
-                    .from('people_cars') // תיקון: הטבלה הנכונה
+                    .from("people_cars")
                     .select(`
-                        *,
-                        vehicle_catalog (
-                            manufacturer,
-                            model,
-                            year
-                        )
-                    `)
-                    .eq('id', id)
+        *,
+        vehicle_catalog (
+          manufacturer,
+          model,
+          year
+        )
+      `)
+                    .eq("id", id)
                     .single();
 
                 if (vehicleError) throw vehicleError;
 
                 if (data) {
-                    // המרה בטוחה לטיפוס שלנו
                     const rawData = data as unknown as RawVehicleData;
 
-                    // טיפול בנתוני הקטלוג (לפעמים מגיע כמערך)
                     const catalog = Array.isArray(rawData.vehicle_catalog)
                         ? rawData.vehicle_catalog[0]
                         : rawData.vehicle_catalog;
@@ -99,32 +96,46 @@ export default function VehicleDetailsPage() {
                         remind_oil_water: rawData.remind_oil_water,
                         remind_tires: rawData.remind_tires,
                         remind_winter: rawData.remind_winter,
-                        // נתונים מהקטלוג
-                        manufacturer: catalog?.manufacturer || 'לא ידוע',
-                        model: catalog?.model || '',
+                        manufacturer: catalog?.manufacturer || "לא ידוע",
+                        model: catalog?.model || "",
                         year: catalog?.year || 0,
                     };
 
                     setVehicle(formattedVehicle);
 
-                    // 2. חיפוש ספר רכב תואם
-                    // הערה: כאן אנחנו משתמשים במודל שהגיע מהקטלוג כדי לחפש את ספר הרכב
+                    // חיפוש ספר רכב
                     if (catalog?.model) {
-                        const { data: manualData } = await supabase
-                            .from('manuals')
-                            .select('*')
-                            .eq('car_model', catalog.model)
-                            .maybeSingle(); // שימוש ב-maybeSingle מונע שגיאה אם אין תוצאות
+                        try {
+                            const res = await fetch("/api/manuals/ensure", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    manufacturer: catalog.manufacturer,
+                                    model: catalog.model,
+                                    year: catalog.year,
+                                }),
+                            });
 
-                        if (manualData) setManual(manualData as Manual);
+                            if (!res.ok) {
+                                const text = await res.text();
+                                console.error("API /manuals/ensure נכשל:", text);
+                                throw new Error("שליפת ספר רכב נכשלה");
+                            }
+
+                            const json = await res.json();
+                            if (json.manual) setManual(json.manual);
+                        } catch (error) {
+                            console.error("Error loading manual:", error);
+                        }
                     }
                 }
             } catch (error) {
-                console.error('Error loading vehicle details:', error);
+                console.error("Error loading vehicle details:", error);
             } finally {
                 setLoading(false);
             }
         };
+
 
         loadData();
     }, [id]);
