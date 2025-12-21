@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { createOpenAIClient } from "@/lib/ai/client";
 import { buildShortDescriptionPrompt } from "@/lib/ai/prompt-builder";
-import { extractJSON } from "../ai/aiUtils";
+import { extractJSON } from "../../ai/aiUtils";
 
 type RequestBody = {
   draft_id?: string;

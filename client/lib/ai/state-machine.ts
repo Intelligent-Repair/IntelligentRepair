@@ -144,11 +144,42 @@ export function aiStateReducer(state: AIState, action: AIAction): AIState {
         text: payload.text ?? "",
         images,
         timestamp: payload.timestamp || Date.now(),
+        isInstruction: payload.isInstruction || false,
       };
 
       return {
         ...state,
         messages: [...state.messages, newMessage],
+      };
+    }
+
+    case "REMOVE_LAST_ANSWER": {
+      // Remove the last answer and its corresponding user message
+      // Safety check: only remove if there are answers to remove
+      if (state.answers.length === 0) {
+        console.warn("[State Machine] REMOVE_LAST_ANSWER called but no answers to remove");
+        return state;
+      }
+      
+      const updatedAnswers = state.answers.slice(0, -1);
+      
+      // Find and remove the last user message
+      let lastUserMessageIndex = -1;
+      for (let i = state.messages.length - 1; i >= 0; i--) {
+        if (state.messages[i].sender === "user") {
+          lastUserMessageIndex = i;
+          break;
+        }
+      }
+      
+      const updatedMessages = lastUserMessageIndex >= 0
+        ? state.messages.filter((_, index) => index !== lastUserMessageIndex)
+        : state.messages;
+
+      return {
+        ...state,
+        answers: updatedAnswers,
+        messages: updatedMessages,
       };
     }
 

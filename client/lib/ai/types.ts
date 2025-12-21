@@ -63,6 +63,7 @@ export interface ChatMessage {
   text?: string;
   images?: string[];
   timestamp: number;
+  isInstruction?: boolean; // True if this is an instruction message (when user says "not sure")
 }
 
 export type AIQuestionType = "yesno" | "multi";
@@ -108,5 +109,6 @@ export type AIAction =
   | { type: "FINISH"; payload: DiagnosisData }
   | { type: "ERROR"; payload: string }
   | { type: "RESET" }
-  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } };
+  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } }
+  | { type: "REMOVE_LAST_ANSWER" }; // Remove last answer (e.g., when user says "not sure" and we re-ask)
 

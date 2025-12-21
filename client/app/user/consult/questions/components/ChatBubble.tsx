@@ -82,14 +82,14 @@ export default function ChatBubble({
         damping: 25,
         delay,
       }}
-      className={`flex w-full mb-4 ${isUser ? "justify-start" : "justify-end"}`}
+      className={`flex w-full mb-4 ${isUser ? "justify-end" : "justify-start"}`}
       dir="rtl"
     >
       <div
-        className={`max-w-[85%] sm:max-w-[75%] p-4 sm:p-5 break-words ${
+        className={`max-w-[85%] sm:max-w-[75%] p-4 break-words ${
           isUser
-            ? "bg-gradient-to-br from-[#4A90E2] to-[#6A9CF2] text-white rounded-3xl rounded-tl-sm shadow-[0_4px_20px_rgba(74,144,226,0.35)]"
-            : "bg-white/10 backdrop-blur-md border border-white/15 text-white rounded-3xl rounded-tr-sm shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
+            ? "bg-gradient-to-br from-[#4A90E2] to-[#6A9CF2] text-white rounded-[20px] rounded-bl-sm shadow-[0_4px_20px_rgba(74,144,226,0.35)]"
+            : "bg-white/10 backdrop-blur-md border border-white/15 text-white rounded-[20px] rounded-br-sm shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
         }`}
         style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
       >

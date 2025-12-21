@@ -6,8 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import ChatBubble from "./components/ChatBubble";
 import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
+import FreeTextInput from "./components/FreeTextInput";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
 import WarningBanner from "./components/WarningBanner";
+import InstructionBubble from "./components/InstructionBubble";
 import { useAIStateMachine } from "./hooks/useAIStateMachine";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
 import { withRetry } from "../../../../lib/ai/retry";
@@ -630,11 +632,17 @@ export default function QuestionsPage() {
           ? draftImagesRef.current.slice(0, 3).filter(url => typeof url === "string" && url.trim().length > 0)
           : [];
         
-        // New spec: Don't send vehicle info to API (only for DB storage)
+        // Send vehicle info only when needed (for instructions about oil/pressure/coolant)
+        // We'll check on backend if it's needed, but send it to be safe
         const requestBody = {
           description: state.description,
           answers: answersToUse,
           image_urls: imageUrls,
+          vehicle: state.vehicle ? {
+            manufacturer: state.vehicle.manufacturer,
+            model: state.vehicle.model,
+            year: state.vehicle.year,
+          } : undefined,
         };
         
         console.log("[QuestionsPage] /api/ai/questions payload", { 
@@ -832,6 +840,13 @@ export default function QuestionsPage() {
           { question: currentQuestion.question, answer: answerText },
         ];
 
+        // Log the answer for debugging
+        console.log("[Questions Page] Submitting answer:", {
+          question: currentQuestion.question,
+          answer: answerText,
+          answersCount: newAnswers.length,
+        });
+
         // Save to session
         saveSessionState(state.vehicle, state.description, researchRef.current, newAnswers);
 
@@ -845,8 +860,8 @@ export default function QuestionsPage() {
           images: imageUrls 
         });
 
-        // New spec: Don't send vehicle info to API (only for DB storage)
-        // Fetch next question or diagnosis and surface a notice if it takes too long
+        // Send vehicle info for instructions about oil/pressure/coolant
+        // Backend will only use it when relevant
         const questionsPromise = fetch("/api/ai/questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -854,6 +869,11 @@ export default function QuestionsPage() {
             description: state.description,
             answers: newAnswers,
             image_urls: imageUrls,
+            vehicle: state.vehicle ? {
+              manufacturer: state.vehicle.manufacturer,
+              model: state.vehicle.model,
+              year: state.vehicle.year,
+            } : undefined,
           }),
         });
 
@@ -907,6 +927,85 @@ export default function QuestionsPage() {
               recommendations: null,
             };
             dispatch.finish(fallbackDiagnosis);
+          }
+        } else if (data.type === "instruction") {
+          // Handle instruction message - show instructions and then re-ask the question
+          try {
+            console.log("[Questions Page] Received instruction response:", data);
+            
+            const instructionText = typeof data.instruction === "string" ? data.instruction : "";
+            const questionText = typeof data.question === "string" ? data.question : "";
+            const options = Array.isArray(data.options) ? data.options : ["כן", "לא", "לא בטוח"];
+            
+            console.log("[Questions Page] Instruction data:", {
+              hasInstruction: !!instructionText,
+              hasQuestion: !!questionText,
+              instructionLength: instructionText.length,
+              questionLength: questionText.length,
+              answersCount: state.answers.length,
+            });
+            
+            if (instructionText && questionText) {
+              // Safety check: only remove if we have answers
+              if (state.answers.length > 0) {
+                // Remove the last "uncertain" answer from state since we're re-asking
+                // This prevents counting "לא בטוח" as a real answer
+                console.log("[Questions Page] Removing last answer and showing instructions");
+                dispatch.removeLastAnswer();
+                
+                // Update session state with removed answer
+                const updatedAnswers = state.answers.slice(0, -1);
+                saveSessionState(state.vehicle, state.description, researchRef.current, updatedAnswers);
+              } else {
+                console.warn("[Questions Page] No answers to remove, but received instruction");
+              }
+              
+              // Add instruction message with special flag
+              dispatch.addMessage({
+                sender: "ai",
+                text: instructionText,
+                isInstruction: true,
+              });
+              
+              // Then add the question to re-ask
+              const questionToReAsk: AIQuestion = {
+                question: questionText,
+                type: "multi",
+                options: options,
+                shouldStop: false,
+              };
+              dispatch.nextQuestion(questionToReAsk);
+            } else {
+              // Fallback if instruction format is invalid
+              console.warn("[Questions Page] Instruction response missing required fields, using fallback");
+              const parsed = parseQuestion(data);
+              if (parsed) {
+                dispatch.nextQuestion(parsed.question);
+              } else {
+                const fallbackQuestion: AIQuestion = {
+                  question: "האם יש תסמינים נוספים?",
+                  type: "multi",
+                  options: ["כן", "לא", "לא בטוח"],
+                  shouldStop: false,
+                };
+                dispatch.nextQuestion(fallbackQuestion);
+              }
+            }
+          } catch (instructionError) {
+            console.error("[Questions Page] Error handling instruction:", instructionError);
+            // Fallback to regular question flow
+            const parsed = parseQuestion(data);
+            if (parsed) {
+              dispatch.nextQuestion(parsed.question);
+            } else {
+              const fallbackQuestion: AIQuestion = {
+                question: "האם יש תסמינים נוספים?",
+                type: "multi",
+                options: ["כן", "לא", "לא בטוח"],
+                shouldStop: false,
+              };
+              dispatch.nextQuestion(fallbackQuestion);
+            }
           }
         } else {
         // Parse and dispatch next question (warnings are only for first question, so we ignore them here)
@@ -1081,10 +1180,11 @@ export default function QuestionsPage() {
   }
 
   const currentQuestion = state.currentQuestion;
+  const canAnswer = helpers.canAnswer(state) && !helpers.isFinished(state);
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a0f1c] via-[#0d1424] to-[#0a0f1c] p-4 md:p-6 relative overflow-hidden"
+      className="h-[100dvh] flex flex-col bg-gradient-to-br from-[#0a0f1c] via-[#0d1424] to-[#0a0f1c] overflow-hidden"
       dir="rtl"
       style={{
         backgroundImage: `
@@ -1095,21 +1195,15 @@ export default function QuestionsPage() {
         boxShadow: "inset 0 0 200px rgba(0, 0, 0, 0.3)",
       }}
     >
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: "radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.2) 100%)",
-        }}
-      />
-
-      <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col relative z-10">
-        <div className="flex-1 overflow-y-auto mb-4 space-y-4 py-6 px-2">
+      {/* Scroll Area - Messages Only */}
+      <div className="flex-1 overflow-y-auto p-4 pb-32">
+        <div className="max-w-4xl mx-auto space-y-4">
           {/* Vehicle Info Banner */}
           {vehicle && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/10 backdrop-blur-lg border border-white/15 rounded-3xl p-5 mb-4 shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
+              className="bg-white/10 backdrop-blur-lg border border-white/15 rounded-3xl p-5 shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
             >
               <div className="text-white/70 text-sm mb-2">רכב נבחר</div>
               <div className="text-white font-bold text-lg">
@@ -1167,51 +1261,32 @@ export default function QuestionsPage() {
                   );
                 }
 
-                // Check if this is the current question
-                const isCurrentQuestion = currentQuestion && msg.text === currentQuestion.question && isLastMessage;
+                // Render instruction message (when user says "not sure")
+                if (msg.isInstruction && msg.text) {
+                  return (
+                    <InstructionBubble key={messageKey} message={msg.text} />
+                  );
+                }
 
                 return (
-                  <React.Fragment key={messageKey}>
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 25,
-                        delay: 0.1
-                      }}
-                      className="mb-4"
-                    >
-                      <ChatBubble
-                        message={msg.text}
-                        isUser={false}
-                        typewriter={false}
-                      />
-                    </motion.div>
-
-                    {/* Show buttons for current question */}
-                    {isCurrentQuestion &&
-                      helpers.canAnswer(state) && !helpers.isFinished(state) && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.3 }}
-                          className="mb-6"
-                        >
-                          <MultiChoiceButtons
-                            options={
-                              currentQuestion.options && currentQuestion.options.length > 0
-                                ? currentQuestion.options.slice(0, 5)
-                                : ["כן", "לא"]
-                            }
-                            onSelect={(option) => handleAnswer(option)}
-                            disabled={isTyping || isProcessingRef.current || helpers.isFinished(state)}
-                          />
-                        </motion.div>
-                      )}
-                  </React.Fragment>
+                  <motion.div
+                    key={messageKey}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 25,
+                      delay: 0.1
+                    }}
+                  >
+                    <ChatBubble
+                      message={msg.text}
+                      isUser={false}
+                      typewriter={false}
+                    />
+                  </motion.div>
                 );
               } else {
                 // User message
@@ -1227,7 +1302,6 @@ export default function QuestionsPage() {
                       damping: 25,
                       delay: 0.1
                     }}
-                    className="mb-4"
                   >
                     <ChatBubble message={msg.text} images={msg.images} isUser={true} />
                   </motion.div>
@@ -1254,7 +1328,7 @@ export default function QuestionsPage() {
                 damping: 25,
                 delay: 0.5,
               }}
-              className="flex flex-col gap-4 mb-4 w-full mt-6"
+              className="flex flex-col gap-4 w-full mt-6"
               dir="rtl"
             >
               <motion.button
@@ -1296,6 +1370,35 @@ export default function QuestionsPage() {
           <div ref={chatEndRef} />
         </div>
       </div>
+
+      {/* Fixed Footer - Input Area */}
+      {!helpers.isFinished(state) && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0f1c] via-[#0d1424]/95 to-transparent z-50" dir="rtl">
+          <div className="max-w-4xl mx-auto w-full">
+            {/* Choice Chips */}
+            {currentQuestion && canAnswer && (
+              <div className="mb-3">
+                <MultiChoiceButtons
+                  options={
+                    currentQuestion.options && currentQuestion.options.length > 0
+                      ? currentQuestion.options.slice(0, 5)
+                      : ["כן", "לא"]
+                  }
+                  onSelect={(option) => handleAnswer(option)}
+                  disabled={isTyping || isProcessingRef.current || helpers.isFinished(state)}
+                />
+              </div>
+            )}
+            
+            {/* Text Input */}
+            <FreeTextInput
+              onSubmit={(text) => handleAnswer(text)}
+              disabled={isTyping || isProcessingRef.current || !canAnswer}
+              placeholder="או כתוב תשובה משלך..."
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
