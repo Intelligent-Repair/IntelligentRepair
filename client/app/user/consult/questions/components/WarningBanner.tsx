@@ -45,7 +45,7 @@ export default function WarningBanner({ message, type, onClose }: WarningBannerP
                 isDanger ? "text-red-200" : "text-orange-200"
               }`}
             >
-              {isDanger ? "אזהרת בטיחות קריטית" : "הודעת זהירות"}
+              {isDanger ? "שים לב ! אזהרת בטיחות קריטית !" : "שים לב !"}
             </h3>
             <p
               className={`leading-relaxed ${

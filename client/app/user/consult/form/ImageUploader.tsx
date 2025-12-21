@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Image as ImageIcon, X } from "lucide-react";
+import { Camera, Image as ImageIcon, X, CheckCircle2, Upload as UploadIcon } from "lucide-react";
 
 type UploadStatus = "uploading" | "uploaded" | "error";
 
@@ -44,6 +44,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -151,8 +152,16 @@ export default function ImageUploader(props: ImageUploaderProps) {
         )
       );
 
+      // Show success message
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 3000); // Hide after 3 seconds
+
       if (!uploadedUrl) {
         setFeedback("התמונה הועלתה, מחכים לכתובת תצוגה מהשרת.");
+      } else {
+        setFeedback(null); // Clear any previous feedback
       }
     } catch (err) {
       console.error("Error uploading image:", err);
@@ -243,17 +252,51 @@ export default function ImageUploader(props: ImageUploaderProps) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="relative group h-24 w-24"
               >
-                <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 h-full w-full">
+                <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 h-full w-full relative">
                   <img
                     src={img.url || img.preview}
                     alt={img.name || "תמונה שהועלתה"}
                     className="h-full w-full object-cover"
                   />
+                  
+                  {/* Upload Status Indicator */}
+                  {img.status === "uploading" && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Success Badge */}
+                  {img.status === "uploaded" && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1 shadow-lg"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </motion.div>
+                  )}
+                  
+                  {/* Error Badge */}
+                  {img.status === "error" && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute bottom-1 right-1 bg-red-500 rounded-full p-1 shadow-lg"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </motion.div>
+                  )}
+                  
                   {/* Remove Button - Top Corner */}
                   <button
                     type="button"
                     onClick={() => handleRemove(img.id)}
-                    className="absolute top-1 right-1 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     aria-label="הסר תמונה"
                   >
                     <X className="w-3 h-3" />
@@ -333,11 +376,45 @@ export default function ImageUploader(props: ImageUploaderProps) {
         }}
       />
 
-      {/* Feedback Message */}
-      {feedback && (
-        <div className="mt-3 text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+      {/* Success Message - Shows when image is uploaded */}
+      <AnimatePresence>
+        {showSuccessMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-3 flex items-center gap-2 text-sm text-green-200 bg-green-500/10 border border-green-500/30 rounded-xl p-3"
+          >
+            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+            <span>התמונה הועלתה בהצלחה!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Feedback Message (for errors or info) */}
+      {feedback && !showSuccessMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3"
+        >
           {feedback}
-        </div>
+        </motion.div>
+      )}
+      
+      {/* Upload Count Info */}
+      {images.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-3 text-xs text-slate-400 flex items-center gap-1.5"
+        >
+          <UploadIcon className="w-3.5 h-3.5" />
+          <span>
+            {images.filter(img => img.status === "uploaded").length} מתוך {images.length} תמונות הועלו
+            {images.some(img => img.status === "uploading") && " • מעלה..."}
+          </span>
+        </motion.div>
       )}
 
       {/* Request ID Error */}

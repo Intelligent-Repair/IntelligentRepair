@@ -14,6 +14,7 @@ import { useAIStateMachine } from "./hooks/useAIStateMachine";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
 import { withRetry } from "../../../../lib/ai/retry";
 import { supabase } from "@/lib/supabaseClient";
+import { CarFront } from "lucide-react";
 
 interface Vehicle {
   id: string;
@@ -149,7 +150,8 @@ async function fetchResearchWithRetry(
 function parseQuestion(
   data: any
 ): { question: AIQuestion; safetyWarning: string | null; cautionNotice: string | null } | null {
-  if (data.type !== "question") {
+  // Accept both "question" and "text_input" types
+  if (data.type !== "question" && data.type !== "text_input") {
     return null;
   }
 
@@ -158,10 +160,26 @@ function parseQuestion(
     return null;
   }
 
+  // Check if this is a text input question (open-ended)
+  const isTextInput = data.type === "text_input";
+  
+  // Extract options from response
   const options = Array.isArray(data.options)
     ? data.options.filter((o: any) => typeof o === "string" && o.trim()).slice(0, 5)
     : [];
-  const safeOptions = options.length >= 3 ? options : ["כן", "לא", "לא בטוח"];
+  
+  // Determine if this is an open-ended question (no options or empty options)
+  const isOpenEnded = isTextInput || options.length === 0;
+  
+  // Only use fallback options for yes/no questions (not for open-ended)
+  // If we have 0 options, it's an open-ended question - don't add fallback
+  // If we have 1 option, it's invalid - use fallback
+  // If we have 2+ options, use them as-is
+  const safeOptions = isOpenEnded
+    ? [] // No options for open-ended questions
+    : options.length >= 2 
+      ? options 
+      : ["כן", "לא"]; // Fallback only for yes/no questions with invalid options
 
   const safetyWarning =
     typeof data.safety_warning === "string" && data.safety_warning.trim()
@@ -173,11 +191,21 @@ function parseQuestion(
       ? data.caution_notice.trim()
       : null;
 
+  // Determine question type
+  let questionType: "yesno" | "multi" | "text";
+  if (isOpenEnded) {
+    questionType = "text";
+  } else if (options.length === 2) {
+    questionType = "yesno";
+  } else {
+    questionType = "multi";
+  }
+
   return {
     question: {
       question: questionText,
-      type: "multi",
-      options: safeOptions,
+      type: questionType,
+      options: safeOptions.length > 0 ? safeOptions : undefined, // undefined if empty array
       shouldStop: typeof data.shouldStop === "boolean" ? data.shouldStop : false,
     },
     safetyWarning,
@@ -1198,18 +1226,35 @@ export default function QuestionsPage() {
       {/* Scroll Area - Messages Only */}
       <div className="flex-1 overflow-y-auto p-4 pb-32">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Vehicle Info Banner */}
+          {/* Vehicle Floating Pill */}
           {vehicle && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/10 backdrop-blur-lg border border-white/15 rounded-3xl p-5 shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
+              className="w-full flex justify-center mb-6 z-10 relative"
             >
-              <div className="text-white/70 text-sm mb-2">רכב נבחר</div>
-              <div className="text-white font-bold text-lg">
-                {vehicle.manufacturer} {vehicle.model} {vehicle.year && `(${vehicle.year})`}
+              <div className="w-fit max-w-2xl mx-auto rounded-full bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl px-8 py-3 flex flex-row items-center gap-4">
+                {/* Icon */}
+                <div className="p-2.5 bg-blue-500/20 rounded-full text-blue-400 flex-shrink-0">
+                  <CarFront size={20} />
+                </div>
+                
+                {/* Divider */}
+                <div className="h-8 w-[1px] bg-white/10 flex-shrink-0" />
+                
+                {/* Text Content */}
+                <div className="flex flex-col gap-0.5">
+                  {/* Vehicle Title */}
+                  <h1 className="text-lg font-bold text-white">
+                    {vehicle.manufacturer} {vehicle.model}
+                  </h1>
+                  
+                  {/* Vehicle Details */}
+                  <p className="text-sm text-slate-400">
+                    {vehicle.year && `שנת ${vehicle.year}`} {vehicle.year && vehicle.license_plate && " | "} {vehicle.license_plate && `מ.ר. ${vehicle.license_plate}`}
+                  </p>
+                </div>
               </div>
-              <div className="text-white/60 text-sm">{vehicle.license_plate}</div>
             </motion.div>
           )}
 
@@ -1375,15 +1420,14 @@ export default function QuestionsPage() {
       {!helpers.isFinished(state) && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0f1c] via-[#0d1424]/95 to-transparent z-50" dir="rtl">
           <div className="max-w-4xl mx-auto w-full">
-            {/* Choice Chips */}
-            {currentQuestion && canAnswer && (
+            {/* Choice Chips - Only show if question has explicit options (not for open-ended text questions) */}
+            {currentQuestion && canAnswer && 
+             currentQuestion.options && 
+             currentQuestion.options.length > 0 && 
+             currentQuestion.type !== "text" && (
               <div className="mb-3">
                 <MultiChoiceButtons
-                  options={
-                    currentQuestion.options && currentQuestion.options.length > 0
-                      ? currentQuestion.options.slice(0, 5)
-                      : ["כן", "לא"]
-                  }
+                  options={currentQuestion.options.slice(0, 5)}
                   onSelect={(option) => handleAnswer(option)}
                   disabled={isTyping || isProcessingRef.current || helpers.isFinished(state)}
                 />
@@ -1394,7 +1438,12 @@ export default function QuestionsPage() {
             <FreeTextInput
               onSubmit={(text) => handleAnswer(text)}
               disabled={isTyping || isProcessingRef.current || !canAnswer}
-              placeholder="או כתוב תשובה משלך..."
+              placeholder={
+                currentQuestion && 
+                (!currentQuestion.options || currentQuestion.options.length === 0 || currentQuestion.type === "text")
+                  ? "כתוב תשובה מפורטת..."
+                  : "או כתוב תשובה משלך..."
+              }
             />
           </div>
         </div>

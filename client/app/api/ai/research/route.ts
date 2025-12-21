@@ -6,9 +6,22 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createOpenAIClient } from "@/lib/ai/client";
 import { extractJSON } from "../aiUtils";
 import { buildResearchPrompt } from "@/lib/ai/prompt-builder";
+
+// Research model - using mini for cost optimization
+const RESEARCH_MODEL = "gpt-4o-mini";
+
+// Strict Zod schema for research response validation
+const ResearchResponseSchema = z.object({
+  top_causes: z.array(z.string()).min(1),
+  differentiating_factors: z.array(z.string()).min(1),
+  reasoning: z.string().min(1),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  keywords: z.array(z.string()).min(3).max(5),
+});
 
 function fallbackResearch() {
   return {
@@ -25,6 +38,8 @@ function fallbackResearch() {
     summary: "הממצאים מבוססים על ניתוח כללי של תקלות נפוצות. מומלץ להמשיך בתהליך האבחון.",
     raw: "",
     reasoning: "הממצאים מבוססים על ניתוח כללי של תקלות נפוצות. מומלץ להמשיך בתהליך האבחון.",
+    severity: "medium" as const,
+    keywords: ["תקלה כללית", "מערכת", "אבחון"],
   };
 }
 
@@ -41,14 +56,17 @@ export async function POST(req: Request) {
       return NextResponse.json(fallbackResearch(), { status: 200 });
     }
 
-    const client = createOpenAIClient(apiKey, "gpt-4o", {
+    // Use gpt-4o-mini for cost optimization and set low temperature for deterministic output
+    const client = createOpenAIClient(apiKey, RESEARCH_MODEL, {
       responseFormat: { type: "json_object" },
+      temperature: 0.2, // Low temperature for factual, consistent research output
     });
 
     // Build prompt without vehicle info (according to new spec)
     const prompt = buildResearchPrompt(description);
 
     console.log("[Research API] Calling OpenAI with description length:", description?.length || 0);
+    console.log("[Research API] Using model:", RESEARCH_MODEL, "with temperature: 0.2");
     
     let raw: string;
     try {
@@ -70,13 +88,26 @@ export async function POST(req: Request) {
       return NextResponse.json(fallbackResearch(), { status: 200 });
     }
 
+    // Strict validation using Zod schema
+    const validationResult = ResearchResponseSchema.safeParse(parsed);
+    
+    if (!validationResult.success) {
+      console.error("[Research API] Zod validation failed:", validationResult.error.errors);
+      console.error("[Research API] Invalid response structure, using fallback");
+      return NextResponse.json(fallbackResearch(), { status: 200 });
+    }
+
+    const validated = validationResult.data;
+
     return NextResponse.json(
       {
-        top_causes: parsed.top_causes ?? [],
-        differentiating_factors: parsed.differentiating_factors ?? [],
-        summary: parsed.reasoning ?? parsed.summary ?? "Analysis summary unavailable.",
+        top_causes: validated.top_causes,
+        differentiating_factors: validated.differentiating_factors,
+        summary: validated.reasoning,
         raw: raw,
-        reasoning: parsed.reasoning ?? "Analysis summary unavailable.",
+        reasoning: validated.reasoning,
+        severity: validated.severity,
+        keywords: validated.keywords,
       },
       { status: 200 }
     );

@@ -36,8 +36,16 @@ export default function FreeTextInput({
     if (trimmedText && !disabled) {
       onSubmit(trimmedText);
       setText("");
+      // Force reset textarea height and trigger reflow
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
+        // Use requestAnimationFrame to ensure layout update
+        requestAnimationFrame(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+          }
+        });
       }
     }
   };
@@ -87,15 +95,11 @@ export default function FreeTextInput({
           disabled={disabled || !text.trim()}
           whileHover={!disabled && text.trim() ? { scale: 1.1 } : {}}
           whileTap={!disabled && text.trim() ? { scale: 0.9 } : {}}
-          className={`absolute left-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+          className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
             disabled || !text.trim()
               ? "bg-white/5 text-white/30 cursor-not-allowed"
               : "bg-gradient-to-r from-[#4A90E2] to-[#6A9CF2] text-white shadow-[0_4px_12px_rgba(74,144,226,0.4)] hover:shadow-[0_6px_16px_rgba(74,144,226,0.6)]"
           }`}
-          style={{
-            top: "50%",
-            transform: "translateY(-50%)",
-          }}
         >
           <svg
             className="w-4 h-4"

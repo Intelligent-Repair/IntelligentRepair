@@ -24,6 +24,8 @@ export interface ResearchData {
   top_causes: string[];
   differentiating_factors: string[];
   reasoning: string;
+  severity: "low" | "medium" | "high" | "critical";
+  keywords: string[];
 }
 
 export interface DiagnosisData {
@@ -66,12 +68,12 @@ export interface ChatMessage {
   isInstruction?: boolean; // True if this is an instruction message (when user says "not sure")
 }
 
-export type AIQuestionType = "yesno" | "multi";
+export type AIQuestionType = "yesno" | "multi" | "text";
 
 export interface AIQuestion {
   question: string;
   type: AIQuestionType;
-  options: string[];
+  options?: string[];
   shouldStop?: boolean;
 }
 
