@@ -37,6 +37,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ manual: existing });
         }
 
+        console.log("🔍 מחפש עבור:", manufacturer, model, year);
+
+
+
         // הכנה ל־GPT עם פלט בעברית בלבד
         const prompt = `
 החזר אך ורק אובייקט JSON תקין שמתאר ספר רכב עבור רכב מסוג ${manufacturer} ${model} משנת ${year} (בלי טקסט נוסף):

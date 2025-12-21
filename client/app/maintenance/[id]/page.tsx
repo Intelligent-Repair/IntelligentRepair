@@ -1,19 +1,20 @@
-﻿'use client';
+﻿// ✅ קובץ מוכן להדבקה - VehicleDetailsPage.tsx
+'use client';
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Wrench, Bell, Save, Droplets, Wind, Thermometer, Calendar } from 'lucide-react';
+import {
+    ArrowRight, Wrench, Bell, Save, Droplets, Wind, Thermometer
+} from 'lucide-react';
 
-// 1. הגדרת הממשקים (Interfaces) בצורה מדויקת
 interface CatalogData {
     manufacturer: string;
     model: string;
     year: number;
 }
 
-// המבנה הגולמי שמגיע מ-Supabase ב-Join
 interface RawVehicleData {
     id: string;
     license_plate: string;
@@ -22,26 +23,12 @@ interface RawVehicleData {
     remind_oil_water: boolean;
     remind_tires: boolean;
     remind_winter: boolean;
-    // האובייקט המקושר
-    vehicle_catalog: CatalogData | CatalogData[] | null;
+    vehicle_catalog: CatalogData | null;
 }
 
-// המבנה הסופי והנוח לשימוש בקומפוננטה
-interface Vehicle {
-    id: string;
-    manufacturer: string;
-    model: string;
-    year: number;
-    license_plate: string;
-    test_date: string | null;
-    service_date: string | null;
-    remind_oil_water: boolean;
-    remind_tires: boolean;
-    remind_winter: boolean;
-}
+interface Vehicle extends RawVehicleData, CatalogData { }
 
 interface Manual {
-    // car_model?: string; <-- מיותר
     tire_pressure_front: string;
     tire_pressure_rear: string;
     tire_instructions: string;
@@ -50,118 +37,91 @@ interface Manual {
     coolant_type: string;
 }
 
-
 export default function VehicleDetailsPage() {
     const { id } = useParams();
-    const router = useRouter();
     const [activeTab, setActiveTab] = useState<'technical' | 'reminders'>('technical');
     const [loading, setLoading] = useState(true);
-
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [manual, setManual] = useState<Manual | null>(null);
 
-    // טעינת נתונים
     useEffect(() => {
         const loadData = async () => {
+            setLoading(true);
+
+            // שלב 1 - הבאת פרטי רכב כולל vehicle_catalog
+            const { data: raw, error } = await supabase
+                .from('people_cars')
+                .select(`*, vehicle_catalog(*)`)
+                .eq('id', id)
+                .maybeSingle();
+
+            if (error || !raw || !raw.vehicle_catalog) {
+                console.warn('לא נמצא רכב או vehicle_catalog ריק');
+                setLoading(false);
+                return;
+            }
+
+            const catalog = raw.vehicle_catalog;
+            const normalizedVehicle: Vehicle = {
+                ...raw,
+                manufacturer: catalog.manufacturer,
+                model: catalog.model,
+                year: catalog.year,
+            };
+            setVehicle(normalizedVehicle);
+
+            // שלב 2 - בדיקת נתונים ב-manuals / הבאת GPT
             try {
-                if (!id) return;
+                const res = await fetch('/api/manuals/ensure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        manufacturer: catalog.manufacturer,
+                        model: catalog.model,
+                        year: catalog.year,
+                    }),
+                });
 
-                const { data, error: vehicleError } = await supabase
-                    .from("people_cars")
-                    .select(`
-        *,
-        vehicle_catalog (
-          manufacturer,
-          model,
-          year
-        )
-      `)
-                    .eq("id", id)
-                    .single();
-
-                if (vehicleError) throw vehicleError;
-
-                if (data) {
-                    const rawData = data as unknown as RawVehicleData;
-
-                    const catalog = Array.isArray(rawData.vehicle_catalog)
-                        ? rawData.vehicle_catalog[0]
-                        : rawData.vehicle_catalog;
-
-                    const formattedVehicle: Vehicle = {
-                        id: rawData.id,
-                        license_plate: rawData.license_plate,
-                        test_date: rawData.test_date,
-                        service_date: rawData.service_date,
-                        remind_oil_water: rawData.remind_oil_water,
-                        remind_tires: rawData.remind_tires,
-                        remind_winter: rawData.remind_winter,
-                        manufacturer: catalog?.manufacturer || "לא ידוע",
-                        model: catalog?.model || "",
-                        year: catalog?.year || 0,
-                    };
-
-                    setVehicle(formattedVehicle);
-
-                    // חיפוש ספר רכב
-                    if (catalog?.model) {
-                        try {
-                            const res = await fetch("/api/manuals/ensure", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    manufacturer: catalog.manufacturer,
-                                    model: catalog.model,
-                                    year: catalog.year,
-                                }),
-                            });
-
-                            if (!res.ok) {
-                                const text = await res.text();
-                                console.error("API /manuals/ensure נכשל:", text);
-                                throw new Error("שליפת נתוני תחזוקה נכשלה");
-                            }
-
-                            const json = await res.json();
-                            if (json.manual) setManual(json.manual);
-                        } catch (error) {
-                            console.error("Error loading manual:", error);
-                        }
-                    }
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error('API /manuals/ensure נכשל:', text);
+                    throw new Error('שליפת נתוני תחזוקה נכשלה');
                 }
-            } catch (error) {
-                console.error("Error loading vehicle details:", error);
+
+                const json = await res.json();
+                if (json.manual) {
+                    setManual(json.manual);
+                } else {
+                    console.warn('⚠️ לא הוחזר manual מהשרת');
+                }
+            } catch (err) {
+                console.error('שגיאה בטעינת נתוני תחזוקה:', err);
             } finally {
                 setLoading(false);
             }
         };
 
-
         loadData();
     }, [id]);
 
-    // שמירת תזכורות
     const saveReminders = async () => {
         if (!vehicle) return;
-
         try {
             const { error } = await supabase
-                .from('people_cars') // תיקון: עדכון הטבלה הנכונה
+                .from('people_cars')
                 .update({
                     test_date: vehicle.test_date,
                     service_date: vehicle.service_date,
                     remind_oil_water: vehicle.remind_oil_water,
                     remind_tires: vehicle.remind_tires,
-                    remind_winter: vehicle.remind_winter
+                    remind_winter: vehicle.remind_winter,
                 })
                 .eq('id', id);
 
             if (error) throw error;
             alert('ההגדרות נשמרו בהצלחה! ✅');
-
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
-            alert('שגיאה: ' + errorMessage);
+            alert('שגיאה בשמירה');
         }
     };
 
@@ -170,13 +130,10 @@ export default function VehicleDetailsPage() {
 
     return (
         <div dir="rtl" className="min-h-screen p-6 text-white pb-24">
-
             <Link href="/maintenance" className="inline-flex items-center text-blue-300 hover:text-white mb-6">
-                <ArrowRight className="w-5 h-5 ml-2" />
-                חזרה לרשימה
+                <ArrowRight className="w-5 h-5 ml-2" /> חזרה לרשימה
             </Link>
 
-            {/* כותרת הרכב */}
             <header className="mb-8">
                 <h1 className="text-4xl font-bold text-white mb-2">
                     {vehicle.manufacturer} {vehicle.model}
@@ -187,34 +144,16 @@ export default function VehicleDetailsPage() {
                 </div>
             </header>
 
-            {/* טאבים */}
             <div className="flex gap-4 mb-8 border-b border-white/10 pb-4">
-                <button
-                    onClick={() => setActiveTab('technical')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'technical'
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                        : 'text-white/50 hover:bg-white/5'
-                        }`}
-                >
-                    <Wrench className="w-4 h-4" />
-                    מידע טכני
+                <button onClick={() => setActiveTab('technical')} className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'technical' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-white/50 hover:bg-white/5'}`}>
+                    <Wrench className="w-4 h-4" /> מידע טכני
                 </button>
-                <button
-                    onClick={() => setActiveTab('reminders')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'reminders'
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                        : 'text-white/50 hover:bg-white/5'
-                        }`}
-                >
-                    <Bell className="w-4 h-4" />
-                    תזכורות וטיפולים
+                <button onClick={() => setActiveTab('reminders')} className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all ${activeTab === 'reminders' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-white/50 hover:bg-white/5'}`}>
+                    <Bell className="w-4 h-4" /> תזכורות וטיפולים
                 </button>
             </div>
 
-            {/* תוכן הטאבים */}
             <div className="max-w-3xl">
-
-                {/* טאב 1: מידע טכני */}
                 {activeTab === 'technical' && (
                     <div className="grid gap-6">
                         {!manual ? (
@@ -223,7 +162,6 @@ export default function VehicleDetailsPage() {
                             </div>
                         ) : (
                             <>
-                                {/* לחץ אוויר */}
                                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
                                     <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-300">
                                         <Wind className="w-5 h-5" /> לחץ אוויר
@@ -243,7 +181,6 @@ export default function VehicleDetailsPage() {
                                     </p>
                                 </div>
 
-                                {/* שמן ונוזלים */}
                                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
                                     <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-green-300">
                                         <Droplets className="w-5 h-5" /> נוזלים ושמנים
@@ -269,10 +206,8 @@ export default function VehicleDetailsPage() {
                     </div>
                 )}
 
-                {/* טאב 2: תזכורות */}
                 {activeTab === 'reminders' && (
                     <div className="bg-white/5 border border-white/10 p-6 rounded-2xl space-y-6">
-
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm text-gray-400 mb-2">תאריך טסט הבא</label>
@@ -344,10 +279,8 @@ export default function VehicleDetailsPage() {
                             <Save className="w-5 h-5" />
                             שמור הגדרות
                         </button>
-
                     </div>
                 )}
-
             </div>
         </div>
     );
