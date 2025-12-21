@@ -11,15 +11,25 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY!,
 });
 
+function clean(value?: string) {
+    return value?.toLowerCase().includes("empty") ? "" : value?.trim() || "";
+}
+
 export async function POST(req: Request) {
     try {
-        const { manufacturer, model, year } = await req.json();
+        const body = await req.json();
 
+        // ניקוי נתונים לפני שימוש
+        const manufacturer = body.manufacturer?.trim();
+        const model = body.model?.trim().replace(/\s+/g, " ");
+        const year = Number(body.year);
+
+        // בדיקה אם כבר קיים ספר רכב כזה
         const { data: existing } = await supabase
             .from("manuals")
             .select("*")
-            .eq("manufacturer", manufacturer)
-            .eq("model", model)
+            .ilike("manufacturer", manufacturer)
+            .ilike("model", model)
             .eq("year", year)
             .maybeSingle();
 
@@ -27,22 +37,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ manual: existing });
         }
 
+        // הכנה ל־GPT עם פלט בעברית בלבד
         const prompt = `
-תענה בפורמט JSON בלבד, ללא טקסט נוסף, בלי הסברים, בלי כותרות.
+החזר אך ורק אובייקט JSON תקין שמתאר ספר רכב עבור רכב מסוג ${manufacturer} ${model} משנת ${year} (בלי טקסט נוסף):
 
-החזר מבנה JSON שמכיל את המאפיינים הבאים עבור רכב מסוג:
-יצרן: ${manufacturer}, דגם: ${model}, שנה: ${year}
+{
+  "tire_pressure_front": "xx psi",
+  "tire_pressure_rear": "xx psi",
+  "tire_instructions": "כתוב בעברית בלבד על בדיקות לחץ אוויר",
+  "oil_type": "סוג שמן מומלץ",
+  "oil_instructions": "כתוב בעברית בלבד מתי ואיך להחליף שמן",
+  "coolant_type": "סוג נוזל קירור"
+}
 
-- tire_pressure_front (string)
-- tire_pressure_rear (string)
-- tire_instructions (string)
-- oil_type (string)
-- oil_instructions (string)
-- coolant_type (string)
-
-אם אין לך מידע, שים "".
+אם אתה לא יודע ערך מסוים — החזר מחרוזת ריקה "".
+אל תשתמש ב־\\ או תווי בריחה.
 `;
-
 
         const gpt = await openai.chat.completions.create({
             model: "gpt-4o",
@@ -54,48 +64,49 @@ export async function POST(req: Request) {
 
         let parsed;
         try {
-            // חילוץ תוכן שנראה כמו JSON מתוך כל ההודעה שהגיעה מ־GPT
-            const match = content.match(/\{[\s\S]*\}/);
-            const cleaned = match ? match[0] : '';
-
-            parsed = JSON.parse(cleaned);
-        } catch (e) {
-            console.error("❌ שגיאה בפענוח JSON מה-GPT:", content);
+            parsed = JSON.parse(content);
+        } catch {
             return NextResponse.json(
                 { error: "GPT החזיר תוכן לא תקין", raw: content },
                 { status: 500 }
             );
         }
 
-
-
-        const { data: saved } = await supabase
+        // שמירה ל־Supabase עם ניקוי
+        const { data: saved, error: insertError } = await supabase
             .from("manuals")
             .upsert({
                 manufacturer,
                 model,
                 year,
-                tire_pressure_front: parsed.tire_pressure_front ?? "",
-                tire_pressure_rear: parsed.tire_pressure_rear ?? "",
-                tire_instructions: parsed.tire_instructions ?? "",
-                oil_type: parsed.oil_type ?? "",
-                oil_instructions: parsed.oil_instructions ?? "",
-                coolant_type: parsed.coolant_type ?? "",
+                tire_pressure_front: clean(parsed.tire_pressure_front),
+                tire_pressure_rear: clean(parsed.tire_pressure_rear),
+                tire_instructions: clean(parsed.tire_instructions),
+                oil_type: clean(parsed.oil_type),
+                oil_instructions: clean(parsed.oil_instructions),
+                coolant_type: clean(parsed.coolant_type),
             })
             .select("*")
             .single();
 
+        if (insertError) {
+            throw insertError;
+        }
+
         return NextResponse.json({ manual: saved });
-    } catch (err) {
-        console.error("שגיאה ב־/api/manuals/ensure:", err);
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "שגיאה לא ידועה";
+        console.error("שגיאה ב־/api/manuals/ensure:", message);
         return NextResponse.json(
             {
                 error: "שגיאה בצד שרת",
-                message: err instanceof Error ? err.message : String(err),
+                message,
             },
             { status: 500 }
         );
     }
+
 }
+
 
 

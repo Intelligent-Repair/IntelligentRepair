@@ -119,7 +119,7 @@ export default function VehicleDetailsPage() {
                             if (!res.ok) {
                                 const text = await res.text();
                                 console.error("API /manuals/ensure נכשל:", text);
-                                throw new Error("שליפת ספר רכב נכשלה");
+                                throw new Error("שליפת נתוני תחזוקה נכשלה");
                             }
 
                             const json = await res.json();
@@ -219,7 +219,7 @@ export default function VehicleDetailsPage() {
                     <div className="grid gap-6">
                         {!manual ? (
                             <div className="p-10 text-center bg-white/5 rounded-2xl border border-dashed border-white/20">
-                                <p className="text-white/50">לא נמצא ספר רכב לדגם זה במערכת.</p>
+                                <p className="text-white/50">לא נמצא נתונים על סוג רכב זה.</p>
                             </div>
                         ) : (
                             <>
