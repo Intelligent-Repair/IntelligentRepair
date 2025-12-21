@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { CarFront, Send, Loader2, Pencil, Bot, Sparkles } from "lucide-react";
 import ImageUploader from "./ImageUploader";
 
 interface Vehicle {
@@ -125,10 +126,38 @@ export default function ConsultFormPage() {
   if (loading) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center p-6"
+        className="min-h-screen flex items-center justify-center p-6 bg-[#0f172a] relative overflow-hidden"
         dir="rtl"
       >
-        <div className="text-white/70 text-lg">טוען פרטי רכב...</div>
+        {/* Animated Dot Background */}
+        <div className="fixed inset-0 -z-10">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px)`,
+              backgroundSize: "32px 32px",
+              backgroundPosition: "0 0",
+            }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              style={{
+                backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.2) 1px, transparent 1px)`,
+                backgroundSize: "32px 32px",
+                backgroundPosition: "0 0",
+              }}
+            />
+          </div>
+        </div>
+        <div className="text-slate-200 text-lg">טוען פרטי רכב...</div>
       </div>
     );
   }
@@ -136,17 +165,45 @@ export default function ConsultFormPage() {
   if (error && !vehicle) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center p-6"
+        className="min-h-screen flex items-center justify-center p-6 bg-[#0f172a] relative overflow-hidden"
         dir="rtl"
       >
-        <div className="bg-white/10 backdrop-blur-xl border border-red-500/30 rounded-3xl shadow-2xl p-8 max-w-md">
+        {/* Animated Dot Background */}
+        <div className="fixed inset-0 -z-10">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px)`,
+              backgroundSize: "32px 32px",
+              backgroundPosition: "0 0",
+            }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              style={{
+                backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.2) 1px, transparent 1px)`,
+                backgroundSize: "32px 32px",
+                backgroundPosition: "0 0",
+              }}
+            />
+          </div>
+        </div>
+        <div className="bg-[#1e293b] border border-slate-800 rounded-3xl shadow-2xl p-8 max-w-md">
           <div className="text-red-400 text-xl font-bold mb-4">שגיאה</div>
-          <div className="text-white/70 mb-6">{error}</div>
+          <div className="text-slate-200 mb-6">{error}</div>
           <motion.button
             onClick={() => router.push("/user")}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-full p-4 bg-gradient-to-r from-[#4A90E2] to-[#5c60ff] text-white font-bold rounded-xl"
+            className="w-full p-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold rounded-full"
           >
             חזרה לתפריט הראשי
           </motion.button>
@@ -155,84 +212,193 @@ export default function ConsultFormPage() {
     );
   }
 
+  // Animation variants for staggerChildren
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut",
+      },
+    },
+  };
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
+      className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden"
       dir="rtl"
     >
-      <div className="w-full max-w-4xl space-y-6">
-        {/* כרטיס פרטי רכב */}
+      {/* Animated Dot Background */}
+      <div className="fixed inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px)`,
+            backgroundSize: "32px 32px",
+            backgroundPosition: "0 0",
+          }}
+        >
+          <motion.div
+            className="absolute inset-0"
+            animate={{
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(148, 163, 184, 0.2) 1px, transparent 1px)`,
+              backgroundSize: "32px 32px",
+              backgroundPosition: "0 0",
+            }}
+          />
+        </div>
+      </div>
+      {/* Atmospheric Glow behind card */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/20 blur-[100px] rounded-full pointer-events-none -z-0" />
+      
+      <motion.div
+        className="w-full max-w-xl md:max-w-2xl space-y-6 relative z-10"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header Title - Centered */}
+        <motion.h1
+          variants={itemVariants}
+          className="text-2xl md:text-3xl font-bold text-center mb-6 flex items-center justify-center gap-3"
+        >
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">
+            ייעוץ עם העוזר האישי
+          </span>
+          {/* AI Visual Cluster */}
+          <div className="relative">
+            <Bot size={32} className="text-blue-400" />
+            <Sparkles 
+              size={16} 
+              className="absolute -top-1 -right-2 text-yellow-300 animate-pulse" 
+            />
+          </div>
+        </motion.h1>
+
+        {/* Centered Vehicle Badge with Border Beam */}
         {vehicle && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8"
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            className="relative flex flex-col items-center justify-center p-4 rounded-xl bg-slate-800/80 border border-slate-700 shadow-lg hover:shadow-xl hover:shadow-slate-700/20 transition-shadow duration-300 overflow-hidden"
           >
-            <h3 className="text-xl font-bold text-white mb-4">פרטי הרכב</h3>
-            <div className="grid grid-cols-2 gap-4 text-white">
-              <div>
-                <div className="text-sm text-white/70 mb-1">יצרן</div>
+            {/* Border Beam Effect */}
+            <div className="absolute inset-0 rounded-xl">
+              <motion.div
+                className="absolute inset-0 rounded-xl"
+                style={{
+                  background: `linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent)`,
+                  backgroundSize: "200% 100%",
+                }}
+                animate={{
+                  backgroundPosition: ["200% 0", "-200% 0"],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+              <div className="absolute inset-[1px] rounded-xl bg-slate-800/80" />
+            </div>
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-row items-center justify-center gap-3">
+              {/* Glassmorphism Icon Container */}
+              <div className="bg-white/10 backdrop-blur-md shadow-xl border border-white/20 p-3 rounded-2xl">
+                <CarFront className="w-8 h-8 text-slate-200" />
+              </div>
+              <div className="text-center text-slate-200">
                 <div className="font-bold text-lg">
-                  {vehicle.manufacturer}
+                  {vehicle.manufacturer} {vehicle.model}
                 </div>
+                {vehicle.year && (
+                  <div className="text-sm text-slate-400 mt-1">{vehicle.year}</div>
+                )}
               </div>
-              <div>
-                <div className="text-sm text-white/70 mb-1">דגם</div>
-                <div className="font-bold text-lg">{vehicle.model}</div>
-              </div>
-              <div>
-                <div className="text-sm text-white/70 mb-1">שנה</div>
-                <div className="font-bold">{vehicle.year || "לא צוין"}</div>
-              </div>
-              <div>
-                <div className="text-sm text-white/70 mb-1">מספר רישוי</div>
-                <div className="font-bold">{vehicle.license_plate}</div>
-              </div>
+              {/* Edit Icon (Visual only) */}
+              <Pencil className="w-4 h-4 text-slate-400 opacity-50" />
             </div>
           </motion.div>
         )}
 
-        {/* טופס תיאור תקלה */}
+        {/* Form Container */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8"
+          variants={itemVariants}
+          className="bg-[#1e293b]/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-blue-900/20 p-6 md:p-8"
         >
-          <h1 className="text-3xl font-bold text-white mb-6">פתיחת פנייה חדשה</h1>
-
+          {/* Description Input */}
           <div className="mb-6">
-            <label className="block text-white font-bold mb-3 text-xl">
-              תיאור התקלה
-            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-6 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 resize-none min-h-[200px] text-lg transition-all duration-300"
-              placeholder="תאר את התקלה שאתה חווה בפירוט..."
+              className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 resize-none min-h-[160px] text-[15px] leading-relaxed transition-all duration-300 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+              placeholder="תאר את התקלה..."
             />
           </div>
 
-          <div className="mb-8">
+          {/* Image Upload Section */}
+          <div className="mb-6">
             <ImageUploader requestId={draftId} onImagesChange={setImageUrls} />
           </div>
 
+          {/* Error Message */}
           {error && (
-            <div className="text-red-400 mb-4 text-sm">{error}</div>
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-400 mb-4 text-sm"
+            >
+              {error}
+            </motion.div>
           )}
 
+          {/* Submit Button */}
           <motion.button
             onClick={handleContinue}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ 
+              scale: 1.02,
+              boxShadow: "0 0 20px rgba(37,99,235,0.5)",
+            }}
+            whileTap={{ scale: 0.95 }}
             disabled={isSubmitting}
-            className="w-full p-6 bg-gradient-to-r from-[#4A90E2] to-[#5c60ff] hover:from-[#5a9ef0] hover:to-[#6c70ff] text-white font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-[#4A90E2]/30 hover:shadow-xl hover:shadow-[#4A90E2]/50 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full p-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-full transition-all duration-300 shadow-lg shadow-blue-500/30 text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSubmitting ? "מתחיל ייעוץ AI..." : "המשך לשאלות אבחון (AI)"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                מתחיל ייעוץ AI...
+              </>
+            ) : (
+              <>
+                שלח
+                <Send className="w-4 h-4" />
+              </>
+            )}
           </motion.button>
         </motion.div>
-      </div>
+      </motion.div>
     </div>
   );
 }
