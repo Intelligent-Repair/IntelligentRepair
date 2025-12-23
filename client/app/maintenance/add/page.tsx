@@ -73,6 +73,7 @@ export default function AddVehiclePage() {
         fetchModels();
         setSelectedModel('');
         setSelectedYear('');
+        setLicensePlate('');
     }, [selectedManufacturer]);
 
     // --- טעינת שנים כשיש דגם ---
@@ -98,7 +99,16 @@ export default function AddVehiclePage() {
         };
         fetchYears();
         setSelectedYear('');
+        setLicensePlate('');
     }, [selectedModel]);
+
+    // --- איפוס לוחית רישוי בשינוי שנה ---
+    useEffect(() => {
+        if (selectedYear) {
+            setLicensePlate('');
+        }
+    }, [selectedYear]);
+
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -227,7 +237,19 @@ export default function AddVehiclePage() {
                                     required
                                     className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white text-center font-mono tracking-widest focus:border-blue-500 outline-none"
                                     value={licensePlate}
-                                    onChange={(e) => setLicensePlate(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+
+                                        let max = 8;
+                                        if (selectedYear && Number(selectedYear) <= 2016) {
+                                            max = 7;
+                                        }
+
+                                        if (value.length <= max) {
+                                            setLicensePlate(value);
+                                        }
+                                    }}
+
                                     placeholder="12-345-67"
                                 />
                             </div>

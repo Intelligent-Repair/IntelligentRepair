@@ -1,6 +1,6 @@
-﻿// ✅ קובץ מוכן להדבקה - VehicleDetailsPage.tsx
-'use client';
+﻿'use client';
 
+import { Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams } from 'next/navigation';
@@ -84,9 +84,10 @@ export default function VehicleDetailsPage() {
 
                 if (!res.ok) {
                     const text = await res.text();
-                    console.error('API /manuals/ensure נכשל:', text);
-                    throw new Error('שליפת נתוני תחזוקה נכשלה');
+                    console.warn("⚠️ API /manuals/ensure נכשל, אבל ממשיכים בלי לקרוס:", text);
+                    return; // מפסיק כאן את הפונקציה אבל לא קורס
                 }
+
 
                 const json = await res.json();
                 if (json.manual) {
@@ -124,6 +125,25 @@ export default function VehicleDetailsPage() {
             alert('שגיאה בשמירה');
         }
     };
+    const deleteVehicle = async () => {
+        if (!confirm('האם אתה בטוח שברצונך למחוק את הרכב? פעולה זו לא ניתנת לביטול.')) return;
+
+        try {
+            const { error } = await supabase
+                .from('people_cars')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
+            alert('הרכב נמחק בהצלחה.');
+            window.location.href = '/maintenance';
+        } catch (error) {
+            console.error('שגיאה במחיקת רכב:', error);
+            alert('שגיאה במחיקה, נסה שוב.');
+        }
+    };
+
 
     if (loading) return <div className="text-white text-center mt-20">טוען פרטי רכב...</div>;
     if (!vehicle) return <div className="text-white text-center mt-20">רכב לא נמצא במערכת</div>;
@@ -279,8 +299,17 @@ export default function VehicleDetailsPage() {
                             <Save className="w-5 h-5" />
                             שמור הגדרות
                         </button>
+                        <button
+                            onClick={deleteVehicle}
+                            className="w-full mt-4 bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <Trash className="w-5 h-5" />
+                            מחק רכב
+                        </button>
                     </div>
+
                 )}
+
             </div>
         </div>
     );

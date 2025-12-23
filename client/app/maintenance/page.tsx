@@ -140,9 +140,12 @@ export default function MaintenancePage() {
                     {vehicles.map((vehicle) => (
                         <Link key={vehicle.id} href={`/maintenance/${vehicle.id}`}>
                             <div className="
-                                group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
-                                hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
-                            ">
+    group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
+    hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
+    flex flex-col justify-between min-h-[260px]
+">
+
+
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <h2 className="text-3xl font-bold text-white mb-3 group-hover:text-blue-300 transition-colors">
