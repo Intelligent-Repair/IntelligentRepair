@@ -6,6 +6,10 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode");
+    const status = searchParams.get("status"); // Filter by repair status
+    const issueType = searchParams.get("issue_type"); // Filter by final issue type
+    const manufacturer = searchParams.get("manufacturer"); // Filter by manufacturer
+    const model = searchParams.get("model"); // Filter by model
 
     // Authenticate the user (required for both modes)
     const {
@@ -26,7 +30,10 @@ export async function GET(request: Request) {
         id,
         ai_summary,
         mechanic_notes,
+        status,
+        final_issue_type,
         created_at,
+        updated_at,
         garage_id,
         request:requests (
           id,
@@ -38,6 +45,10 @@ export async function GET(request: Request) {
             plate_number,
             manufacturer,
             model,
+            vehicle_catalog:vehicle_catalog_id (
+              manufacturer,
+              model
+            ),
             user:users (
               id,
               full_name,
@@ -53,11 +64,11 @@ export async function GET(request: Request) {
 
     // If mode is not "global", filter by garage_id
     if (mode !== "global") {
-      // Find the garage record via user_id
+      // Find the garage record via user_id (check both owner_user_id and user_id)
       const { data: garage, error: garageError } = await supabase
         .from("garages")
         .select("id")
-        .eq("user_id", user.id)
+        .or(`owner_user_id.eq.${user.id},user_id.eq.${user.id}`)
         .single();
 
       if (garageError || !garage) {
@@ -71,6 +82,16 @@ export async function GET(request: Request) {
       query = query.eq("garage_id", garage.id);
     }
 
+    // Apply status filter if provided
+    if (status && status !== "all") {
+      query = query.eq("status", status);
+    }
+
+    // Apply final issue type filter if provided
+    if (issueType && issueType !== "all") {
+      query = query.eq("final_issue_type", issueType);
+    }
+
     // Order by created_at descending
     const { data: repairs, error: repairsError } = await query.order("created_at", { ascending: false });
 
@@ -81,18 +102,44 @@ export async function GET(request: Request) {
       );
     }
 
+    // Apply additional filters in memory (for nested fields)
+    let filteredRepairs = repairs || [];
+    
+    if (manufacturer || model) {
+      filteredRepairs = filteredRepairs.filter((repair: any) => {
+        const car = repair.request?.car;
+        const carManufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
+        const carModel = car?.model || car?.vehicle_catalog?.model;
+
+        if (manufacturer && carManufacturer !== manufacturer) {
+          return false;
+        }
+
+        if (model && carModel !== model) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     // Transform the data to match the expected structure
-    const transformedRepairs = repairs?.map((repair: any) => {
+    const transformedRepairs = filteredRepairs.map((repair: any) => {
       const request = repair.request;
       const car = request?.car;
       const user = car?.user;
       const garage = repair.garage;
+      const carManufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
+      const carModel = car?.model || car?.vehicle_catalog?.model;
 
       return {
         id: repair.id,
         ai_summary: repair.ai_summary,
         mechanic_notes: repair.mechanic_notes,
+        status: repair.status,
+        final_issue_type: repair.final_issue_type,
         created_at: repair.created_at,
+        updated_at: repair.updated_at,
         request: request
           ? {
               id: request.id,
@@ -104,8 +151,8 @@ export async function GET(request: Request) {
           ? {
               id: car.id,
               plate_number: car.plate_number,
-              manufacturer: car.manufacturer,
-              model: car.model,
+              manufacturer: carManufacturer,
+              model: carModel,
             }
           : null,
         user: user
@@ -122,10 +169,11 @@ export async function GET(request: Request) {
             }
           : null,
       };
-    }) || [];
+    });
 
     return NextResponse.json({
       repairs: transformedRepairs,
+      total: transformedRepairs.length,
     });
   } catch (err) {
     return NextResponse.json(
