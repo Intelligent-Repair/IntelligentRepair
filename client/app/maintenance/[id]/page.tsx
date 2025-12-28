@@ -226,7 +226,7 @@ export default function VehicleDetailsPage() {
                         }`}
                 >
                     <Bell className="w-4 h-4" />
-                    תזכורות וטיפולים
+                    הגדרות ותזכורות
                 </button>
             </div>
 
