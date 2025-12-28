@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import ImageUploader from "./ImageUploader";
@@ -13,7 +13,7 @@ interface Vehicle {
   license_plate: string;
 }
 
-export default function ConsultFormPage() {
+function ConsultFormContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const vehicleId = searchParams.get("vehicle");
@@ -234,5 +234,19 @@ export default function ConsultFormPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function ConsultFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-6" dir="rtl">
+          <div className="text-white/70 text-lg">טוען טופס...</div>
+        </div>
+      }
+    >
+      <ConsultFormContent />
+    </Suspense>
   );
 }
