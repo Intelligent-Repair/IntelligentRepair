@@ -2,14 +2,20 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: process.env.OPENAI_API_KEY!,
 });
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    throw new Error("Missing Supabase env vars (URL or SERVICE_ROLE_KEY)");
+  }
+
+  return createClient(url, serviceRoleKey);
+}
 
 // ניקוי ערכים חשודים
 function clean(value?: string) {
@@ -29,6 +35,7 @@ async function askGPT(prompt: string): Promise<string> {
 
 export async function POST(req: Request) {
     try {
+        const supabase = getSupabase();
         const body = await req.json();
 
         const manufacturer = body.manufacturer?.trim();
