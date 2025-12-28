@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reminders/daily",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/reminders/winter",
+      "schedule": "0 3 1 11 *"
+    }
+  ]
+}
+

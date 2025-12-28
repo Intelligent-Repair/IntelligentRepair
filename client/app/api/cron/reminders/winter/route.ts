@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "db_error", details: error.message }, { status: 500 });
     }
 
-    const rows = (data || []) as CarRow[];
+    const rows = (data || []) as unknown as CarRow[];
     const results: { id: string; status: "sent" | "skipped" | "failed"; reason?: string }[] = [];
 
     for (const row of rows) {
@@ -141,5 +141,10 @@ export async function POST(req: Request) {
     console.error("[cron/winter] fatal error", err);
     return NextResponse.json({ error: "internal_error", message: (err as Error).message }, { status: 500 });
   }
+}
+
+// Allow Vercel Cron (GET) to hit this route as well
+export async function GET(req: Request) {
+  return POST(req);
 }
 

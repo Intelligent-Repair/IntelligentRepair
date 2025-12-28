@@ -241,3 +241,8 @@ export async function POST(req: Request) {
   }
 }
 
+// Allow Vercel Cron (GET) to hit this route as well
+export async function GET(req: Request) {
+  return POST(req);
+}
+
