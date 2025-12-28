@@ -177,7 +177,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
     });
   };
 
-  const triggerInput = (ref: React.RefObject<HTMLInputElement>) => {
+  const triggerInput = (ref: React.RefObject<HTMLInputElement | null>) => {
     if (!canUploadMore) {
       setFeedback(`ניתן להעלות עד ${MAX_IMAGES} תמונות בלבד.`);
       return;
