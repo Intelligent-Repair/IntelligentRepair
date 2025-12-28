@@ -39,6 +39,7 @@ function isAuthorized(req: Request) {
 
 async function sendEmail(to: string, subject: string, text: string) {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY missing");
+  const from = process.env.RESEND_FROM || "onboarding@resend.dev";
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -46,7 +47,7 @@ async function sendEmail(to: string, subject: string, text: string) {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "IntelligentRepair <no-reply@intelligentrepair.app>",
+      from,
       to,
       subject,
       text,
