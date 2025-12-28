@@ -145,7 +145,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "db_error", details: error.message }, { status: 500 });
     }
 
-    const rows = (data || []) as CarRow[];
+    const rawRows = (data || []) as any[];
+    const rows: CarRow[] = rawRows.map((r) => ({
+      ...r,
+      users: Array.isArray(r.users)
+        ? r.users[0] ?? { email: null, full_name: null }
+        : (r.users ?? { email: null, full_name: null }),
+      vehicle_catalog: Array.isArray(r.vehicle_catalog)
+        ? r.vehicle_catalog[0] ?? { manufacturer: null, model: null, year: null }
+        : (r.vehicle_catalog ?? { manufacturer: null, model: null, year: null }),
+    }));
     const results: { id: string; type: string; status: "sent" | "skipped" | "failed"; reason?: string }[] = [];
 
     for (const row of rows) {
