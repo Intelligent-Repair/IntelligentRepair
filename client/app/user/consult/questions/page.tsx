@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ChatBubble from "./components/ChatBubble";
@@ -19,6 +19,20 @@ interface Vehicle {
   model: string;
   year: number | null;
   license_plate: string;
+}
+
+export default function QuestionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-6" dir="rtl">
+          <div className="text-white/70 text-lg">טוען שאלון...</div>
+        </div>
+      }
+    >
+      <QuestionsContent />
+    </Suspense>
+  );
 }
 
 const SESSION_STORAGE_KEY = "consult_questions_state";
@@ -307,7 +321,7 @@ function loadSessionState(): { vehicle: VehicleInfo | null; description: string;
   }
 }
 
-export default function QuestionsPage() {
+function QuestionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const vehicleId = searchParams.get("vehicle");
