@@ -30,6 +30,7 @@ type CarRow = {
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const SEND_DELAY_MS = Number(process.env.REMINDER_SEND_DELAY_MS ?? "1200"); // האטה בין שליחות כדי להימנע מ-429
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -83,6 +84,10 @@ function formatDaysLabel(days: number) {
   if (days <= 0) return "היום";
   if (days === 1) return "מחר";
   return `בעוד כ-${days} ימים`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function sendEmail(to: string, subject: string, text: string) {
@@ -182,6 +187,7 @@ export async function POST(req: Request) {
 מומלץ לבדוק ולהתאים לפי ספר הרכב.`;
         try {
           await sendEmail(userEmail, subject, text);
+          await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ tires_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "tires", status: "sent" });
         } catch (err) {
@@ -203,6 +209,7 @@ export async function POST(req: Request) {
 מומלץ לוודא מפלס שמן ונוזל קירור לפי ספר הרכב.`;
         try {
           await sendEmail(userEmail, subject, text);
+          await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase
             .from("people_cars")
             .update({ oil_water_last_sent_at: now.toISOString() })
@@ -227,6 +234,7 @@ export async function POST(req: Request) {
 מומלץ לקבוע תור למכון הרישוי ולהתכונן בהתאם.`;
         try {
           await sendEmail(userEmail, subject, text);
+          await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ test_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "test", status: "sent" });
         } catch (err) {
@@ -255,6 +263,7 @@ export async function POST(req: Request) {
 מומלץ לקבוע מועד טיפול ולהכין חלקים/שמנים לפי היצרן.`;
         try {
           await sendEmail(userEmail, subject, text);
+          await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ service_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "service", status: "sent" });
         } catch (err) {

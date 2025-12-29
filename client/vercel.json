@@ -1,12 +1,24 @@
 {
   "crons": [
     {
-      "path": "/api/cron/reminders/daily",
+      "path": "/api/cron/reminders/tires",
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/cron/reminders/oil-water",
+      "schedule": "15 5 * * *"
+    },
+    {
+      "path": "/api/cron/reminders/test",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/reminders/service",
+      "schedule": "45 5 * * *"
+    },
+    {
       "path": "/api/cron/reminders/winter",
-      "schedule": "0 3 1 11 *"
+      "schedule": "45 4 1 11 *"
     }
   ]
 }
