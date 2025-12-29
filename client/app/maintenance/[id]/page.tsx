@@ -159,12 +159,14 @@ export default function VehicleDetailsPage() {
 
         try {
             const nowIso = new Date().toISOString();
+            const testDate = vehicle.test_date && vehicle.test_date.trim() !== "" ? vehicle.test_date : null;
+            const serviceDate = vehicle.service_date && vehicle.service_date.trim() !== "" ? vehicle.service_date : null;
             const updates: Record<string, any> = {
-                test_date: vehicle.test_date,
-                service_date: vehicle.service_date,
+                test_date: testDate,
+                service_date: serviceDate,
                 // טסט/טיפול נחשבים פעילים אם יש תאריך
-                remind_test: !!vehicle.test_date,
-                remind_service: !!vehicle.service_date,
+                remind_test: !!testDate,
+                remind_service: !!serviceDate,
                 remind_oil_water: vehicle.remind_oil_water,
                 remind_tires: vehicle.remind_tires,
                 remind_winter: vehicle.remind_winter,
@@ -198,8 +200,14 @@ export default function VehicleDetailsPage() {
             alert('ההגדרות נשמרו בהצלחה! ✅');
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
-            alert('שגיאה: ' + errorMessage);
+            const message =
+                (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string')
+                    ? (error as any).message
+                    : typeof error === 'string'
+                    ? error
+                    : 'שגיאה לא ידועה';
+            console.error('saveReminders error:', error);
+            alert('שגיאה: ' + message);
         }
     };
     const deleteVehicle = async () => {
