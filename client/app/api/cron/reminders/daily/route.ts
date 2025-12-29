@@ -7,8 +7,9 @@ type CarRow = {
   license_plate: string | null;
   remind_tires: boolean | null;
   remind_oil_water: boolean | null;
-  remind_test: boolean | null;
-  remind_service: boolean | null;
+  // flags לא נדרשים לטסט/טיפול — משתמשים רק בתאריכים
+  remind_test?: boolean | null;
+  remind_service?: boolean | null;
   tires_started_at: string | null;
   tires_last_sent_at: string | null;
   oil_water_started_at: string | null;
@@ -125,8 +126,6 @@ export async function POST(req: Request) {
           license_plate,
           remind_tires,
           remind_oil_water,
-          remind_test,
-          remind_service,
           tires_started_at,
           tires_last_sent_at,
           oil_water_started_at,
@@ -209,7 +208,7 @@ export async function POST(req: Request) {
       }
 
       // Test 30 days before
-      if (row.remind_test && isDue30DaysBefore(row.test_date, row.test_last_sent_at, now)) {
+      if (row.test_date && isDue30DaysBefore(row.test_date, row.test_last_sent_at, now)) {
         const subject = "תזכורת טסט בעוד כחודש";
         const text = `שלום,
 
@@ -226,7 +225,7 @@ export async function POST(req: Request) {
       }
 
       // Service 30 days before
-      if (row.remind_service && isDue30DaysBefore(row.service_date, row.service_last_sent_at, now)) {
+      if (row.service_date && isDue30DaysBefore(row.service_date, row.service_last_sent_at, now)) {
         const subject = "תזכורת טיפול רכב בעוד כחודש";
         const text = `שלום,
 

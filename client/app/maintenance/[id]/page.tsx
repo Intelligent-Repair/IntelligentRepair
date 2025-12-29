@@ -162,6 +162,9 @@ export default function VehicleDetailsPage() {
             const updates: Record<string, any> = {
                 test_date: vehicle.test_date,
                 service_date: vehicle.service_date,
+                // טסט/טיפול נחשבים פעילים אם יש תאריך
+                remind_test: !!vehicle.test_date,
+                remind_service: !!vehicle.service_date,
                 remind_oil_water: vehicle.remind_oil_water,
                 remind_tires: vehicle.remind_tires,
                 remind_winter: vehicle.remind_winter,
