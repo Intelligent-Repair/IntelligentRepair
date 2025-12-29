@@ -41,6 +41,12 @@ interface Vehicle {
     remind_winter: boolean;
 }
 
+interface RemindersSnapshot {
+    remind_oil_water: boolean;
+    remind_tires: boolean;
+    remind_winter: boolean;
+}
+
 interface Manual {
     // car_model?: string; <-- מיותר
     tire_pressure_front: string;
@@ -60,6 +66,7 @@ export default function VehicleDetailsPage() {
 
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [manual, setManual] = useState<Manual | null>(null);
+    const [initialReminders, setInitialReminders] = useState<RemindersSnapshot | null>(null);
 
     // טעינת נתונים
     useEffect(() => {
@@ -103,6 +110,11 @@ export default function VehicleDetailsPage() {
                     };
 
                     setVehicle(formattedVehicle);
+                    setInitialReminders({
+                        remind_oil_water: formattedVehicle.remind_oil_water,
+                        remind_tires: formattedVehicle.remind_tires,
+                        remind_winter: formattedVehicle.remind_winter,
+                    });
 
                     // חיפוש ספר רכב
                     if (catalog?.model) {
@@ -146,18 +158,40 @@ export default function VehicleDetailsPage() {
         if (!vehicle) return;
 
         try {
+            const nowIso = new Date().toISOString();
+            const updates: Record<string, any> = {
+                test_date: vehicle.test_date,
+                service_date: vehicle.service_date,
+                remind_oil_water: vehicle.remind_oil_water,
+                remind_tires: vehicle.remind_tires,
+                remind_winter: vehicle.remind_winter,
+            };
+
+            // כאשר מפעילים תזכורת – לאתחל ספירה ולהפסיק היסטוריית שליחה
+            if (vehicle.remind_oil_water && initialReminders?.remind_oil_water === false) {
+                updates.oil_water_started_at = nowIso;
+                updates.oil_water_last_sent_at = null;
+            }
+            if (vehicle.remind_tires && initialReminders?.remind_tires === false) {
+                updates.tires_started_at = nowIso;
+                updates.tires_last_sent_at = null;
+            }
+            if (vehicle.remind_winter && initialReminders?.remind_winter === false) {
+                // אין started_at לחורף, מאפסים רק חותמת שליחה שנתית
+                updates.winter_last_sent_at = null;
+            }
+
             const { error } = await supabase
-                .from('people_cars') // תיקון: עדכון הטבלה הנכונה
-                .update({
-                    test_date: vehicle.test_date,
-                    service_date: vehicle.service_date,
-                    remind_oil_water: vehicle.remind_oil_water,
-                    remind_tires: vehicle.remind_tires,
-                    remind_winter: vehicle.remind_winter
-                })
+                .from('people_cars')
+                .update(updates)
                 .eq('id', id);
 
             if (error) throw error;
+            setInitialReminders({
+                remind_oil_water: vehicle.remind_oil_water,
+                remind_tires: vehicle.remind_tires,
+                remind_winter: vehicle.remind_winter,
+            });
             alert('ההגדרות נשמרו בהצלחה! ✅');
 
         } catch (error) {
