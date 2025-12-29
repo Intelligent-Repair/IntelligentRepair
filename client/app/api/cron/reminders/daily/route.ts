@@ -19,7 +19,6 @@ type CarRow = {
   service_last_sent_at: string | null;
   users: {
     email: string | null;
-    full_name: string | null;
   } | null;
   vehicle_catalog: {
     manufacturer: string | null;
@@ -136,7 +135,7 @@ export async function POST(req: Request) {
           test_last_sent_at,
           service_date,
           service_last_sent_at,
-          users ( email, full_name ),
+          users ( email ),
           vehicle_catalog:vehicle_catalog_id ( manufacturer, model, year )
         `
       );
@@ -150,8 +149,8 @@ export async function POST(req: Request) {
     const rows: CarRow[] = rawRows.map((r) => ({
       ...r,
       users: Array.isArray(r.users)
-        ? r.users[0] ?? { email: null, full_name: null }
-        : (r.users ?? { email: null, full_name: null }),
+        ? r.users[0] ?? { email: null }
+        : (r.users ?? { email: null }),
       vehicle_catalog: Array.isArray(r.vehicle_catalog)
         ? r.vehicle_catalog[0] ?? { manufacturer: null, model: null, year: null }
         : (r.vehicle_catalog ?? { manufacturer: null, model: null, year: null }),

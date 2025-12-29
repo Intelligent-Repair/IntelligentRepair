@@ -9,7 +9,6 @@ type CarRow = {
   winter_last_sent_at: string | null;
   users: {
     email: string | null;
-    full_name: string | null;
   } | null;
   vehicle_catalog: {
     manufacturer: string | null;
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
           license_plate,
           remind_winter,
           winter_last_sent_at,
-          users ( email, full_name ),
+          users ( email ),
           vehicle_catalog:vehicle_catalog_id ( manufacturer, model, year )
         `
       )
@@ -97,7 +96,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "db_error", details: error.message }, { status: 500 });
     }
 
-    const rows = (data || []) as unknown as CarRow[];
+    const rawRows = (data || []) as any[];
+    const rows: CarRow[] = rawRows.map((r) => ({
+      ...r,
+      users: Array.isArray(r.users) ? r.users[0] ?? { email: null } : (r.users ?? { email: null }),
+      vehicle_catalog: Array.isArray(r.vehicle_catalog)
+        ? r.vehicle_catalog[0] ?? { manufacturer: null, model: null, year: null }
+        : (r.vehicle_catalog ?? { manufacturer: null, model: null, year: null }),
+    }));
     const results: { id: string; status: "sent" | "skipped" | "failed"; reason?: string }[] = [];
 
     for (const row of rows) {
