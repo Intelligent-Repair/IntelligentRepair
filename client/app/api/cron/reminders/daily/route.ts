@@ -63,19 +63,26 @@ function isDueEveryNDays(
   return daysBetween(baseline, now) >= intervalDays - 0.01; // small tolerance
 }
 
-function isDue30DaysBefore(
+function dueInWindow30(
   targetDate: string | null,
   lastSentAt: string | null,
   now: Date
-) {
-  if (!targetDate) return false;
+): { due: boolean; days: number } {
+  if (!targetDate) return { due: false, days: Number.POSITIVE_INFINITY };
   const target = new Date(targetDate + "T00:00:00Z");
-  const daysToTarget = daysBetween(now, target);
-  if (daysToTarget < 0) return false; // already passed
-  if (daysToTarget > 30) return false;
-  if (!lastSentAt) return true;
+  const daysToTarget = Math.floor(daysBetween(now, target));
+  if (daysToTarget < 0) return { due: false, days: daysToTarget }; // עבר
+  if (daysToTarget > 30) return { due: false, days: daysToTarget };
+  if (!lastSentAt) return { due: true, days: daysToTarget };
   const last = new Date(lastSentAt);
-  return daysBetween(last, now) >= 25; // avoid spamming, allow ~once per month
+  const daysSinceLast = daysBetween(last, now);
+  return { due: daysSinceLast >= 25, days: daysToTarget };
+}
+
+function formatDaysLabel(days: number) {
+  if (days <= 0) return "היום";
+  if (days === 1) return "מחר";
+  return `בעוד כ-${days} ימים`;
 }
 
 async function sendEmail(to: string, subject: string, text: string) {
@@ -208,11 +215,15 @@ export async function POST(req: Request) {
       }
 
       // Test 30 days before
-      if (row.test_date && isDue30DaysBefore(row.test_date, row.test_last_sent_at, now)) {
-        const subject = "תזכורת טסט בעוד כחודש";
+      const testWindow = dueInWindow30(row.test_date, row.test_last_sent_at, now);
+      if (!row.test_date) {
+        results.push({ id: row.id, type: "test", status: "skipped", reason: "no_test_date" });
+      } else if (testWindow.due) {
+        const label = formatDaysLabel(testWindow.days);
+        const subject = `תזכורת טסט ${label}`;
         const text = `שלום,
 
-הטסט של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (כ-30 יום).
+הטסט של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (${label}).
 מומלץ לקבוע תור למכון הרישוי ולהתכונן בהתאם.`;
         try {
           await sendEmail(userEmail, subject, text);
@@ -222,14 +233,25 @@ export async function POST(req: Request) {
           console.error("[cron/daily] test send failed", err);
           results.push({ id: row.id, type: "test", status: "failed", reason: (err as Error).message });
         }
+      } else {
+        results.push({
+          id: row.id,
+          type: "test",
+          status: "skipped",
+          reason: testWindow.days > 30 ? "not_in_window" : "already_sent_recently_or_not_due",
+        });
       }
 
       // Service 30 days before
-      if (row.service_date && isDue30DaysBefore(row.service_date, row.service_last_sent_at, now)) {
-        const subject = "תזכורת טיפול רכב בעוד כחודש";
+      const serviceWindow = dueInWindow30(row.service_date, row.service_last_sent_at, now);
+      if (!row.service_date) {
+        results.push({ id: row.id, type: "service", status: "skipped", reason: "no_service_date" });
+      } else if (serviceWindow.due) {
+        const label = formatDaysLabel(serviceWindow.days);
+        const subject = `תזכורת טיפול רכב ${label}`;
         const text = `שלום,
 
-הטיפול הבא של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (כ-30 יום).
+הטיפול הבא של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (${label}).
 מומלץ לקבוע מועד טיפול ולהכין חלקים/שמנים לפי היצרן.`;
         try {
           await sendEmail(userEmail, subject, text);
@@ -239,6 +261,13 @@ export async function POST(req: Request) {
           console.error("[cron/daily] service send failed", err);
           results.push({ id: row.id, type: "service", status: "failed", reason: (err as Error).message });
         }
+      } else {
+        results.push({
+          id: row.id,
+          type: "service",
+          status: "skipped",
+          reason: serviceWindow.days > 30 ? "not_in_window" : "already_sent_recently_or_not_due",
+        });
       }
     }
 
