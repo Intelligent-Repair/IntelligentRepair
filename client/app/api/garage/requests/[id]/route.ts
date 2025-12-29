@@ -50,10 +50,6 @@ export async function GET(
         car:people_cars (
           id,
           license_plate,
-          plate_number,
-          manufacturer,
-          model,
-          year,
           vehicle_catalog:vehicle_catalog_id (
             manufacturer,
             model,
@@ -61,7 +57,8 @@ export async function GET(
           ),
           user:users (
             id,
-            full_name,
+            first_name,
+            last_name,
             phone,
             email
           )
@@ -95,9 +92,9 @@ export async function GET(
     // Transform the data
     const car = requestData.car;
     const carUser = car?.user;
-    const manufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
-    const model = car?.model || car?.vehicle_catalog?.model;
-    const year = car?.year || car?.vehicle_catalog?.year;
+    const manufacturer = car?.vehicle_catalog?.manufacturer;
+    const model = car?.vehicle_catalog?.model;
+    const year = car?.vehicle_catalog?.year;
 
     const transformedRequest = {
       id: requestData.id,
@@ -110,13 +107,15 @@ export async function GET(
       created_at: requestData.created_at,
       client: carUser ? {
         id: carUser.id,
-        name: carUser.full_name,
+        name: `${carUser.first_name || ''} ${carUser.last_name || ''}`.trim(),
+        first_name: carUser.first_name,
+        last_name: carUser.last_name,
         phone: carUser.phone,
         email: carUser.email,
       } : null,
       car: car ? {
         id: car.id,
-        license_plate: car.license_plate || car.plate_number,
+        license_plate: car.license_plate,
         manufacturer: manufacturer,
         model: model,
         year: year,

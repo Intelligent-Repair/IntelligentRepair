@@ -42,23 +42,23 @@ export async function GET(request: Request) {
           created_at,
           car:people_cars (
             id,
-            plate_number,
-            manufacturer,
-            model,
+            license_plate,
             vehicle_catalog:vehicle_catalog_id (
               manufacturer,
-              model
+              model,
+              year
             ),
             user:users (
               id,
-              full_name,
+              first_name,
+              last_name,
               phone
             )
           )
         ),
         garage:garages (
           id,
-          name
+          garage_name
         )
       `);
 
@@ -108,8 +108,8 @@ export async function GET(request: Request) {
     if (manufacturer || model) {
       filteredRepairs = filteredRepairs.filter((repair: any) => {
         const car = repair.request?.car;
-        const carManufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
-        const carModel = car?.model || car?.vehicle_catalog?.model;
+        const carManufacturer = car?.vehicle_catalog?.manufacturer;
+        const carModel = car?.vehicle_catalog?.model;
 
         if (manufacturer && carManufacturer !== manufacturer) {
           return false;
@@ -129,8 +129,9 @@ export async function GET(request: Request) {
       const car = request?.car;
       const user = car?.user;
       const garage = repair.garage;
-      const carManufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
-      const carModel = car?.model || car?.vehicle_catalog?.model;
+      const carManufacturer = car?.vehicle_catalog?.manufacturer;
+      const carModel = car?.vehicle_catalog?.model;
+      const carYear = car?.vehicle_catalog?.year;
 
       return {
         id: repair.id,
@@ -150,22 +151,25 @@ export async function GET(request: Request) {
         car: car
           ? {
               id: car.id,
-              plate_number: car.plate_number,
+              license_plate: car.license_plate,
               manufacturer: carManufacturer,
               model: carModel,
+              year: carYear,
             }
           : null,
         user: user
           ? {
               id: user.id,
-              full_name: user.full_name,
+              full_name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+              first_name: user.first_name,
+              last_name: user.last_name,
               phone: user.phone,
             }
           : null,
         garage: mode === "global" && garage
           ? {
               id: garage.id,
-              name: garage.name || null,
+              name: garage.garage_name || null,
             }
           : null,
       };

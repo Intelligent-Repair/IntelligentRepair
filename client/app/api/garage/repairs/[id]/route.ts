@@ -59,10 +59,6 @@ export async function GET(
           car:people_cars (
             id,
             license_plate,
-            plate_number,
-            manufacturer,
-            model,
-            year,
             vehicle_catalog:vehicle_catalog_id (
               manufacturer,
               model,
@@ -70,7 +66,8 @@ export async function GET(
             ),
             user:users (
               id,
-              full_name,
+              first_name,
+              last_name,
               phone,
               email
             )
@@ -78,7 +75,7 @@ export async function GET(
         ),
         garage:garages (
           id,
-          name
+          garage_name
         )
       `)
       .eq("id", repairId)
@@ -130,13 +127,15 @@ export async function GET(
         created_at: repair.request.created_at,
         car: repair.request.car ? {
           id: repair.request.car.id,
-          license_plate: repair.request.car.license_plate || repair.request.car.plate_number,
-          manufacturer: repair.request.car.manufacturer || repair.request.car.vehicle_catalog?.manufacturer,
-          model: repair.request.car.model || repair.request.car.vehicle_catalog?.model,
-          year: repair.request.car.year || repair.request.car.vehicle_catalog?.year,
+          license_plate: repair.request.car.license_plate,
+          manufacturer: repair.request.car.vehicle_catalog?.manufacturer,
+          model: repair.request.car.vehicle_catalog?.model,
+          year: repair.request.car.vehicle_catalog?.year,
           user: repair.request.car.user ? {
             id: repair.request.car.user.id,
-            full_name: repair.request.car.user.full_name,
+            full_name: `${repair.request.car.user.first_name || ''} ${repair.request.car.user.last_name || ''}`.trim(),
+            first_name: repair.request.car.user.first_name,
+            last_name: repair.request.car.user.last_name,
             phone: repair.request.car.user.phone,
             email: repair.request.car.user.email,
           } : null,
@@ -144,7 +143,7 @@ export async function GET(
       } : null,
       garage: repair.garage ? {
         id: repair.garage.id,
-        name: repair.garage.name,
+        name: repair.garage.garage_name,
       } : null,
     };
 

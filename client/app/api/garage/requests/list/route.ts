@@ -45,10 +45,6 @@ export async function GET(request: Request) {
         car:people_cars (
           id,
           license_plate,
-          plate_number,
-          manufacturer,
-          model,
-          year,
           vehicle_catalog:vehicle_catalog_id (
             manufacturer,
             model,
@@ -56,7 +52,8 @@ export async function GET(request: Request) {
           ),
           user:users (
             id,
-            full_name,
+            first_name,
+            last_name,
             phone,
             email
           )
@@ -96,10 +93,10 @@ export async function GET(request: Request) {
       filteredRequests = filteredRequests.filter((req: any) => {
         const car = req.car;
         const user = car?.user;
-        const fullName = user?.full_name?.toLowerCase() || "";
-        const manufacturer = (car?.manufacturer || car?.vehicle_catalog?.manufacturer || "").toLowerCase();
-        const model = (car?.model || car?.vehicle_catalog?.model || "").toLowerCase();
-        const licensePlate = (car?.license_plate || car?.plate_number || "").toLowerCase();
+        const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim().toLowerCase();
+        const manufacturer = (car?.vehicle_catalog?.manufacturer || "").toLowerCase();
+        const model = (car?.vehicle_catalog?.model || "").toLowerCase();
+        const licensePlate = (car?.license_plate || "").toLowerCase();
 
         return (
           fullName.includes(lowerSearchTerm) ||
@@ -114,9 +111,9 @@ export async function GET(request: Request) {
     const transformedRequests = filteredRequests.map((req: any) => {
       const car = req.car;
       const user = car?.user;
-      const manufacturer = car?.manufacturer || car?.vehicle_catalog?.manufacturer;
-      const model = car?.model || car?.vehicle_catalog?.model;
-      const year = car?.year || car?.vehicle_catalog?.year;
+      const manufacturer = car?.vehicle_catalog?.manufacturer;
+      const model = car?.vehicle_catalog?.model;
+      const year = car?.vehicle_catalog?.year;
 
       return {
         id: req.id,
@@ -129,13 +126,15 @@ export async function GET(request: Request) {
         created_at: req.created_at,
         client: user ? {
           id: user.id,
-          name: user.full_name,
+          name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+          first_name: user.first_name,
+          last_name: user.last_name,
           phone: user.phone,
           email: user.email,
         } : null,
         car: car ? {
           id: car.id,
-          license_plate: car.license_plate || car.plate_number,
+          license_plate: car.license_plate,
           manufacturer: manufacturer,
           model: model,
           year: year,
