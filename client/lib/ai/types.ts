@@ -61,26 +61,39 @@ export interface AIQuestionResponse {
 
 export interface ChatMessage {
   id: string;
-  sender: "ai" | "user";
-  text?: string;
+  sender: "ai" | "user" | "system";
+  text: string;
+  type?: string;
+  meta?: any;
   images?: string[];
-  timestamp: number;
-  isInstruction?: boolean; // True if this is an instruction message (when user says "not sure")
+  timestamp?: number;
+  isInstruction?: boolean;
 }
 
-export type AIQuestionType = "yesno" | "multi" | "text";
+export type AIQuestionType =
+  | "question"
+  | "scenario_step"
+  | "safety_alert"
+  | "instruction"
+  | "diagnosis_report"
+  | "ai_response"
+  | "yesno"
+  | "multi"
+  | "text";
 
 export interface AIQuestion {
-  question: string;
   type: AIQuestionType;
+  text?: string;
+  question?: string;
   options?: string[];
   shouldStop?: boolean;
+  [k: string]: any;
 }
 
 /**
  * State machine states
  */
-export type AIStateStatus = 
+export type AIStateStatus =
   | "IDLE"
   | "ASKING"
   | "WAITING_FOR_ANSWER"
