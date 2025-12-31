@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-<<<<<<< HEAD
-=======
-import { Camera, Image as ImageIcon, X, CheckCircle2, Upload as UploadIcon } from "lucide-react";
->>>>>>> rescue/ui-stable
+import React, { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Camera,
+  CheckCircle2,
+  Image as ImageIcon,
+  Upload as UploadIcon,
+  X,
+} from "lucide-react";
 
 type UploadStatus = "uploading" | "uploaded" | "error";
 
@@ -46,11 +49,8 @@ export default function ImageUploader(props: ImageUploaderProps) {
   const { requestId, onImagesChange } = props;
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
-<<<<<<< HEAD
-=======
   const [isDragOver, setIsDragOver] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
->>>>>>> rescue/ui-stable
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -67,7 +67,10 @@ export default function ImageUploader(props: ImageUploaderProps) {
     const uploadedUrls = images
       .filter((img) => img.status === "uploaded")
       .map((img) => img.url || img.preview)
-      .filter((url): url is string => typeof url === "string" && url.trim().length > 0);
+      .filter(
+        (url): url is string =>
+          typeof url === "string" && url.trim().length > 0
+      );
     onImagesChange(uploadedUrls);
   }, [images, onImagesChange]);
 
@@ -158,21 +161,15 @@ export default function ImageUploader(props: ImageUploaderProps) {
         )
       );
 
-<<<<<<< HEAD
-      if (!uploadedUrl) {
-        setFeedback("התמונה הועלתה, מחכים לכתובת תצוגה מהשרת.");
-=======
-      // Show success message
       setShowSuccessMessage(true);
       setTimeout(() => {
         setShowSuccessMessage(false);
-      }, 3000); // Hide after 3 seconds
+      }, 3000);
 
       if (!uploadedUrl) {
         setFeedback("התמונה הועלתה, מחכים לכתובת תצוגה מהשרת.");
       } else {
-        setFeedback(null); // Clear any previous feedback
->>>>>>> rescue/ui-stable
+        setFeedback(null);
       }
     } catch (err) {
       console.error("Error uploading image:", err);
@@ -199,11 +196,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
     });
   };
 
-<<<<<<< HEAD
   const triggerInput = (ref: React.RefObject<HTMLInputElement | null>) => {
-=======
-  const triggerInput = (ref: React.RefObject<HTMLInputElement>) => {
->>>>>>> rescue/ui-stable
     if (!canUploadMore) {
       setFeedback(`ניתן להעלות עד ${MAX_IMAGES} תמונות בלבד.`);
       return;
@@ -211,8 +204,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
     ref.current?.click();
   };
 
-<<<<<<< HEAD
-=======
   const handleDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -248,7 +239,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
     }
   };
 
->>>>>>> rescue/ui-stable
   const disabledReason = !requestId
     ? "נדרש מזהה טיוטה כדי להעלות תמונות"
     : !canUploadMore
@@ -256,64 +246,9 @@ export default function ImageUploader(props: ImageUploaderProps) {
     : "";
 
   return (
-<<<<<<< HEAD
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 backdrop-blur-xl">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <div className="text-white font-bold text-lg">הוספת תמונות</div>
-          <p className="text-white/60 text-sm">
-            עד {MAX_IMAGES} תמונות | JPG או PNG | העלאה מיידית
-          </p>
-        </div>
-        <div className="text-white/50 text-sm">
-          {images.length}/{MAX_IMAGES}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={() => triggerInput(fileInputRef)}
-          disabled={!requestId || !canUploadMore}
-          className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border border-white/15 bg-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          title={disabledReason || "בחירת תמונות"}
-        >
-          📎 הוספת תמונה
-        </motion.button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPT_ATTR}
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            handleFiles(e.target.files);
-            if (e.target) e.target.value = "";
-          }}
-        />
-      </div>
-
-      {feedback && (
-        <div className="text-sm text-yellow-200 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-3">
-          {feedback}
-        </div>
-      )}
-
-      {images.length === 0 ? (
-        <div className="border border-dashed border-white/15 rounded-xl p-4 text-white/60 text-sm text-center">
-          ניתן לצלם או לבחור תמונות לתיאור התקלה. ההעלאה מתבצעת מיד.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-=======
     <div>
-      {/* Horizontal Grid of Images */}
       {images.length > 0 && (
         <div className="flex flex-row flex-wrap gap-3 mb-4">
-          {/* Image Previews */}
->>>>>>> rescue/ui-stable
           <AnimatePresence>
             {images.map((img) => (
               <motion.div
@@ -321,44 +256,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-<<<<<<< HEAD
-                className="relative group"
-              >
-                <div className="overflow-hidden rounded-xl border border-white/15 bg-black/20">
-                  <img
-                    src={img.url || img.preview}
-                    alt={img.name || "תמונה שהועלתה"}
-                    className="h-32 w-full object-cover"
-                  />
-                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(img.id)}
-                      className="bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 border border-white/20"
-                      aria-label="הסר תמונה"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="text-white/70 text-xs truncate">{img.name}</span>
-                  <span
-                    className={`text-[10px] px-2 py-1 rounded-full border ${
-                      img.status === "uploaded"
-                        ? "text-green-200 border-green-400/40 bg-green-500/10"
-                        : img.status === "uploading"
-                        ? "text-blue-200 border-blue-400/40 bg-blue-500/10"
-                        : "text-red-200 border-red-400/40 bg-red-500/10"
-                    }`}
-                  >
-                    {img.status === "uploaded"
-                      ? "הועלה"
-                      : img.status === "uploading"
-                      ? "מעלה..."
-                      : "שגיאה"}
-                  </span>
-=======
                 className="relative group h-24 w-24"
               >
                 <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 h-full w-full relative">
@@ -367,19 +264,21 @@ export default function ImageUploader(props: ImageUploaderProps) {
                     alt={img.name || "תמונה שהועלתה"}
                     className="h-full w-full object-cover"
                   />
-                  
-                  {/* Upload Status Indicator */}
+
                   {img.status === "uploading" && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
                         className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full"
                       />
                     </div>
                   )}
-                  
-                  {/* Success Badge */}
+
                   {img.status === "uploaded" && (
                     <motion.div
                       initial={{ scale: 0 }}
@@ -389,8 +288,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
                       <CheckCircle2 className="w-4 h-4 text-white" />
                     </motion.div>
                   )}
-                  
-                  {/* Error Badge */}
+
                   {img.status === "error" && (
                     <motion.div
                       initial={{ scale: 0 }}
@@ -400,8 +298,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
                       <X className="w-4 h-4 text-white" />
                     </motion.div>
                   )}
-                  
-                  {/* Remove Button - Top Corner */}
+
                   <button
                     type="button"
                     onClick={() => handleRemove(img.id)}
@@ -410,7 +307,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
                   >
                     <X className="w-3 h-3" />
                   </button>
->>>>>>> rescue/ui-stable
                 </div>
               </motion.div>
             ))}
@@ -418,28 +314,18 @@ export default function ImageUploader(props: ImageUploaderProps) {
         </div>
       )}
 
-<<<<<<< HEAD
-      {!requestId && (
-        <div className="mt-4 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-=======
-      {/* Modern Upload Buttons - Side by Side */}
       {canUploadMore && (
         <div className="flex flex-row gap-3">
-          {/* Camera Button */}
           <motion.button
             type="button"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => {
-              // For camera, we can use the same file input but with capture attribute
               if (fileInputRef.current) {
                 fileInputRef.current.setAttribute("capture", "environment");
                 fileInputRef.current.click();
-                // Reset after click
                 setTimeout(() => {
-                  if (fileInputRef.current) {
-                    fileInputRef.current.removeAttribute("capture");
-                  }
+                  fileInputRef.current?.removeAttribute("capture");
                 }, 100);
               }
             }}
@@ -451,7 +337,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
             <span className="text-sm font-medium">צלם תמונה</span>
           </motion.button>
 
-          {/* Gallery Button - Dropzone */}
           <motion.button
             type="button"
             whileHover={{ scale: 1.02 }}
@@ -477,7 +362,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
         </div>
       )}
 
-      {/* Hidden File Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -490,7 +374,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
         }}
       />
 
-      {/* Success Message - Shows when image is uploaded */}
       <AnimatePresence>
         {showSuccessMessage && (
           <motion.div
@@ -505,7 +388,6 @@ export default function ImageUploader(props: ImageUploaderProps) {
         )}
       </AnimatePresence>
 
-      {/* Feedback Message (for errors or info) */}
       {feedback && !showSuccessMessage && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -515,8 +397,7 @@ export default function ImageUploader(props: ImageUploaderProps) {
           {feedback}
         </motion.div>
       )}
-      
-      {/* Upload Count Info */}
+
       {images.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -525,16 +406,15 @@ export default function ImageUploader(props: ImageUploaderProps) {
         >
           <UploadIcon className="w-3.5 h-3.5" />
           <span>
-            {images.filter(img => img.status === "uploaded").length} מתוך {images.length} תמונות הועלו
-            {images.some(img => img.status === "uploading") && " • מעלה..."}
+            {images.filter((img) => img.status === "uploaded").length} מתוך{" "}
+            {images.length} תמונות הועלו
+            {images.some((img) => img.status === "uploading") && " • מעלה..."}
           </span>
         </motion.div>
       )}
 
-      {/* Request ID Error */}
       {!requestId && (
         <div className="mt-3 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
->>>>>>> rescue/ui-stable
           נדרש מזהה פנייה תקף כדי להעלות תמונות. ודא שהגעת מהזרימה הנכונה.
         </div>
       )}

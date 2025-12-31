@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
-=======
-import React, { useState, useEffect, useRef } from "react";
->>>>>>> rescue/ui-stable
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { CarFront, ArrowRight } from "lucide-react";
@@ -15,20 +11,12 @@ import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
 import FreeTextInput from "./components/FreeTextInput";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
-<<<<<<< HEAD
 import WarningBanner from "./components/WarningBanner";
-import { useAIStateMachine } from "./hooks/useAIStateMachine";
+import { supabase } from "@/lib/supabaseClient";
+import InstructionBubble from "./components/InstructionBubble";
+import { useHybridFlow } from "./hooks/useHybridFlow";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
 import { withRetry } from "../../../../lib/ai/retry";
-=======
-import InstructionBubble from "./components/InstructionBubble";
-
-// The New Hybrid Hook
-import { useHybridFlow } from "./hooks/useHybridFlow";
-
-// Services
->>>>>>> rescue/ui-stable
-import { supabase } from "@/lib/supabaseClient";
 
 interface Vehicle {
   id: string;
@@ -38,7 +26,6 @@ interface Vehicle {
   license_plate: string;
 }
 
-<<<<<<< HEAD
 export default function QuestionsPage() {
   return (
     <Suspense
@@ -356,7 +343,6 @@ function QuestionsContent() {
 
   // Local UI State
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-<<<<<<< HEAD
   const [isTyping, setIsTyping] = useState(false);
   const [draftImagesLoaded, setDraftImagesLoaded] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
@@ -498,33 +484,7 @@ function QuestionsContent() {
     loadData();
   }, [vehicleId]);
 
-<<<<<<< HEAD
-    fetchVehicle();
-  }, [vehicleId, vehicle]);
-
-  // Fetch user
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-
-        if (authUser) {
-          setUser({ id: authUser.id });
-        }
-      } catch (err) {
-        console.error("Error getting user:", err);
-      }
-    };
-
-    getUser();
-  }, []);
-
-  // Initialize state machine and load from session
-=======
   // 2. Initialize Chat (Fixed Logic)
->>>>>>> rescue/ui-stable
   useEffect(() => {
     // 🔴 בדיקה: אם הרף כבר true, עצור מיד (מונע ריצה שנייה)
     if (hasInitialized.current) return;

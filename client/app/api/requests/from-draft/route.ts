@@ -15,11 +15,8 @@ type RequestBody = {
   ai_diagnosis?: string;
   ai_recommendations?: string[] | null;
   ai_confidence?: number | null;
-<<<<<<< HEAD
-=======
-  status?: 'open' | 'closed';  // NEW: request status
-  ai_mechanic_summary?: Record<string, any> | null;  // NEW: full mechanic summary
->>>>>>> rescue/ui-stable
+  status?: "open" | "closed"; // NEW: request status
+  ai_mechanic_summary?: Record<string, any> | null; // NEW: full mechanic summary
 };
 
 function normalizeImageUrls(urls: RequestBody["image_urls"]): string[] | null {
@@ -62,11 +59,8 @@ export async function POST(req: Request) {
       ai_diagnosis,
       ai_recommendations,
       ai_confidence,
-<<<<<<< HEAD
-=======
       status,
       ai_mechanic_summary,
->>>>>>> rescue/ui-stable
     } = body;
 
     // Step 1 – Validate required fields
@@ -152,15 +146,9 @@ export async function POST(req: Request) {
 
     const validatedConfidence =
       typeof ai_confidence === "number" &&
-<<<<<<< HEAD
       Number.isFinite(ai_confidence) &&
       ai_confidence >= 0 &&
       ai_confidence <= 1
-=======
-        Number.isFinite(ai_confidence) &&
-        ai_confidence >= 0 &&
-        ai_confidence <= 1
->>>>>>> rescue/ui-stable
         ? ai_confidence
         : null;
 
@@ -200,21 +188,14 @@ export async function POST(req: Request) {
       user_id: user_id.trim(),
       car_id: car_id.trim(),
       description: finalDescription,
-<<<<<<< HEAD
-      status: "open",
-=======
-      status: status === 'closed' ? 'closed' : 'open',  // Use provided status or default to 'open'
->>>>>>> rescue/ui-stable
+      status: status === "closed" ? "closed" : "open", // Use provided status or default to 'open'
       image_urls: normalizedImages,
       ai_diagnosis: ai_diagnosis.trim(),
       ai_confidence: validatedConfidence,
       ai_questions: ai_questions ?? null,
       ai_answers: ai_answers ?? null,
       ai_recommendations: normalizedRecommendations,
-<<<<<<< HEAD
-=======
-      ai_mechanic_summary: ai_mechanic_summary ?? null,  // NEW: mechanic summary
->>>>>>> rescue/ui-stable
+      ai_mechanic_summary: ai_mechanic_summary ?? null, // NEW: mechanic summary
     };
 
     if (draftIdColumnExists) {
