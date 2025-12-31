@@ -30,19 +30,16 @@ Complete API system for garages to manage customer repair requests and track rep
 
 Go to: https://rdrlxmpwkkeryfcszltc.supabase.co/project/_/sql/new
 
-Run this SQL:
+Run this SQL (3 lines, that's it!):
 
 ```sql
 ALTER TABLE repairs 
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'in_progress',
 ADD COLUMN IF NOT EXISTS final_issue_type VARCHAR(50),
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
-
-CREATE INDEX IF NOT EXISTS idx_repairs_status ON repairs(status);
-CREATE INDEX IF NOT EXISTS idx_repairs_final_issue_type ON repairs(final_issue_type);
 ```
 
-See `MIGRATION_INSTRUCTIONS.md` for full SQL.
+**Done!** Indexes are optional (for performance). See `MIGRATION_INSTRUCTIONS.md` for details.
 
 ### 2. Install Dependencies
 
