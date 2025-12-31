@@ -9,11 +9,6 @@ interface MultiChoiceButtonsProps {
   disabled?: boolean;
 }
 
-/**
- * Premium pill-shaped multi-choice buttons with press animations
- * Full-width responsive design with checkmark animation on selection
- * Supports 3-5 options for future question types
- */
 export default function MultiChoiceButtons({ 
   options, 
   onSelect, 
@@ -27,10 +22,8 @@ export default function MultiChoiceButtons({
     setSelected(option);
     setIsProcessing(true);
     
-    // Animate press: shrink 5% + glow effect
     setTimeout(() => {
       onSelect(option);
-      // Reset after a short delay to prevent rapid clicks
       setTimeout(() => {
         setIsProcessing(false);
         setSelected(null);
@@ -42,17 +35,13 @@ export default function MultiChoiceButtons({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        type: "spring",
-        stiffness: 300,
-        damping: 25,
-      }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="flex flex-row flex-wrap gap-2 justify-start"
       dir="rtl"
     >
-      {options.map((option, index) => (
+      {options.map((option) => (
         <motion.button
-          key={index}
+          key={option} // ✅ FIX: Using option text as key instead of index
           onClick={() => handleClick(option)}
           disabled={disabled || isProcessing}
           whileHover={!disabled && !isProcessing ? { scale: 1.05 } : {}}
@@ -71,4 +60,3 @@ export default function MultiChoiceButtons({
     </motion.div>
   );
 }
-

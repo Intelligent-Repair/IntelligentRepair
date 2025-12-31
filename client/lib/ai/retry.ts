@@ -37,7 +37,7 @@ function isRetryableError(error: any, retryableStatuses: number[]): boolean {
   }
 
   // HTTP status codes
-  const status = error?.status || error?.response?.status || error?.code;
+  const status = error?.status || error?.response?.status || error?.cause?.status || error?.code;
   if (status && retryableStatuses.includes(status)) {
     return true;
   }

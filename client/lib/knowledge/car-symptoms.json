@@ -1,0 +1,286 @@
+{
+  "symptoms": [
+    {
+      "category": "noises",
+      "description": "רעשים",
+      "mappings": [
+        {
+          "keywords": [
+            "תיקתוק",
+            "קליקים",
+            "רעש של חשמל"
+          ],
+          "targetId": "car_wont_start",
+          "type": "scenario"
+        },
+        {
+          "keywords": [
+            "חריקה בבלימה",
+            "שפשוף מתכת",
+            "חריקה מהגלגל",
+            "רעש בבלימה"
+          ],
+          "targetId": "brake_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "דפיקות מתכתיות",
+            "תקתוק חזק מהמנוע",
+            "רעש של טרקטור",
+            "רעש מתכתי מהמנוע"
+          ],
+          "targetId": "oil_pressure_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "שריקה מהמנוע",
+            "חריקה בסיבוב",
+            "צפצוף ברכב"
+          ],
+          "targetId": "battery_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "רעש מהגלגל",
+            "חריקה מהצמיג",
+            "דפיקות בנסיעה"
+          ],
+          "targetId": "tpms_light",
+          "type": "light"
+        }
+      ]
+    },
+    {
+      "category": "smells",
+      "description": "ריחות",
+      "mappings": [
+        {
+          "keywords": [
+            "ריח שרוף",
+            "ריח של פלסטיק",
+            "עשן",
+            "ריח חריף"
+          ],
+          "targetId": "smoke_fire",
+          "type": "safety"
+        },
+        {
+          "keywords": [
+            "ריח דלק",
+            "ריח בנזין",
+            "ריח של סולר"
+          ],
+          "targetId": "fuel_leak",
+          "type": "safety"
+        },
+        {
+          "keywords": [
+            "ריח מתוק",
+            "ריח של סירופ",
+            "ריח של מים רותחים",
+            "ריח אנטיפריז"
+          ],
+          "targetId": "overheating_extreme",
+          "type": "safety"
+        }
+      ]
+    },
+    {
+      "category": "sensations",
+      "description": "תחושות נסיעה",
+      "mappings": [
+        {
+          "keywords": [
+            "הגה קשה",
+            "קשה לסובב",
+            "היגוי כבד",
+            "הגה ננעל"
+          ],
+          "targetId": "steering_fail",
+          "type": "safety"
+        },
+        {
+          "keywords": [
+            "רעידות",
+            "מגמגם",
+            "מאבד כוח",
+            "רועד",
+            "הרכב רועד",
+            "רעידות במנוע"
+          ],
+          "targetId": "check_engine_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "דוושה רכה",
+            "ברקס שוקע",
+            "דוושה ספוגית",
+            "אין בלמים",
+            "בלמים לא עובדים"
+          ],
+          "targetId": "brakes_fail",
+          "type": "safety"
+        },
+        {
+          "keywords": [
+            "מושך הצידה",
+            "הגה רועד בנסיעה",
+            "רכב נוטה"
+          ],
+          "targetId": "tpms_light",
+          "type": "light"
+        }
+      ]
+    },
+    {
+      "category": "visuals",
+      "description": "ממצאים ויזואליים",
+      "mappings": [
+        {
+          "keywords": [
+            "שלולית שמן",
+            "נזילה שחורה",
+            "כתם שמן מתחת לרכב"
+          ],
+          "targetId": "oil_pressure_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "שלולית מים",
+            "נוזל צבעוני",
+            "נזילה מקדימה",
+            "נזילה ירוקה"
+          ],
+          "targetId": "coolant_temperature_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "אדים",
+            "עשן לבן",
+            "מים רותחים",
+            "אדים מהמנוע",
+            "קיטור",
+            "קיטור מהמנוע",
+            "רתיחה",
+            "נוזל קירור נשפך"
+          ],
+          "targetId": "overheating_extreme",
+          "type": "safety"
+        },
+        {
+          "keywords": [
+            "גלגל שטוח",
+            "צמיג ריק",
+            "פנצר",
+            "פנצ'ר",
+            "גלגל תקוע"
+          ],
+          "targetId": "flat_tire",
+          "type": "scenario"
+        }
+      ]
+    },
+    {
+      "category": "starting_issues",
+      "description": "בעיות התנעה",
+      "mappings": [
+        {
+          "keywords": [
+            "לא מניע",
+            "לא מתניע",
+            "הרכב לא נדלק",
+            "משתעל",
+            "מנסה להניע ולא מצליח",
+            "סטרטר לא עובד",
+            "אין סטרטר",
+            "שקט בהתנעה"
+          ],
+          "targetId": "car_wont_start",
+          "type": "scenario"
+        },
+        {
+          "keywords": [
+            "מצבר חלש",
+            "סוללה ריקה",
+            "אורות חלשים",
+            "לא נדלק"
+          ],
+          "targetId": "battery_light",
+          "type": "light"
+        }
+      ]
+    },
+    {
+      "category": "temperature",
+      "description": "בעיות טמפרטורה",
+      "mappings": [
+        {
+          "keywords": [
+            "המנוע מתחמם",
+            "רכב מתחמם",
+            "מד חום גבוה",
+            "מחוג חום באדום",
+            "התחממות יתר",
+            "נורת טמפרטורה"
+          ],
+          "targetId": "overheating",
+          "type": "scenario"
+        },
+        {
+          "keywords": [
+            "נורת חום אדומה",
+            "מד טמפרטורה אדום",
+            "מד חום באדום",
+            "התחממות אחרי עצירה"
+          ],
+          "targetId": "coolant_temperature_light",
+          "type": "light"
+        }
+      ]
+    },
+    {
+      "category": "warning_lights",
+      "description": "ניסוחים אמיתיים של משתמשים על נורות אזהרה",
+      "mappings": [
+        {
+          "keywords": [
+            "אחרי תדלוק נדלקה נורת מנוע",
+            "פקק דלק",
+            "לא סגרתי פקק",
+            "מכסה דלק לא סגור",
+            "פקק דלק לא סגור",
+            "נורת מנוע אחרי תדלוק"
+          ],
+          "targetId": "check_engine_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "מילאתי אוויר והנורה לא כבתה",
+            "מילאתי אוויר אבל הנורה דולקת",
+            "מילאתי אוויר והנורה עדיין דולקת"
+          ],
+          "targetId": "tpms_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת שמן אדומה",
+            "מנורת אלדין",
+            "נורת שמן",
+            "מנורת שמן",
+            "נורת אלדין"
+          ],
+          "targetId": "oil_pressure_light",
+          "type": "light"
+        }
+      ]
+    }
+  ]
+}

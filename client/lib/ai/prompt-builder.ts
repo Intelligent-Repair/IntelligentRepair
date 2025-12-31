@@ -1,487 +1,382 @@
 /**
  * Prompt builder for AI consultation flow
- * Simplified and optimized according to new chat structure
- * 
- * Key principles:
- * - No vehicle info sent to API (only for DB storage)
- * - Focus on general car problems, not model-specific
- * - Natural, friendly Hebrew prompts
- * - Safety warnings for dangerous situations
- * - Confidence-based early diagnosis (90% trigger)
+ *
+ * Anti-Gravity Design (Hybrid Modes):
+ * - KB_COORDINATION: When detectedLightType exists → inject only that light's KB slice.
+ * - OPTION_MAPPER: Map free-text answers to predefined option labels.
+ * - BRIDGE_TO_KB: Ask up to 3 questions to identify warning_light or scenario.
+ * - EXPERT_FALLBACK: General expertise when KB bridging fails.
+ *
+ * All modes return JSON only (no Markdown).
  */
 
-import type { UserAnswer } from "./types";
-import { sanitizeInput } from "./sanitize";
+import type { UserAnswer } from './types';
+import { sanitizeInput } from './sanitize';
+import warningLightsKB from '@/lib/knowledge/warning-lights.json';
 
-const MAX_ANSWERS_LENGTH = 200; // Limit answer length to reduce tokens
+// =============================================================================
+// TYPES
+// =============================================================================
 
-/**
- * Build optimized answers context with summarization for token efficiency
- * If more than 3 Q&A pairs: summarize oldest as facts, keep last 2 in full format
- * If 3 or fewer: keep all in full format
- */
-function buildAnswersContext(answers: UserAnswer[]): string {
-  if (answers.length === 0) {
-    return "אין תשובות קודמות.";
-  }
-
-  // If 3 or fewer answers, keep all in full format
-  if (answers.length <= 3) {
-    return answers
-      .map((a, i) => {
-        const q = sanitizeInput(a.question || "", MAX_ANSWERS_LENGTH);
-        const ans = sanitizeInput(a.answer || "", MAX_ANSWERS_LENGTH);
-        return `שאלה ${i + 1}: ${q}\nתשובה: ${ans}`;
-      })
-      .join("\n\n");
-  }
-
-  // More than 3 answers: summarize oldest, keep last 2 in full format
-  const oldestAnswers = answers.slice(0, answers.length - 2);
-  const recentAnswers = answers.slice(answers.length - 2);
-
-  // Summarize oldest answers as concise facts
-  const summarizedFacts = oldestAnswers
-    .map((a) => {
-      const ans = sanitizeInput(a.answer || "", MAX_ANSWERS_LENGTH);
-      // Extract key information from answer, remove question context to save tokens
-      return `עובדה: ${ans}`;
-    })
-    .join("\n");
-
-  // Keep last 2 Q&A pairs in full format
-  const recentContext = recentAnswers
-    .map((a, i) => {
-      const q = sanitizeInput(a.question || "", MAX_ANSWERS_LENGTH);
-      const ans = sanitizeInput(a.answer || "", MAX_ANSWERS_LENGTH);
-      const questionNum = answers.length - 2 + i + 1;
-      return `שאלה ${questionNum}: ${q}\nתשובה: ${ans}`;
-    })
-    .join("\n\n");
-
-  return `${summarizedFacts}\n\n${recentContext}`;
+export interface PromptContext {
+  mode?: 'option_map' | 'bridge' | 'expert' | null;
+  currentQuestionOptions?: string[];
+  bridgeQuestionCount?: number;
+  [key: string]: unknown;
 }
 
-// מילות מפתח לנורות אדומות קריטיות (שמן, מנוע, בלם, חום מנוע, מצבר, כרית אוויר) – סימן לסכנת נסיעה מיידית
-// חשוב: רק נורות אדומות דולקות או בעיות קריטיות אחרות - לא "לא מניע" לבד (יכול להיות מצבר מת, דלק, וכו')
-// רק נורות אדומות מפורשות או בעיות קריטיות (חום מנוע גבוה, בלם יד דולק) - לא בעיות כלליות
-export const DANGER_KEYWORDS = [
-  "נורת שמן אדומה",
-  "נורה אדומה של שמן",
-  "נורת שמן", // נורת שמן היא תמיד אדומה וקריטית
-  "שמן מנוע", // אם יש נורת שמן או בעיית שמן - קריטי
-  "לחץ שמן",
-  "נורת מנוע אדומה",
-  "נורה אדומה של מנוע",
-  "נורת מנוע אדומה במרכז הלוח",
-  "נורת בלם אדומה",
-  "נורת בלימה אדומה",
-  "נורת בלמים אדומה",
-  "בלם יד דולק בזמן נסיעה", // קריטי - בלם יד דולק בזמן נסיעה
-  "נורת טמפרטורת מנוע",
-  "טמפרטורת מנוע גבוהה",
-  "חום מנוע גבוה",
-  "נורת מצבר אדומה",
-  "נורת טעינת מצבר אדומה",
-  "נורת כרית אוויר אדומה",
-  "נורת airbag אדומה",
-  // Note: Removed "לא מניע", "הרכב לא מניע", "נורת מצבר" (without "אדומה"), "נורת בטרייה" - 
-  // these are not necessarily dangerous without a red light being explicitly mentioned
-];
+// =============================================================================
+// INTERNAL HELPERS
+// =============================================================================
 
-// מילות מפתח לנורות כתומות (אזהרה – אפשר לנסוע בזהירות אבל חשוב לטפל בהקדם)
-export const CAUTION_KEYWORDS = [
-  "נורת מנוע כתומה",
-  "נורת מנוע",
-  "check engine",
-  "צ'ק אנג'ין",
-  "צ'ק אינג'ין",
-  "abs",
-  "נורת abs",
-  "נורת abs כתומה",
-  "בקרת יציבות",
-  "בקרת אחיזה",
-  "traction control",
-  "נורת החלקה",
-  "נורת לחץ אוויר",
-  "לחץ אוויר בצמיגים",
-  "צמיג עם לחץ נמוך",
-];
+const MAX_ANSWERS_CHARS = 2000;
+
+function clampText(s: string, max: number): string {
+  const t = (s || '').trim();
+  return t.length > max ? t.slice(0, max) + '…' : t;
+}
+
+function buildAnswersContext(answers: UserAnswer[]): string {
+  if (!answers || answers.length === 0) return 'אין תשובות קודמות.';
+  const recent = answers.slice(-6);
+
+  const lines = recent.map((a, idx) => {
+    const q = clampText((a as any)?.question ?? '', 120);
+    const ans = clampText((a as any)?.answer ?? '', 120);
+    return `${idx + 1}) Q: "${q}" | A: "${ans}"`;
+  });
+
+  return clampText(lines.join('\n'), MAX_ANSWERS_CHARS);
+}
 
 /**
- * Build prompt for initial question or follow-up questions
- * This is the main prompt used throughout the chat flow
+ * Surgical KB injection:
+ * - If targetLightId exists, inject ONLY that light JSON.
+ * - Else inject a minimal list for identification.
+ */
+function buildKnowledgeBaseContext(targetLightId?: string | null): string {
+  const lights = warningLightsKB as Record<string, any>;
+
+  if (targetLightId && lights[targetLightId]) {
+    const lightData = lights[targetLightId];
+    return JSON.stringify({ lightId: targetLightId, lightData }, null, 2);
+  }
+
+  const list = Object.entries(lights).map(([lightId, lightData]) => ({
+    lightId,
+    names_he: lightData?.names?.he ?? [],
+    names_en: lightData?.names?.en ?? []
+  }));
+
+  return JSON.stringify({ available_lights: list }, null, 2);
+}
+
+/**
+ * JSON-only response contract shared by all modes.
+ */
+function jsonOnlyContract(mode: string): string {
+  if (mode === 'OPTION_MAPPER') {
+    return `
+Return ONLY a valid JSON object. No markdown, no extra text.
+
+Schema for OPTION_MAPPER mode:
+{
+  "type": "option_map",
+  "selectedOptionLabel": "<exact label from options | null>",
+  "needClarification": "<clarifying question string | null>"
+}
+
+Rules:
+- selectedOptionLabel MUST be exactly one of the provided option labels, or null if no match.
+- If null, provide a short clarification question in needClarification.
+`.trim();
+  }
+
+  return `
+Return ONLY a valid JSON object. No markdown, no extra text.
+
+Schema:
+{
+  "type": "question" | "ai_response",
+  "warning_light"?: "<lightId>",
+  "text": "<string>",
+  "options"?: ["<string>", ...]
+}
+
+Rules:
+- Do NOT invent technical diagnosis.
+- If you choose a warning_light, it must be one of the provided KB IDs.
+- If detectedLightType exists, ONLY use the KB slice injected for that light.
+- Always include options as an array of strings when type is "question".
+`.trim();
+}
+
+/**
+ * Try to pick a followup question based on the user's last answer and KB structure.
+ * Supports:
+ * - new: first_question.followups[optionId]
+ * - old: first_question.followup_for_steady / followup_for_flashing
+ */
+function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | null {
+  const last = (lastAnswerRaw || '').toLowerCase();
+
+  const firstQ = lightData?.first_question;
+  if (!firstQ) return null;
+
+  // New structure: followups map keyed by optionId
+  const options = Array.isArray(firstQ.options) ? firstQ.options : [];
+  const followups = firstQ.followups;
+
+  if (followups && typeof followups === 'object' && options.length > 0) {
+    const matched = options.find((o: any) => {
+      const id = String(o?.id ?? '').toLowerCase();
+      const label = String(o?.label ?? o ?? '').toLowerCase();
+      return (id && last.includes(id)) || (label && last.includes(label));
+    });
+
+    if (matched) {
+      const f = followups[String(matched.id)];
+      if (f?.text) return f;
+    }
+  }
+
+  // Old structure fallback
+  if (last.includes('מהבהב') || last.includes('flashing')) {
+    const f = firstQ.followup_for_flashing;
+    if (f?.text) return f;
+  }
+  if (last.includes('קבוע') || last.includes('steady')) {
+    const f = firstQ.followup_for_steady;
+    if (f?.text) return f;
+  }
+
+  return null;
+}
+
+// =============================================================================
+// MAIN EXPORTS
+// =============================================================================
+
+/**
+ * Build prompt for chat-based AI coordination.
+ *
+ * Modes resolved internally:
+ * - OPTION_MAPPER: ctx.mode === 'option_map' with ctx.currentQuestionOptions
+ * - KB_COORDINATION: detectedLightType present
+ * - IMAGE_IDENTIFICATION: hasImages && no detected light
+ * - BRIDGE_TO_KB: no light, trying to identify
  */
 export function buildChatPrompt(
   description: string,
   answers: UserAnswer[],
   hasImages: boolean,
-  questionNumber: number = 0
+  questionNumber: number = 0,
+  detectedLightType?: string | null,
+  ctx?: PromptContext | null
 ): string {
-  const sanitizedDescription = sanitizeInput(description, 1000);
-  
-  // Build optimized answers context with summarization for token efficiency
+  const sanitizedDescription = sanitizeInput(description || '', 1000);
   const answersContext = buildAnswersContext(answers);
 
-  // Detect immediate danger / caution situations לפי תיאור הבעיה והתשובות
-  const lowerDesc = sanitizedDescription.toLowerCase();
-  const answersText = answers
-    .map((a) => `${a.question} ${a.answer}` || "")
-    .join(" ")
-    .toLowerCase();
-  const combined = `${lowerDesc} ${answersText}`;
+  // -------------------------------------------------------------------------
+  // MODE: OPTION_MAPPER
+  // -------------------------------------------------------------------------
+  if (ctx?.mode === 'option_map' && Array.isArray(ctx.currentQuestionOptions) && ctx.currentQuestionOptions.length > 0) {
+    const optionsList = ctx.currentQuestionOptions.map((o, i) => `${i + 1}. "${o}"`).join('\n');
 
-  const isDanger = DANGER_KEYWORDS.some((kw) => combined.includes(kw));
-  const isCaution = !isDanger && CAUTION_KEYWORDS.some((kw) => combined.includes(kw));
+    return `
+You are an Option Mapper assistant.
 
-  // Image analysis instructions
-  const imageInstructions = hasImages ? `
-**קריטי - זיהוי נורה מהתמונה:**
-יש לך תמונה של נורת אזהרה בלוח המחוונים. אתה **חייב** לזהות את הנורה ישירות מהתמונה.
+User's free-text answer:
+"${sanitizedDescription}"
 
-**נורות נפוצות לזיהוי:**
-- נורת מצבר/בטרייה: אייקון מצבר עם סימנים + ו- (אדום/כתום)
-- נורת שמן: אייקון שמן/קנרית (אדום)
-- נורת מנוע: אייקון מנוע/Check Engine (כתום/אדום)
-- נורת בלם: אייקון בלם/בלימה (אדום)
-- נורת לחץ אוויר: אייקון צמיג עם סימן קריאה (כתום)
-- נורת טמפרטורה: אייקון מדחום/מים (אדום)
-- נורת ABS: כתוב "ABS" (כתום)
+Available options (choose EXACTLY one label or null):
+${optionsList}
 
-**חוקים חשובים - קריטי לקרוא:**
-1. **אל תשאל לעולם** "תאר את הנורה", "מה אתה רואה?", "מה אתה רואה כשאתה מסתכל על הנורה?" - אתה רואה את התמונה, זהה אותה בעצמך!
-2. **זהה את הנורה מהתמונה** וציין אותה ישירות בשאלה הראשונה (למשל: "זיהיתי נורת מצבר בתמונה")
-3. **המשך ישר לשאלות רלוונטיות** לנורה שזיהית (לא שאלות על הנורה עצמה)
-4. אם זיהית נורת מצבר + המשתמש אמר "הרכב לא מניע" → שאל שאלות על מצבר, קורוזיה, חיבורים
-5. אם זיהית נורת שמן → שאל שאלות על מפלס שמן, רעשים, נזילות
-6. **אם יש תמונה - תמיד זהה את הנורה ישירות, לעולם אל תשאל את המשתמש לתאר אותה!**
-
-**דוגמה נכונה:**
-"זיהיתי נורת מצבר בתמונה. הרכב לא מניע - האם אתה שומע קליקים כשאתה מנסה להתניע?" (type: "question", options: ["כן, יש קליקים", "לא, אין קליקים", "לא בטוח"])
-
-**דוגמה שגויה (אל תעשה כך - זה אסור!):**
-"מה אתה רואה כשאתה מסתכל על הנורה?" (type: "text_input") - זה אסור! אתה רואה את התמונה, זהה אותה בעצמך!
-"תאר את הנורה שאתה רואה בלוח המחוונים" (type: "text_input") - זה אסור! אתה רואה את התמונה, זהה אותה בעצמך!` : "";
-
-  // Safety / caution warning section – רק בשאלה הראשונה
-  let safetyWarning = "";
-  if (questionNumber === 0) {
-    if (isDanger) {
-      safetyWarning = `
-⚠️ אזהרת בטיחות – נורת אזהרה אדומה (סכנת נסיעה מיידית):
-אם זיהית נורת שמן אדומה, נורת מנוע אדומה, נורת בלם אדומה, נורת בלימה אדומה, נורת בלמים אדומה, בלם יד דולק בזמן נסיעה, נורת טמפרטורת מנוע, נורת מצבר אדומה או נורת כרית אוויר אדומה – מדובר בסכנת נסיעה מיידית.
-**חשוב:** כשאתה מחזיר את שדה safety_warning, החזר רק את תוכן ההודעה (ללא כותרת - הכותרת "שים לב ! אזהרת בטיחות קריטית !" תוצג אוטומטית).
-התחל את התשובה במשפט בסגנון:
-"נראה שנדלקה נורת אזהרה אדומה שמעידה על סכנה מיידית למנוע או למערכת הבלימה. אני ממליץ לעצור את הרכב בצד בבטחה ולא להמשיך בנסיעה עד שתבוצע בדיקה במוסך."
-לאחר האזהרה, המשך לשאול שאלה מנחה על התסמינים כדי לדייק את האבחנה.`;
-    } else if (isCaution) {
-      safetyWarning = `
-⚠️ אזהרת בטיחות – נורת אזהרה כתומה:
-אם זו נורת Check Engine, נורת ABS, נורת בקרת יציבות/אחיזה או נורת לחץ אוויר בצמיגים – הדגש שמדובר בתקלה שצריך לטפל בה בהקדם, אבל בדרך כלל ניתן להמשיך בנסיעה בזהירות.
-**חשוב:** כשאתה מחזיר את שדה caution_notice, החזר רק את תוכן ההודעה (ללא כותרת - הכותרת "שים לב !" תוצג אוטומטית).
-התחל את התשובה במשפט בסגנון:
-"נראה שנדלקה נורת אזהרה במערכת הרכב (למשל מנוע, ABS, בקרת יציבות או לחץ אוויר בצמיגים). מומלץ להמשיך בנסיעה בזהירות, להימנע מנהיגה מהירה או אגרסיבית, ולפנות למוסך לבדיקה בהקדם."`;
-    }
+${jsonOnlyContract('OPTION_MAPPER')}
+`.trim();
   }
 
-  // Scenario Library for common issues
-  const scenarioLibrary = `
-ספריית תרחישים נפוצים - השתמש בהם כשמתאים:
+  // -------------------------------------------------------------------------
+  // MODE: KB_COORDINATION / IMAGE_IDENTIFICATION / BRIDGE_TO_KB
+  // -------------------------------------------------------------------------
+  const lights = warningLightsKB as Record<string, any>;
+  const lightData = detectedLightType ? lights[detectedLightType] : null;
+  const lightHebrewName = lightData?.names?.he?.[0] || detectedLightType || '';
 
-**מצתים (Spark Plugs):**
-- בדוק אם המצתים שחורים (פיח) - מעיד על בעיית בעירה
-- בדוק אם המצתים רטובים (שמן) - מעיד על דליפת שמן
-- בדוק אם יש סדקים או נזק פיזי במצתים
+  const kbContext = buildKnowledgeBaseContext(detectedLightType);
 
-**מצבר (Battery) - נורה אדומה/כתומה:**
-- אם יש תמונה של נורת מצבר + המשתמש אמר "לא מניע" → זה כמעט בוודאות בעיית מצבר
-- שאל שאלות על: קליקים בהתנעה, אורות חלשים, קורוזיה על הקטבים, חיבורים רופפים
-- **שאלה מעשית מומלצת:** "האם ניסית להניע את הרכב באמצעות כבלים עם רכב אחר?" (במקום לשאול על מד מתח)
-- אם המשתמש אמר "לא מניע" + יש נורת מצבר → אל תשאל "תאר את הנורה", המשך ישר לשאלות על מצבר
-- אם המשתמש עונה "לא" או "לא יודע" על שאלת הכבלים → תן הנחיות להנעה עם כבלים
+  const needsImageIdentification =
+    hasImages && (!detectedLightType || detectedLightType === 'unidentified_light');
 
-**שמן מנוע (Oil) - נורה אדומה:**
-- **שאלה מעשית מומלצת:** "האם ניסית למלא שמן מנוע?" (במקום לשאול רק על בדיקת מפלס)
-- אם המשתמש עונה "לא" או "לא יודע" → תן הנחיות למילוי שמן
+  const lastAnswer = (answers?.[answers.length - 1] as any)?.answer ?? '';
+  const followup = lightData ? suggestFollowupQuestion(lightData, lastAnswer) : null;
 
-**נוזל בלמים (Brake Fluid) - נורה אדומה:**
-- **אזהרה: נוזל בלמים זה דבר מסוכן מאוד - רק מוסך מוסמך יכול למלא אותו!**
-- **אל תשאל** "האם ניסית למלא נוזל בלמים?" - זה מסוכן!
-- **שאל רק:** "האם אתה רואה שהנוזל נמוך?" או "האם חסר נוזל בלמים?"
-- אם המשתמש עונה "כן, חסר" → תן הנחיה **לפנות למוסך מיד** - אל תן הנחיות למילוי!
+  let mode: string;
+  if (needsImageIdentification) {
+    mode = 'IMAGE_IDENTIFICATION';
+  } else if (detectedLightType && detectedLightType !== 'unidentified_light') {
+    mode = 'KB_COORDINATION';
+  } else {
+    mode = 'BRIDGE_TO_KB';
+  }
 
-**נוזל קירור (Coolant) - נורה אדומה:**
-- **שאלה מעשית מומלצת:** "האם ניסית למלא נוזל קירור?" (אם זיהית שהנוזל נמוך)
-- אם המשתמש עונה "לא" או "לא יודע" → תן הנחיות למילוי נוזל קירור
+  const bridgeCount = ctx?.bridgeQuestionCount ?? 0;
+  const remainingBridgeQuestions = Math.max(0, 3 - bridgeCount);
 
-**לחץ אוויר בצמיגים (Tire Pressure) - נורה כתומה:**
-- **שאלה מעשית מומלצת:** "האם ניסית למלא אוויר לצמיגים בתחנת דלק?" (במקום לשאול רק על בדיקה ויזואלית)
-- אם המשתמש עונה "לא" או "לא יודע" → תן הנחיות למילוי אוויר
+  const instruction = `
+You are a Data Coordinator for a car diagnostics assistant.
 
-**בלמים (Brakes):**
-- בדוק את פני הדיסק (דיסק בלם) - האם יש חריצים, בליטות, או שחיקה לא אחידה
-- בדוק עובי רפידות הבלם
-- בדוק אם יש רעשים (חריקה, חריקה) בעת בלימה
+Mode: ${mode}
 
-**עשן (Smoke):**
-- עשן לבן - בדרך כלל מעיד על בעיית קירור (מים/נוזל קירור)
-- עשן כחול - בדרך כלל מעיד על בעיית שמן (שריפת שמן)
-- עשן שחור - בדרך כלל מעיד על בעיית בעירה (תערובת דלק עשירה מדי)
-`;
+User input:
+"${sanitizedDescription}"
 
-  return `אתה המוסכניק החבר - מכונאי רכב מקצועי, ישיר וידידותי. דיבר בעברית מקצועית ופשוטה, בלי ביטויים ילדותיים כמו "בואו נבדוק יחד". תהיה ישיר, מקצועי וענייני.
+Recent Q/A history:
+${answersContext}
 
-${imageInstructions}
+Detected warning light (if any): ${detectedLightType ? `"${detectedLightType}" (${lightHebrewName})` : 'none'}
 
-תיאור הבעיה שהמשתמש נתן: "${sanitizedDescription}"
+${mode === 'IMAGE_IDENTIFICATION' ? `
+Instructions for IMAGE_IDENTIFICATION:
+- Identify the warning_light ID from the provided available_lights list.
+- Return a JSON object with type="question", include warning_light, and ask the first KB question if possible.
+- Do NOT guess if unclear; ask the user to describe the light.
+` : ''}
 
-${answersContext !== "אין תשובות קודמות." ? `תשובות קודמות (קריטי - בדוק לפני שתשאל שאלה חדשה!):\n${answersContext}\n\n**חשוב מאוד: לפני שתשאל שאלה חדשה, בדוק את השאלות שכבר נשאלו למעלה. אל תחזור על שאלות דומות או זהות!**\n\n**דוגמאות לשאלות זהות/דומות שאסור לחזור עליהן:**\n- "האם ניסית להניע עם כבלים?" = "האם ניסית להניע את הרכב באמצעות כבלים עם רכב אחר?" (אותה שאלה!)\n- "האם יש קורוזיה?" = "האם אתה מבחין בקורוזיה?" (אותה שאלה!)\n- "האם האורות נחלשים?" = "האם האורות בלוח המחוונים נחלשים?" (אותה שאלה!)\n\n**אם כבר שאלת שאלה - אל תשאל אותה שוב בשום ניסוח! המשך לשאלה אחרת או לאבחון.**` : ""}
+${mode === 'KB_COORDINATION' ? `
+Instructions for KB_COORDINATION:
+- Do NOT invent new questions.
+- Use the injected KB slice ONLY.
+- If a followup question is relevant, ask it.
+- Otherwise, ask the KB first_question or a clarifying KB question derived ONLY from injected KB.
+- Always return options as an array of strings.
 
-${safetyWarning}
+Followup hint (if present): ${followup?.text ? `"${followup.text}"` : 'none'}
+` : ''}
 
-${scenarioLibrary}
+${mode === 'BRIDGE_TO_KB' ? `
+Instructions for BRIDGE_TO_KB:
+- Your goal: identify which warning_light (from available_lights) matches the user's problem.
+- You may ask UP TO ${remainingBridgeQuestions} more bridging question(s).
+- Do NOT diagnose or give technical advice.
+- If you identify a warning_light, include it in your response.
+- Keep questions short and focused.
+` : ''}
 
-**לוגיקה קפדנית לסוגי שאלות:**
+KB Context (JSON):
+${kbContext}
 
-1. **שאלות כן/לא או בחירה מרובה:**
-   - אם אתה שואל שאלה עם תשובות מוגדרות מראש (כן/לא, או אפשרויות בחירה)
-   - **חייב** להשתמש ב: "type": "question"
-   - **חייב** לכלול: "options": ["אופציה 1", "אופציה 2", ...]
-   - **קריטי: אם השאלה שלך מכילה אפשרויות ספציפיות - החזר אותן כאופציות!**
-   - **חשוב: תמיד הוסף אופציה "לא יודע" או "לא יודע לבדוק" אם השאלה דורשת בדיקה או תצפית!**
-   - דוגמאות:
-     * "האם אתה מרגיש משיכה לצד?" → options: ["כן, מושך ימינה", "כן, מושך שמאלה", "לא, אין משיכה", "לא יודע"]
-     * "האם יש רעש של קליקים או שהכל שקט?" → options: ["יש קליקים", "הכל שקט", "לא בטוח"]
-     * "האם אתה מבחין בקורוזיה?" → options: ["כן, יש קורוזיה", "לא, אין קורוזיה", "לא יודע לבדוק"]
-     * "מה צבע העשן?" → options: ["לבן", "כחול", "שחור", "אין עשן", "לא יודע"]
-     * "מתי הבעיה מתרחשת?" → options: ["בהתנעה", "בנסיעה", "בעלייה", "בכל זמן", "לא בטוח"]
+${jsonOnlyContract(mode)}
+`.trim();
 
-2. **שאלות פתוחות (תיאור/תצפית):**
-   - אם אתה שואל "מה אתה רואה?", "תאר...", "מה אתה מבחין?", "איך זה נראה?"
-   - **חייב** להשתמש ב: "type": "text_input"
-   - **אל תכלול** שדה "options" - המשתמש יקליד תשובה חופשית
-   - דוגמאות: "מה אתה רואה כשאתה מסתכל על המצתים?", "תאר את פני הדיסק", "מה צבע העשן שאתה רואה?"
-
-3. **אבחון סופי:**
-   - **רק אם יש לך מספיק מידע אמיתי** (confidence 0.9+ ו-3+ תשובות עם מידע קונקרטי, או מקרה ברור מאוד)
-   - **אל תחזיר אבחון אם:**
-     * המשתמש אמר "לא בדקתי", "לא יודע", "לא בטוח" - זה אומר שאין מספיק מידע
-     * יש פחות מ-3 תשובות קונקרטיות (לא "לא יודע" או "לא בדקתי")
-     * המשתמש לא נתן מידע על התסמינים או הבדיקות
-   - **אם יש מספיק מידע:**
-     * **חייב** להשתמש ב: "type": "diagnosis"
-     * **חייב** לכלול שדה "results" עם מערך של לפחות תקלה אחת
-     * **אל תכלול** שדה "question" או "options"
-
-${hasImages ? `**תזכורת: יש לך תמונה של נורה - זהה אותה ישירות ואל תשאל את המשתמש לתאר אותה!**` : ""}
-
-הנחיות כלליות:
-- **קריטי: שאל רק שאלה אחת בכל פעם** - אל תשאל שתי שאלות בבת אחת (למשל: "האם יש רעשים או נזילות?" - זה שתי שאלות!)
-- **קריטי: אל תחזור על שאלות שכבר נשאלו!** - לפני שתשאל שאלה חדשה, בדוק את "תשובות קודמות" למעלה. אם כבר שאלת שאלה דומה או זהה - אל תשאל אותה שוב! המשך לשאלה הבאה או לאבחון.
-- שאל שאלה אחת בעברית, פשוטה וברורה
-- התמקד בתסמינים ספציפיים: מתי (התנעה/נסיעה/עצירה), איך (מושך/רעידות/אובדן כוח), מה הנהג מרגיש
-- **עדיפות לשאלות על בעיות קריטיות:**
-  * אם יש נורת שמן אדומה → שאל קודם על מפלס שמן (לא על רעשים!)
-  * אם יש נורת בלם → שאל קודם על נוזל בלמים
-  * אם יש נורת חום מנוע → שאל קודם על נוזל קירור
-  * אם יש נורת מצבר → שאל קודם על מצבר וקטבים
-  * **אל תשאל על רעשים או נסיעה אם יש נורה אדומה קריטית** - זה מסוכן!
-  * **עדיפות: בעיות בטיחות (שמן, בלמים, חום) > בעיות תפקוד (רעשים, רעידות)**
-- **אם יש תמונה של נורה (קריטי!):**
-  * בשאלה הראשונה: **זהה את הנורה מהתמונה** וציין אותה ישירות (למשל: "זיהיתי נורת מצבר בתמונה")
-  * **אסור לשאול** "תאר את הנורה", "מה אתה רואה?", "מה אתה רואה כשאתה מסתכל על הנורה?" - אתה רואה את התמונה, זהה אותה בעצמך!
-  * **אסור להשתמש ב-type: "text_input"** אם יש תמונה - תמיד זהה את הנורה ישירות והשתמש ב-type: "question"
-  * המשך ישר לשאלות רלוונטיות לנורה שזיהית (לא שאלות על הנורה עצמה)
-  * בשאלות הבאות - רק שאל, אל תזכיר את הנורה שוב
-- **מתי להחזיר אבחון:**
-  * **קריטי: אם המשתמש מצהיר שהבעיה נפתרה (למשל: "כן, הרכב נדלק", "כן, הנורה נעלמה", "כן, זה עובד") - החזר אבחון סופי מיד שמבהיר שהבעיה נפתרה! אל תמשיך לשאול שאלות!**
-  * **רק אם יש 3+ תשובות קונקרטיות** (לא "לא יודע", "לא בדקתי", "לא בטוח")
-  * **רק אם יש confidence 0.9+** ויש מידע אמיתי על התסמינים
-  * במקרים ברורים מאוד (שמן+נמוך+רעשים) → אפשר גם אחרי 2 תשובות קונקרטיות
-- **מתי לא להחזיר אבחון:**
-  * אם המשתמש אמר "לא בדקתי", "לא יודע", "לא בטוח" - זה אומר שאין מספיק מידע
-  * אם יש פחות מ-3 תשובות קונקרטיות
-  * אם אין מידע על התסמינים או הבדיקות
-  * **במקרים כאלה - המשך לשאול שאלות או תן הנחיות לבדיקה**
-- **זכור: אם כבר נתת הנחיות לבדיקה (למשל הנחיות להנעה עם כבלים) והמשתמש ענה על השאלה שאחרי ההנחיות - אל תחזור לשאול "האם ניסית להניע עם כבלים?" שוב! המשך לשאלה הבאה או לאבחון.**
-
-החזר JSON בלבד:
-{
-  "type": "question" | "text_input" | "diagnosis",
-  "question": "שאלה אחת בעברית פשוטה (רק אם type הוא 'question' או 'text_input')",
-  "options": ["אופציה 1", "אופציה 2", "אופציה 3"] (רק אם type הוא 'question' - אל תכלול אם type הוא 'text_input'),
-  "confidence": 0.7-1.0,
-  "results": [{"issue": "...", "probability": 0.85, "explanation": "..."}] (רק אם type הוא 'diagnosis' - **חייב** לכלול לפחות תקלה אחת),
-  "safety_warning": "אזהרת בטיחות (רק בשאלה הראשונה, רק אם יש נורה אדומה קריטית). החזר רק את תוכן ההודעה (ללא כותרת - הכותרת 'שים לב ! אזהרת בטיחות קריטית !' תוצג אוטומטית). אם אין נורה אדומה קריטית, אל תכלול שדה זה.",
-  "caution_notice": "הודעת זהירות (רק בשאלה הראשונה, רק אם יש נורה כתומה). החזר רק את תוכן ההודעה (ללא כותרת - הכותרת 'שים לב !' תוצג אוטומטית). אם אין נורה כתומה, אל תכלול שדה זה."
-}
-
-⚠️ קריטי: הקפד על הלוגיקה:
-- **שאל רק שאלה אחת בכל פעם** - אל תשאל "האם יש X או Y?" (זה שתי שאלות!)
-- דוגמה שגויה: "האם יש רעשים או נזילות?" - זה שתי שאלות, צריך לשאול כל אחת בנפרד
-- דוגמה נכונה: "האם יש רעשים חריגים מהמנוע?" (שאלה אחת)
-- **אם השאלה שלך מכילה אפשרויות ספציפיות - החזר אותן כאופציות!**
-  * דוגמה: "האם יש רעש של קליקים או שהכל שקט?" → options: ["יש קליקים", "הכל שקט", "לא בטוח"]
-  * אל תחזיר "כן"/"לא" אם השאלה מכילה אפשרויות ספציפיות!
-- **תמיד הוסף אופציה "לא יודע" או "לא יודע לבדוק" לשאלות שדורשות בדיקה/תצפית!**
-  * דוגמה: "האם אתה מבחין בקורוזיה?" → options: ["כן, יש קורוזיה", "לא, אין קורוזיה", "לא יודע לבדוק"]
-  * דוגמה: "האם חיברת את הכבלים נכון?" → options: ["כן", "לא", "לא יודע"]
-- **אם יש תמונה - אסור לשאול "מה אתה רואה?" או "תאר..." - תמיד זהה את הנורה ישירות!**
-- שאלה עם אפשרויות בחירה → type: "question" + options
-- שאלה פתוחה ("מה אתה רואה?", "תאר...") → type: "text_input" (ללא options) - **אבל רק אם אין תמונה!**
-- **אם יש תמונה - תמיד type: "question" עם זיהוי ישיר של הנורה**
-- אבחון סופי → type: "diagnosis" (ללא question או options)`;
+  return instruction;
 }
 
 /**
- * Build prompt for final diagnosis
- * Called when confidence >= 90% or after 5 questions
+ * Build prompt for expert fallback mode.
+ *
+ * Used when:
+ * - context-analyzer returns CONSULT_AI
+ * - No recognized light or scenario in KB
+ * - Bridge attempts exhausted
  */
-export function buildDiagnosisPrompt(
+export function buildGeneralExpertPrompt(
   description: string,
   answers: UserAnswer[],
-  hasImages: boolean
+  hasImages: boolean = false,
+  ctx?: PromptContext | null
 ): string {
-  const sanitizedDescription = sanitizeInput(description, 1000);
-  
-  // Build optimized answers context with summarization for token efficiency
+  const sanitizedDescription = sanitizeInput(description || '', 1000);
   const answersContext = buildAnswersContext(answers);
+  const kbContext = buildKnowledgeBaseContext(null);
+  const questionCount = answers.length;
 
-  const imageInstructions = hasImages ? `
-תמונה: נורת אזהרה בלוח המחוונים. שלב את מה שאתה רואה עם התיאור המילולי.
-האבחון חייב להתבסס על שני המקורות: הנורה + התיאור המילולי (תסמינים, התנהגות, מתי הבעיה מתרחשת).` : "";
+  const instruction = `
+You are an EXPERT_FALLBACK assistant for car diagnostics.
 
-  return `אתה מכונאי רכב מקצועי. עבוד בעברית, משפטים קצרים ופשוטים.
+Mode: EXPERT_FALLBACK
 
-החזר רק JSON תקף. אין טקסט מחוץ ל-JSON.
+User input:
+"${sanitizedDescription}"
 
-${imageInstructions}
+Recent Q/A history (${questionCount} questions asked so far):
+${answersContext}
 
-תיאור הבעיה: "${sanitizedDescription}"
+${hasImages ? 'Note: User provided an image. Describe what you see if relevant.\n' : ''}
 
-${answersContext !== "אין תשובות קודמות." ? `תשובות קודמות:\n${answersContext}` : ""}
+Instructions:
+${questionCount >= 5 ? `
+- You have gathered enough information (${questionCount} questions). NOW provide a diagnosis_report.
+- Return type: "diagnosis_report" with results array.
+` : `
+- Ask clarifying questions to understand the problem better.
+- IMPORTANT: Provide 3-4 VARIED options, NOT just "כן/לא". Include specific symptoms, actions, or descriptions.
+- Example good options: ["כן, יש טפטוף קבוע", "לא, אבל יש כתם על הרצפה", "לא בדקתי", "לא בטוח"]
+- If the user indicates they want to go to a mechanic or end the conversation, provide a diagnosis_report.
+`}
+- If you can map the description to a warning_light ID from available_lights, include warning_light in the JSON.
+- Be safety-conscious: if something sounds dangerous, immediately advise stopping and return diagnosis_report.
 
-${hasImages ? `תמונה: נורת אזהרה. האבחון חייב להתבסס על הנורה + התיאור המילולי.` : ""}
+Available lights (JSON):
+${kbContext}
 
-קריטי: זהה את הבעיה הסבירה ביותר על בסיס התיאור המילולי, התמונה (אם יש), והתשובות.
-- אם יש תמונה: שים לב לנורה + השתמש בתיאור המילולי (תסמינים, התנהגות)
-- תסמינים ספציפיים מהתיאור (רעשים, ירידה בכוח, מתי הבעיה מתרחשת) הם מידע קריטי
-- **תמיד** זהה בעיה ספציפית - אל תחזיר "בעיה לא מזוהה" או "לא ניתן לזהות"
-- אם יש נורת שמן + רעשים + מפלס שמן נמוך → זהה זאת כ"מחסור בשמן מנוע" או "נזילת שמן"
-- אם יש נורה ספציפית + תסמינים → קשר ביניהם וזהה את הבעיה
-- השתמש במילים מקצועיות אך פשוטות: "מחסור בשמן", "נזילת שמן", "בעיית מצבר", "בעיית בלמים"
-- הימנע מביטויים שעלולים להיות מובנים כפוגעניים או לא הולמים
+Return ONLY a valid JSON object. No markdown, no extra text.
 
-הנחיות לאבחון:
-1. החזר עד 3 תקלות, מדורגות לפי הסתברות (0-1)
-2. עברית בלבד, משפטים קצרים, ללא ז'רגון מקצועי (אל תשתמש בקודי תקלה, OBD, ECU)
-3. הסבר קצר (2-3 משפטים) לכל תקלה - למה זו הבעיה ואיך הגעת לאבחנה
-4. אם יש נורה ספציפית - האבחון חייב להיות קשור אליה + התיאור המילולי
-5. תסמינים מהתיאור (רעשים, משיכה, רעידות, ירידה בכוח) הם מידע קריטי - השתמש בהם
-6. שים לב לפרטים מהתיאור: מתי הבעיה מתרחשת, איך הרכב מתנהג, כמה זמן קיימת
-
-self_checks (רק לתקלה הראשונה - הסבירה ביותר):
-- 3-5 בדיקות פשוטות ובטוחות שהמשתמש יכול לבצע לבד
-- רק דברים שהמשתמש יכול לעשות באופן עצמאי (מילוי אוויר, מילוי שמן, מילוי מיכל קירור, פתיחת מכסה מנוע ובדיקה ויזואלית)
-- לא דברים שדורשים איש מקצוע
-
-do_not (רק לתקלה הראשונה):
-- 2-4 אזהרות קצרות מתי לא להמשיך או מה לא לעשות
-
-החזר רק JSON תקף. אין טקסט מחוץ ל-JSON.
-
-פורמט JSON בלבד:
+Schema for questions:
 {
-  "type": "diagnosis",
-  "summary": "תקציר קצר בעברית פשוטה - למה אתה חושב שזו הבעיה ואיך הגעת לאבחנה",
+  "type": "question",
+  "text": "<question string>",
+  "options": ["<varied option 1>", "<varied option 2>", "<varied option 3>", "<varied option 4>"]
+}
+
+Schema for diagnosis (use when ${questionCount >= 5 ? 'NOW - enough questions asked' : 'user wants to end or dangerous situation'}):
+{
+  "type": "diagnosis_report",
+  "title": "אבחון: <problem summary>",
   "results": [
-    {
-      "issue": "בעיה 1 בשפה פשוטה",
-      "probability": 0.85,
-      "explanation": "הסבר קצר (2-3 משפטים) למה זו הבעיה ואיך הגעת לאבחנה - קליל וחברי",
-      "self_checks": ["בדיקה פשוטה 1", "בדיקה פשוטה 2", "בדיקה פשוטה 3"],
-      "do_not": ["אזהרה קצרה 1", "אזהרה קצרה 2"]
-    },
-    {
-      "issue": "בעיה 2 בשפה פשוטה",
-      "probability": 0.10,
-      "explanation": "הסבר קצר למה זו אפשרות נוספת"
-    },
-    {
-      "issue": "בעיה 3 בשפה פשוטה",
-      "probability": 0.05,
-      "explanation": "הסבר קצר למה זו אפשרות נוספת"
-    }
+    { "issue": "<diagnosis 1>", "probability": 0.7, "explanation": "<why>" },
+    { "issue": "<diagnosis 2>", "probability": 0.2, "explanation": "<why>" }
   ],
-  "confidence": 0.85
+  "confidence": 0.75,
+  "status": { "color": "yellow", "text": "<severity text>", "instruction": "<action to take>" },
+  "nextSteps": "<recommended next steps>",
+  "recommendations": ["<specific check 1>", "<specific check 2>"],
+  "endConversation": true
+}
+`.trim();
+
+  return instruction;
 }
 
-החזר JSON בלבד.`;
-
-}
+// =============================================================================
+// SHORT DESCRIPTION PROMPT (for from-draft route)
+// =============================================================================
 
 /**
- * Build research prompt (optional - for initial analysis)
- * NOTE: According to new spec, vehicle info should NOT be sent to API
- * This is kept for backward compatibility but vehicle info is ignored
+ * Builds a prompt to generate a short description from a diagnosis.
+ * Used by /api/requests/from-draft to create a summary for the request.
  */
-export function buildResearchPrompt(
-  description: string
-): string {
-  const sanitizedDescription = sanitizeInput(description, 1000);
+export function buildShortDescriptionPrompt(diagnosis: string): string {
+  const safeDiagnosis = sanitizeInput(diagnosis, 2000);
 
-  return `אתה מומחה רכב. עזור לאבחן בעיות רכב כלליות (לא ספציפיות לדגם).
+  return `
+אתה עוזר טכני לרכב. קיבלת אבחנה של בעיה ברכב.
+צור תיאור קצר של הבעיה בעברית (מקסימום 100 תווים).
 
-תיאור הבעיה: "${sanitizedDescription}"
+האבחנה:
+${safeDiagnosis}
 
-בצע מחקר מקצועי על תקלות רכב כלליות:
-- בעיות נפוצות הקשורות לתיאור הזה
-- סיבות אפשריות לתקלה
-- גורמים שמבדילים בין סיבות שונות
-- הערכת חומרת הבעיה (low/medium/high/critical)
-- זיהוי מילות מפתח טכניות רלוונטיות
-
-החזר JSON בלבד:
+החזר JSON בלבד בפורמט:
 {
-  "top_causes": ["סיבה 1", "סיבה 2", "סיבה 3"],
-  "differentiating_factors": ["גורם 1", "גורם 2"],
-  "reasoning": "הסבר קצר",
-  "severity": "low" | "medium" | "high" | "critical",
-  "keywords": ["מילת מפתח 1", "מילת מפתח 2", "מילת מפתח 3", "מילת מפתח 4", "מילת מפתח 5"]
+  "description": "תיאור קצר של הבעיה"
 }
-
-הנחיות:
-- severity: הערך את חומרת הבעיה לפי רמת הסיכון (low = בעיה קלה, medium = בעיה בינונית, high = בעיה חמורה, critical = סכנה מיידית)
-- keywords: 3-5 מילות מפתח טכניות בעברית או אנגלית הקשורות לבעיה (למשל: "מצבר", "שמן מנוע", "בלמים", "battery", "oil pressure")`;
-}
-
-/**
- * Build prompt for generating a short description (up to 5 words)
- * Based on the AI diagnosis summary
- */
-export function buildShortDescriptionPrompt(
-  aiDiagnosis: string
-): string {
-  const sanitizedDiagnosis = sanitizeInput(aiDiagnosis, 500);
-
-  return `אתה מכונאי רכב מקצועי. על בסיס האבחון הבא, צור תיאור קצר מאוד של הבעיה.
-
-אבחון: "${sanitizedDiagnosis}"
-
-הנחיות:
-1. צור תיאור קצר בעברית - עד 5 מילים בלבד
-2. התיאור צריך לתאר את הבעיה העיקרית במילים פשוטות
-3. השתמש במילים שהמשתמש הממוצע יבין
-4. התמקד בבעיה העיקרית, לא בפרטים טכניים
 
 דוגמאות:
-- "נורת שמן אדומה דולקת"
-- "בעיית לחץ אוויר בצמיגים"
-- "נורת מנוע כתומה"
-- "בעיית בלמים"
+- "בעיה במערכת הבלמים"
+- "התחממות יתר של המנוע"
+- "נורת שמן דולקת"
+- "רעש ממערכת ההיגוי"
 
-החזר JSON בלבד:
-{
-  "description": "תיאור קצר עד 5 מילים"
-}`;
+החזר JSON בלבד, ללא טקסט נוסף.
+`.trim();
 }
