@@ -24,6 +24,8 @@ export interface ResearchData {
   top_causes: string[];
   differentiating_factors: string[];
   reasoning: string;
+  severity: "low" | "medium" | "high" | "critical";
+  keywords: string[];
 }
 
 export interface DiagnosisData {
@@ -59,6 +61,7 @@ export interface AIQuestionResponse {
 
 export interface ChatMessage {
   id: string;
+<<<<<<< HEAD
   sender: "ai" | "user";
   text?: string;
   images?: string[];
@@ -72,12 +75,41 @@ export interface AIQuestion {
   type: AIQuestionType;
   options: string[];
   shouldStop?: boolean;
+=======
+  sender: "ai" | "user" | "system";
+  text: string;
+  type?: string;
+  meta?: any;
+  images?: string[];
+  timestamp?: number;
+  isInstruction?: boolean;
+}
+
+export type AIQuestionType =
+  | "question"
+  | "scenario_step"
+  | "safety_alert"
+  | "instruction"
+  | "diagnosis_report"
+  | "ai_response"
+  | "yesno"
+  | "multi"
+  | "text";
+
+export interface AIQuestion {
+  type: AIQuestionType;
+  text?: string;
+  question?: string;
+  options?: string[];
+  shouldStop?: boolean;
+  [k: string]: any;
+>>>>>>> rescue/ui-stable
 }
 
 /**
  * State machine states
  */
-export type AIStateStatus = 
+export type AIStateStatus =
   | "IDLE"
   | "ASKING"
   | "WAITING_FOR_ANSWER"
@@ -108,5 +140,10 @@ export type AIAction =
   | { type: "FINISH"; payload: DiagnosisData }
   | { type: "ERROR"; payload: string }
   | { type: "RESET" }
+<<<<<<< HEAD
   | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } };
+=======
+  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } }
+  | { type: "REMOVE_LAST_ANSWER" }; // Remove last answer (e.g., when user says "not sure" and we re-ask)
+>>>>>>> rescue/ui-stable
 

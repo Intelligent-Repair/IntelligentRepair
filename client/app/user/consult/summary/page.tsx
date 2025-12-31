@@ -24,6 +24,7 @@ interface StoredDiagnosis {
   diagnosis?: string[];
   self_checks?: string[];
   warnings?: string[];
+<<<<<<< HEAD
 }
 
 interface SummaryViewModel {
@@ -35,6 +36,19 @@ interface SummaryViewModel {
 }
 
 function SummaryContent() {
+=======
+}
+
+interface SummaryViewModel {
+  summary: string | null;
+  topCauses: string[];
+  diyChecks: string[];
+  warnings: string[];
+  disclaimer: string | null;
+}
+
+export default function SummaryPage() {
+>>>>>>> rescue/ui-stable
   const router = useRouter();
   const searchParams = useSearchParams();
   const [viewModel, setViewModel] = useState<SummaryViewModel | null>(null);

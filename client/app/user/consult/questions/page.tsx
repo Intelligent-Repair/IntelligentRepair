@@ -1,16 +1,33 @@
 "use client";
 
+<<<<<<< HEAD
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
+=======
+import React, { useState, useEffect, useRef } from "react";
+>>>>>>> rescue/ui-stable
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { CarFront, ArrowRight } from "lucide-react";
+
+// Components
 import ChatBubble from "./components/ChatBubble";
 import TypingIndicator from "./components/TypingIndicator";
 import MultiChoiceButtons from "./components/MultiChoiceButtons";
+import FreeTextInput from "./components/FreeTextInput";
 import FinalDiagnosisCard from "./components/FinalDiagnosisCard";
+<<<<<<< HEAD
 import WarningBanner from "./components/WarningBanner";
 import { useAIStateMachine } from "./hooks/useAIStateMachine";
 import type { AIQuestion, DiagnosisData, VehicleInfo } from "../../../../lib/ai/types";
 import { withRetry } from "../../../../lib/ai/retry";
+=======
+import InstructionBubble from "./components/InstructionBubble";
+
+// The New Hybrid Hook
+import { useHybridFlow } from "./hooks/useHybridFlow";
+
+// Services
+>>>>>>> rescue/ui-stable
 import { supabase } from "@/lib/supabaseClient";
 
 interface Vehicle {
@@ -21,6 +38,7 @@ interface Vehicle {
   license_plate: string;
 }
 
+<<<<<<< HEAD
 export default function QuestionsPage() {
   return (
     <Suspense
@@ -320,19 +338,25 @@ function loadSessionState(): { vehicle: VehicleInfo | null; description: string;
     return null;
   }
 }
+=======
+const DRAFT_IMAGES_KEY = "draft_images";
+>>>>>>> rescue/ui-stable
 
 function QuestionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // URL Params
   const vehicleId = searchParams.get("vehicle");
   const descriptionParam = searchParams.get("description");
   const description = descriptionParam ? decodeURIComponent(descriptionParam) : "";
 
-  // State machine
-  const { state, dispatch, helpers } = useAIStateMachine();
+  // Hybrid Flow State
+  const { state, initFlow, sendMessage } = useHybridFlow();
 
-  // Local UI state
+  // Local UI State
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+<<<<<<< HEAD
   const [isTyping, setIsTyping] = useState(false);
   const [draftImagesLoaded, setDraftImagesLoaded] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
@@ -444,35 +468,37 @@ function QuestionsContent() {
       window.removeEventListener("storage", handleStorageChange);
     };
   }, []);
+=======
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
-  // Auto-scroll to bottom
+  // Refs
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const draftImagesRef = useRef<string[]>([]);
+>>>>>>> rescue/ui-stable
+
+  // 🔴 FIX: שימוש ב-Ref כדי למנוע אתחול כפול ב-React Strict Mode
+  const hasInitialized = useRef(false);
+
+  // 1. Load User & Vehicle
   useEffect(() => {
-    if (chatEndRef.current) {
-      const timeoutId = setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [state.messages, isTyping]);
+    const loadData = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) setUser({ id: authUser.id });
 
-  // Fetch vehicle details
-  useEffect(() => {
-    if (!vehicleId || vehicle) return;
-
-    const fetchVehicle = async () => {
-      try {
-        const response = await fetch(`/api/cars/get?car_id=${vehicleId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch vehicle");
+      if (vehicleId) {
+        try {
+          const res = await fetch(`/api/cars/get?car_id=${vehicleId}`);
+          if (res.ok) setVehicle(await res.json());
+        } catch (e) {
+          console.error("Failed to load vehicle", e);
         }
-        const data = await response.json();
-        setVehicle(data);
-      } catch (err) {
-        console.error("Error fetching vehicle:", err);
-        dispatch.error("שגיאה בטעינת פרטי רכב");
       }
     };
+    loadData();
+  }, [vehicleId]);
 
+<<<<<<< HEAD
     fetchVehicle();
   }, [vehicleId, vehicle]);
 
@@ -496,29 +522,94 @@ function QuestionsContent() {
   }, []);
 
   // Initialize state machine and load from session
+=======
+  // 2. Initialize Chat (Fixed Logic)
+>>>>>>> rescue/ui-stable
   useEffect(() => {
-    if (hasInitializedRef.current || !vehicle) return;
+    // 🔴 בדיקה: אם הרף כבר true, עצור מיד (מונע ריצה שנייה)
+    if (hasInitialized.current) return;
+    // אם אין עדיין נתונים, המתן
+    if (!vehicle || !description) return;
 
-    // Try to load from session first
-    const sessionState = loadSessionState();
-    if (sessionState && sessionState.vehicle && sessionState.description) {
-      initializedFromSessionRef.current = true;
-      researchRef.current = sessionState.research;
-      
-      // Initialize state machine with session data
-      dispatch.init({
-        vehicle: sessionState.vehicle,
-        description: sessionState.description,
-      });
+    // 🔴 סימון מיידי שהאתחול בוצע
+    hasInitialized.current = true;
+    console.log("[QuestionsPage] Initializing flow with:", description);
 
-      // Restore answers from session - these will be used when fetching next question
-      // Note: We don't restore messages here - they will be reconstructed when we fetch the next question
-      // The answers array in sessionState will be used directly in the API call
-      
-      hasInitializedRef.current = true;
-      return;
+    // טעינת תמונות
+    const storedImages = window.sessionStorage.getItem(DRAFT_IMAGES_KEY);
+    if (storedImages) {
+      try {
+        draftImagesRef.current = JSON.parse(storedImages);
+      } catch (e) { console.error("Error loading images", e); }
     }
 
+    // הפעלת הצ'אט
+    initFlow(description, draftImagesRef.current, {
+      manufacturer: vehicle.manufacturer,
+      model: vehicle.model,
+      year: vehicle.year
+    });
+
+  }, [vehicle, description, initFlow]);
+
+  // 3. Auto Scroll
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state.messages, state.status]);
+
+  // 4. Handle Final Save
+  const handleSaveRequest = async (navigatePath: string) => {
+    if (isFinalizing || !user || !vehicle) return;
+    setIsFinalizing(true);
+
+    try {
+      const reportMsg = state.messages.find(m => m.type === "mechanic_report");
+      const reportData = reportMsg?.meta?.diagnosis || {};
+      const draftId = window.sessionStorage.getItem("draft_id");
+
+      const res = await fetch("/api/requests/from-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft_id: draftId,
+          user_id: user.id,
+          car_id: vehicle.id,
+          ai_diagnosis: reportMsg?.text || "אבחון הושלם",
+          ai_confidence: 1.0,
+          // Derive Q&A from actual message history
+          ai_questions: state.messages
+            .filter(m => m.sender === "ai" && m.type !== "mechanic_report")
+            .map(m => m.text),
+          ai_answers: state.messages
+            .filter(m => m.sender === "user")
+            .map(m => m.text),
+          ai_recommendations: reportData.recommendations,
+          image_urls: draftImagesRef.current,
+          // NEW: Set status based on navigation path
+          status: navigatePath === "HOME" ? "closed" : "open",
+          // NEW: Include mechanic summary for the request
+          ai_mechanic_summary: reportData.conversationSummaries?.mechanic || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.request_id) {
+        window.sessionStorage.removeItem(DRAFT_IMAGES_KEY);
+        window.sessionStorage.removeItem("draft_id");
+        router.push(navigatePath === "HOME" ? "/user" : `/user/requests/${data.request_id}`);
+      } else {
+        alert("שגיאה בשמירת הפנייה.");
+      }
+    } catch (e) {
+      console.error("Save error:", e);
+      alert("אירעה שגיאה. נסה שוב.");
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
+<<<<<<< HEAD
     // Initialize from URL params
     if (vehicle && description && state.status === "IDLE" && !state.vehicle) {
       dispatch.init({
@@ -1095,10 +1186,14 @@ function QuestionsContent() {
   }
 
   const currentQuestion = state.currentQuestion;
+=======
+  const isProcessing = state.status === "PROCESSING";
+  const isFinished = state.status === "FINISHED";
+>>>>>>> rescue/ui-stable
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a0f1c] via-[#0d1424] to-[#0a0f1c] p-4 md:p-6 relative overflow-hidden"
+      className="h-[100dvh] flex flex-col bg-gradient-to-br from-[#0a0f1c] via-[#0d1424] to-[#0a0f1c] overflow-hidden"
       dir="rtl"
       style={{
         backgroundImage: `
@@ -1109,30 +1204,34 @@ function QuestionsContent() {
         boxShadow: "inset 0 0 200px rgba(0, 0, 0, 0.3)",
       }}
     >
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: "radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.2) 100%)",
-        }}
-      />
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-center pointer-events-none">
+        {vehicle && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-fit max-w-2xl rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-2xl px-6 py-2 flex items-center gap-3 pointer-events-auto"
+          >
+            <div className="p-2 bg-blue-500/20 rounded-full text-blue-400">
+              <CarFront size={18} />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-white leading-none">
+                {vehicle.manufacturer} {vehicle.model}
+              </h1>
+              <span className="text-xs text-slate-400">
+                {vehicle.year} • {vehicle.license_plate}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </div>
 
-      <div className="flex-1 max-w-4xl mx-auto w-full flex flex-col relative z-10">
-        <div className="flex-1 overflow-y-auto mb-4 space-y-4 py-6 px-2">
-          {/* Vehicle Info Banner */}
-          {vehicle && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/10 backdrop-blur-lg border border-white/15 rounded-3xl p-5 mb-4 shadow-[0_4px_16px_rgba(255,255,255,0.08)]"
-            >
-              <div className="text-white/70 text-sm mb-2">רכב נבחר</div>
-              <div className="text-white font-bold text-lg">
-                {vehicle.manufacturer} {vehicle.model} {vehicle.year && `(${vehicle.year})`}
-              </div>
-              <div className="text-white/60 text-sm">{vehicle.license_plate}</div>
-            </motion.div>
-          )}
+      {/* Main Chat */}
+      <div className="flex-1 overflow-y-auto p-4 pt-24 pb-32 scroll-smooth">
+        <div className="max-w-4xl mx-auto space-y-2">
 
+<<<<<<< HEAD
           {/* Safety Warning Banner */}
           {safetyWarning && (
             <WarningBanner
@@ -1152,12 +1251,12 @@ function QuestionsContent() {
           )}
 
           {/* Chat Messages - Render from state machine messages */}
+=======
+>>>>>>> rescue/ui-stable
           <AnimatePresence mode="popLayout">
-            {state.messages.map((msg, index) => {
-              const messageKey = `msg-${msg.id}`;
-              const isLastMessage = index === state.messages.length - 1;
-              const isDiagnosisMessage = msg.text === "אבחון סופי" && state.diagnosis;
+            {state.messages.map((msg) => {
 
+<<<<<<< HEAD
               if (msg.sender === "ai") {
                 // Render diagnosis message
                 if (isDiagnosisMessage && state.diagnosis) {
@@ -1245,32 +1344,89 @@ function QuestionsContent() {
                   >
                     <ChatBubble message={msg.text} images={msg.images} isUser={true} />
                   </motion.div>
+=======
+              // 🔴 FIX APPLIED: Data Transformation for Mechanic Report
+              if (msg.type === "mechanic_report") {
+                const diagnosisData = msg.meta?.diagnosis || {};
+                const rawDiagnosis = diagnosisData.results || msg.meta?.diagnosis?.diagnosis || [];
+                const safetyNotice = diagnosisData.disclaimer || msg.meta?.diagnosis?.safety_notice;
+
+                // Transform string[] or result objects to DiagnosisResult[]
+                const structuredResults = Array.isArray(rawDiagnosis)
+                  ? rawDiagnosis.map((item: any, idx: number) => {
+                    if (typeof item === 'string') {
+                      return {
+                        issue: item,
+                        probability: idx === 0 ? 0.9 : 0.7,
+                        explanation: idx === 0
+                          ? "זוהה כתרחיש הסביר ביותר ע\"פ הבדיקות שביצענו."
+                          : "אפשרות נוספת שיש לקחת בחשבון."
+                      };
+                    }
+                    return item; // Already structured
+                  })
+                  : [];
+
+                return (
+                  <FinalDiagnosisCard
+                    key={msg.id}
+                    title={diagnosisData.title || msg.meta?.title}
+                    summary={diagnosisData.summary || msg.text}
+                    results={structuredResults}
+                    confidence={diagnosisData.confidence || 1}
+                    confidenceLevel={diagnosisData.confidenceLevel}
+                    status={diagnosisData.status}
+                    reasoning={diagnosisData.reasoning}
+                    selfFix={diagnosisData.selfFix}
+                    nextSteps={diagnosisData.nextSteps}
+                    recommendations={diagnosisData.recommendations || msg.meta?.diagnosis?.recommendations || []}
+                    disclaimer={safetyNotice || "האבחון הינו המלצה בלבד ואינו מהווה תחליף לבדיקת מוסך."}
+                  />
+>>>>>>> rescue/ui-stable
                 );
               }
+
+              // 📋 Instruction Messages - use InstructionBubble with steps
+              if (msg.type === "instruction" || msg.isInstruction) {
+                const instructionMeta = msg.meta || {};
+                return (
+                  <InstructionBubble
+                    key={msg.id}
+                    title={instructionMeta.name || "הוראות בדיקה"}
+                    message={msg.text}
+                    steps={instructionMeta.steps || []}
+                    actionType={instructionMeta.actionType || "inspect"}
+                    isCritical={instructionMeta.actionType === "critical" || instructionMeta.isCritical}
+                  />
+                );
+              }
+
+              return (
+                <ChatBubble
+                  key={msg.id}
+                  message={msg.text}
+                  images={msg.images}
+                  isUser={msg.sender === "user"}
+                  type={msg.type}
+                  meta={msg.meta}
+                />
+              );
             })}
           </AnimatePresence>
 
-          {/* Typing indicator (only when waiting for AI response) */}
-          {isTyping && !helpers.isFinished(state) && (
-            <AnimatePresence>
+          {isProcessing && (
+            <div className="flex justify-start w-full px-4">
               <TypingIndicator />
-            </AnimatePresence>
+            </div>
           )}
 
-          {/* Action buttons after diagnosis */}
-          {helpers.isFinished(state) && state.diagnosis && (
+          {isFinished && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{
-                type: "spring",
-                stiffness: 200,
-                damping: 25,
-                delay: 0.5,
-              }}
-              className="flex flex-col gap-4 mb-4 w-full mt-6"
-              dir="rtl"
+              className="flex flex-col gap-3 mt-6"
             >
+<<<<<<< HEAD
               <motion.button
                 onClick={async () => {
                   const requestId = await finalizeDraftAndCreateRequest();
@@ -1304,12 +1460,47 @@ function QuestionsContent() {
               >
                 {isFinalizing ? "שומר את הפנייה…" : "סיום ייעוץ (חזרה לתפריט)"}
               </motion.button>
+=======
+              <button
+                onClick={() => handleSaveRequest("HOME")}
+                disabled={isFinalizing}
+                className="w-full p-4 bg-white/5 border border-white/10 text-white font-medium rounded-xl hover:bg-white/10 transition-all"
+              >
+                סיום וחזרה לתפריט הראשי
+              </button>
+>>>>>>> rescue/ui-stable
             </motion.div>
           )}
 
           <div ref={chatEndRef} />
         </div>
       </div>
+
+      {/* Input Area */}
+      {!isFinished && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#0a0f1c] via-[#0d1424]/95 to-transparent z-50" dir="rtl">
+          <div className="max-w-4xl mx-auto w-full flex flex-col gap-3">
+
+            {state.currentOptions.length > 0 && !isProcessing && (
+              <MultiChoiceButtons
+                options={state.currentOptions}
+                onSelect={(opt) => sendMessage(opt)}
+                disabled={isProcessing}
+              />
+            )}
+
+            <FreeTextInput
+              onSubmit={(text) => sendMessage(text)}
+              disabled={isProcessing}
+              placeholder={
+                state.currentOptions.length > 0
+                  ? "או הקלד תשובה משלך..."
+                  : "כתוב תשובה..."
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

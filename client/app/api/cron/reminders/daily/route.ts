@@ -112,6 +112,20 @@ async function sendEmail(to: string, subject: string, text: string) {
   }
 }
 
+async function sendEmailWithRetry(to: string, subject: string, text: string, attempts = 3, backoffMs = 1500) {
+  try {
+    await sendEmail(to, subject, text);
+  } catch (err) {
+    const msg = (err as Error).message || "";
+    const is429 = msg.includes("429") || msg.includes("rate_limit");
+    if (is429 && attempts > 0) {
+      await sleep(backoffMs);
+      return sendEmailWithRetry(to, subject, text, attempts - 1, backoffMs * 1.5);
+    }
+    throw err;
+  }
+}
+
 function formatCar(row: CarRow) {
   const maker = row.vehicle_catalog?.manufacturer?.trim();
   const model = row.vehicle_catalog?.model?.trim();
@@ -186,7 +200,7 @@ export async function POST(req: Request) {
 
 מומלץ לבדוק ולהתאים לפי ספר הרכב.`;
         try {
-          await sendEmail(userEmail, subject, text);
+        await sendEmailWithRetry(userEmail, subject, text);
           await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ tires_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "tires", status: "sent" });
@@ -208,7 +222,7 @@ export async function POST(req: Request) {
 
 מומלץ לוודא מפלס שמן ונוזל קירור לפי ספר הרכב.`;
         try {
-          await sendEmail(userEmail, subject, text);
+        await sendEmailWithRetry(userEmail, subject, text);
           await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase
             .from("people_cars")
@@ -233,7 +247,7 @@ export async function POST(req: Request) {
 הטסט של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (${label}).
 מומלץ לקבוע תור למכון הרישוי ולהתכונן בהתאם.`;
         try {
-          await sendEmail(userEmail, subject, text);
+        await sendEmailWithRetry(userEmail, subject, text);
           await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ test_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "test", status: "sent" });
@@ -262,7 +276,7 @@ export async function POST(req: Request) {
 הטיפול הבא של ${main}${plate ? ` (לוחית ${plate})` : ""} מתקרב (${label}).
 מומלץ לקבוע מועד טיפול ולהכין חלקים/שמנים לפי היצרן.`;
         try {
-          await sendEmail(userEmail, subject, text);
+        await sendEmailWithRetry(userEmail, subject, text);
           await sleep(SEND_DELAY_MS); // להימנע מ-429 ברצף שליחות
           await supabase.from("people_cars").update({ service_last_sent_at: now.toISOString() }).eq("id", row.id);
           results.push({ id: row.id, type: "service", status: "sent" });
