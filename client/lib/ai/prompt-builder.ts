@@ -1,20 +1,19 @@
 /**
  * Prompt builder for AI consultation flow
-<<<<<<< HEAD
- * Simplified and optimized according to new chat structure
- * 
- * Key principles:
- * - No vehicle info sent to API (only for DB storage)
- * - Focus on general car problems, not model-specific
- * - Natural, friendly Hebrew prompts
- * - Safety warnings for dangerous situations
- * - Confidence-based early diagnosis (90% trigger)
  */
 
 import type { UserAnswer } from "./types";
 import { sanitizeInput } from "./sanitize";
+import warningLightsKB from "@/lib/knowledge/warning-lights.json";
 
 const MAX_ANSWERS_LENGTH = 200; // Limit answer length to reduce tokens
+
+export interface PromptContext {
+  mode?: "option_map" | "bridge" | "expert" | null;
+  currentQuestionOptions?: string[];
+  bridgeQuestionCount?: number;
+  [key: string]: unknown;
+}
 
 // מילות מפתח לנורות אדומות קריטיות (שמן, מנוע, בלם, חום מנוע, מצבר, כרית אוויר) – סימן לסכנת נסיעה מיידית
 export const DANGER_KEYWORDS = [
@@ -62,7 +61,7 @@ export const CAUTION_KEYWORDS = [
  * Build prompt for initial question or follow-up questions
  * This is the main prompt used throughout the chat flow
  */
-export function buildChatPrompt(
+function buildChatPromptLegacy(
   description: string,
   answers: UserAnswer[],
   hasImages: boolean,
@@ -315,7 +314,7 @@ export function buildResearchPrompt(
  * Build prompt for generating a short description (up to 5 words)
  * Based on the AI diagnosis summary
  */
-export function buildShortDescriptionPrompt(
+function buildShortDescriptionPromptLegacy(
   aiDiagnosis: string
 ): string {
   const sanitizedDiagnosis = sanitizeInput(aiDiagnosis, 500);
@@ -340,30 +339,7 @@ export function buildShortDescriptionPrompt(
 {
   "description": "תיאור קצר עד 5 מילים"
 }`;
-=======
- *
- * Anti-Gravity Design (Hybrid Modes):
- * - KB_COORDINATION: When detectedLightType exists → inject only that light's KB slice.
- * - OPTION_MAPPER: Map free-text answers to predefined option labels.
- * - BRIDGE_TO_KB: Ask up to 3 questions to identify warning_light or scenario.
- * - EXPERT_FALLBACK: General expertise when KB bridging fails.
- *
- * All modes return JSON only (no Markdown).
- */
 
-import type { UserAnswer } from './types';
-import { sanitizeInput } from './sanitize';
-import warningLightsKB from '@/lib/knowledge/warning-lights.json';
-
-// =============================================================================
-// TYPES
-// =============================================================================
-
-export interface PromptContext {
-  mode?: 'option_map' | 'bridge' | 'expert' | null;
-  currentQuestionOptions?: string[];
-  bridgeQuestionCount?: number;
-  [key: string]: unknown;
 }
 
 // =============================================================================
@@ -381,9 +357,9 @@ function buildAnswersContext(answers: UserAnswer[]): string {
   if (!answers || answers.length === 0) return 'אין תשובות קודמות.';
   const recent = answers.slice(-6);
 
-  const lines = recent.map((a, idx) => {
-    const q = clampText((a as any)?.question ?? '', 120);
-    const ans = clampText((a as any)?.answer ?? '', 120);
+  const lines = recent.map((a: any, idx: number) => {
+    const q = clampText(a?.question ?? '', 120);
+    const ans = clampText(a?.answer ?? '', 120);
     return `${idx + 1}) Q: "${q}" | A: "${ans}"`;
   });
 
@@ -720,5 +696,4 @@ ${safeDiagnosis}
 
 החזר JSON בלבד, ללא טקסט נוסף.
 `.trim();
->>>>>>> rescue/ui-stable
 }

@@ -61,23 +61,8 @@ export interface AIQuestionResponse {
 
 export interface ChatMessage {
   id: string;
-<<<<<<< HEAD
-  sender: "ai" | "user";
-  text?: string;
-  images?: string[];
-  timestamp: number;
-}
-
-export type AIQuestionType = "yesno" | "multi";
-
-export interface AIQuestion {
-  question: string;
-  type: AIQuestionType;
-  options: string[];
-  shouldStop?: boolean;
-=======
   sender: "ai" | "user" | "system";
-  text: string;
+  text?: string;
   type?: string;
   meta?: any;
   images?: string[];
@@ -103,7 +88,6 @@ export interface AIQuestion {
   options?: string[];
   shouldStop?: boolean;
   [k: string]: any;
->>>>>>> rescue/ui-stable
 }
 
 /**
@@ -140,10 +124,6 @@ export type AIAction =
   | { type: "FINISH"; payload: DiagnosisData }
   | { type: "ERROR"; payload: string }
   | { type: "RESET" }
-<<<<<<< HEAD
-  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } };
-=======
   | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } }
   | { type: "REMOVE_LAST_ANSWER" }; // Remove last answer (e.g., when user says "not sure" and we re-ask)
->>>>>>> rescue/ui-stable
 

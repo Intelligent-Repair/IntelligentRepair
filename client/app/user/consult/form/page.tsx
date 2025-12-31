@@ -3,10 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-<<<<<<< HEAD
-=======
-import { CarFront, Send, Loader2, Pencil, Bot, Sparkles } from "lucide-react";
->>>>>>> rescue/ui-stable
+import { CarFront, Loader2, Pencil, Bot, Sparkles, ArrowRight } from "lucide-react";
 import ImageUploader from "./ImageUploader";
 
 interface Vehicle {
@@ -234,7 +231,7 @@ function ConsultFormContent() {
       y: 0,
       transition: {
         duration: 0.5,
-        ease: "easeOut",
+        ease: [0.25, 0.1, 0.25, 1] as const,
       },
     },
   };
@@ -361,12 +358,8 @@ function ConsultFormContent() {
             />
           </div>
 
-<<<<<<< HEAD
-          <div className="mb-8">
-=======
           {/* Image Upload Section */}
           <div className="mb-6">
->>>>>>> rescue/ui-stable
             <ImageUploader requestId={draftId} onImagesChange={setImageUrls} />
           </div>
 
@@ -384,14 +377,6 @@ function ConsultFormContent() {
           {/* Submit Button */}
           <motion.button
             onClick={handleContinue}
-<<<<<<< HEAD
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={isSubmitting}
-            className="w-full p-6 bg-gradient-to-r from-[#4A90E2] to-[#5c60ff] hover:from-[#5a9ef0] hover:to-[#6c70ff] text-white font-bold rounded-2xl transition-all duration-300 shadow-lg shadow-[#4A90E2]/30 hover:shadow-xl hover:shadow-[#4A90E2]/50 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? "מתחיל ייעוץ AI..." : "המשך לשאלות אבחון (AI)"}
-=======
             whileHover={{ 
               scale: 1.02,
               boxShadow: "0 0 20px rgba(37,99,235,0.5)",
@@ -407,11 +392,10 @@ function ConsultFormContent() {
               </>
             ) : (
               <>
-                שלח
-                <Send className="w-4 h-4" />
+                התחל אבחון AI
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
->>>>>>> rescue/ui-stable
           </motion.button>
         </motion.div>
       </motion.div>
