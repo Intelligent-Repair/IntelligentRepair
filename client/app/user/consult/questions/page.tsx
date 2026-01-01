@@ -114,6 +114,11 @@ export default function QuestionsPage() {
       const reportData = reportMsg?.meta?.diagnosis || {};
       const draftId = window.sessionStorage.getItem("draft_id");
 
+      // DEBUG: Log what's in reportData
+      console.log("[handleSaveRequest] reportMsg:", reportMsg);
+      console.log("[handleSaveRequest] reportData:", reportData);
+      console.log("[handleSaveRequest] conversationSummaries:", reportData.conversationSummaries);
+
       const res = await fetch("/api/requests/from-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +149,15 @@ export default function QuestionsPage() {
       if (data.request_id) {
         window.sessionStorage.removeItem(DRAFT_IMAGES_KEY);
         window.sessionStorage.removeItem("draft_id");
-        router.push(navigatePath === "HOME" ? "/user" : `/user/requests/${data.request_id}`);
+        // Navigate based on path type
+        if (navigatePath === "HOME") {
+          router.push("/user");
+        } else if (navigatePath === "MECHANIC") {
+          // Go to garage selection page with the request ID
+          router.push(`/user/garages?requestId=${data.request_id}`);
+        } else {
+          router.push("/user");
+        }
       } else {
         alert("שגיאה בשמירת הפנייה.");
       }
@@ -238,6 +251,12 @@ export default function QuestionsPage() {
                     nextSteps={diagnosisData.nextSteps}
                     recommendations={diagnosisData.recommendations || msg.meta?.diagnosis?.recommendations || []}
                     disclaimer={safetyNotice || "האבחון הינו המלצה בלבד ואינו מהווה תחליף לבדיקת מוסך."}
+                    severity={diagnosisData.severity}
+                    showTowButton={diagnosisData.showTowButton}
+                    towConditions={diagnosisData.towConditions}
+                    mechanicReport={diagnosisData.mechanicReport}
+                    conversationSummaries={diagnosisData.conversationSummaries}
+                    onOpenMechanicRequest={() => handleSaveRequest("MECHANIC")}
                   />
                 );
               }

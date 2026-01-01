@@ -459,6 +459,56 @@ function handleResolutionPath(
         };
     }
 
+    // NEEDS_VERIFICATION with next_action -> fetch that instruction from KB
+    if (resolution.status === 'needs_verification' && resolution.next_action) {
+        console.log(`[KBFlow] 🔄 Resolution: needs_verification with next_action: ${resolution.next_action} `);
+
+        // Fetch the actual action from KB
+        const lightData = (warningLightsKB as any)[lightType];
+        const scenario = lightData?.scenarios?.[scenarioId];
+        const selfFixActions = scenario?.self_fix_actions || [];
+        const nextAction = selfFixActions.find((a: any) => a.id === resolution.next_action);
+
+        if (nextAction) {
+            // Return the full instruction with actual steps
+            const followupOptions = nextAction.followup_question?.options || [];
+            const followupLabels = followupOptions.map((opt: any) =>
+                typeof opt === 'string' ? opt : opt?.label || ''
+            ).filter(Boolean);
+
+            console.log(`[KBFlow] 📋 Found next_action instruction: ${nextAction.id} `);
+            console.log(`[KBFlow]   Steps: ${nextAction.steps?.length || 0} `);
+
+            return {
+                handled: true,
+                response: NextResponse.json({
+                    type: 'instruction',
+                    title: nextAction.name || resolution.message || 'בדיקה',
+                    actionType: nextAction.actionType || 'inspect',
+                    steps: nextAction.steps || [],
+                    warning: nextAction.warning,
+                    condition: nextAction.condition,
+                    question: nextAction.followup_question?.text,
+                    options: followupLabels.length > 0 ? followupLabels : undefined,
+                    detectedLightType: lightType,
+                    kbSource: true,
+                    context: mergeContext(mergedContext, {
+                        shownInstructionIds: [...(context.shownInstructionIds || []), nextAction.id],
+                        lastInstructionId: nextAction.id,
+                        awaitingInstructionResult: true,
+                        currentQuestionId: nextAction.id,
+                        currentQuestionText: nextAction.followup_question?.text,
+                        currentQuestionOptions: followupLabels,
+                        pendingResolutionPaths: nextAction.followup_question?.resolution_paths,
+                        optionMapAttempts: 0
+                    })
+                })
+            };
+        } else {
+            console.log(`[KBFlow] ⚠️ next_action "${resolution.next_action}" not found in KB for verification`);
+        }
+    }
+
     // NEEDS_VERIFICATION with next_question -> ask the follow-up
     if (resolution.status === 'needs_verification' && resolution.next_question) {
         console.log('[KBFlow] 🔄 Resolution: needs_verification, asking follow-up question');
@@ -583,16 +633,16 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const uiSeverity = context.lightSeverity || 'caution';
 
     // 📋 CONVERSATION LOG: Log current state
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`[KBFlow] 📋 CONVERSATION STATE:`);
-    console.log(`  Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting...'} | Severity: ${uiSeverity}`);
+    console.log(`\n${'='.repeat(60)} `);
+    console.log(`[KBFlow] 📋 CONVERSATION STATE: `);
+    console.log(`  Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting...'} | Severity: ${uiSeverity} `);
     console.log(`  Last Question: "${(context as any).currentQuestionText || 'N/A'}"`);
     console.log(`  User Answer: "${userText}"`);
-    console.log(`  Total Answers: ${answers?.length || 0}`);
+    console.log(`  Total Answers: ${answers?.length || 0} `);
     if (context.causeScores && Object.keys(context.causeScores).length > 0) {
-        console.log(`  Current Scores: ${JSON.stringify(context.causeScores)}`);
+        console.log(`  Current Scores: ${JSON.stringify(context.causeScores)} `);
     }
-    console.log(`${'='.repeat(60)}\n`);
+    console.log(`${'='.repeat(60)} \n`);
 
     // ---------------------------------------------------------------------------
     // Option Mapping: If user typed free-text and we have expected options
@@ -646,7 +696,7 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const isNewScenario = !scenarioId;
     if (!scenarioId) {
         scenarioId = determineScenario(lightType, answers) || undefined;
-        console.log(`[KBFlow] 🎯 Scenario: ${scenarioId ?? 'none'}`);
+        console.log(`[KBFlow] 🎯 Scenario: ${scenarioId ?? 'none'} `);
     }
     if (!scenarioId) return { response: null, handled: false };
 
@@ -735,7 +785,7 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
 
         const resolution = pendingPaths[optionId];
         if (resolution) {
-            console.log(`[KBFlow] 📋 Found pending resolution_path for: ${optionId}`);
+            console.log(`[KBFlow] 📋 Found pending resolution_path for: ${optionId} `);
             const result = handleResolutionPath(resolution, lightType, scenarioId, context, updatedScores);
             if (result) return result;
         }
@@ -803,9 +853,9 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
             context.shownInstructionIds
         );
         console.log(`[KBFlow] ✅ Generating KB diagnosis`);
-        console.log(`  Top Issue: ${diagnosis.results?.[0]?.issue}`);
+        console.log(`  Top Issue: ${diagnosis.results?.[0]?.issue} `);
         console.log(`  Confidence: ${(diagnosis.confidence * 100).toFixed(0)}% (${(diagnosis.confidenceLevel || 'unknown').toUpperCase()})`);
-        console.log(`  Final Scores: ${JSON.stringify(updatedScores)}`);
+        console.log(`  Final Scores: ${JSON.stringify(updatedScores)} `);
         return {
             handled: true,
             response: NextResponse.json(diagnosis)
@@ -826,11 +876,11 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
             typeof opt === 'string' ? opt : opt?.label || ''
         ).filter(Boolean);
 
-        console.log(`[KBFlow] 📋 INSTRUCTION:`);
-        console.log(`  ID: ${action.id}`);
+        console.log(`[KBFlow] 📋 INSTRUCTION: `);
+        console.log(`  ID: ${action.id} `);
         console.log(`  Name: "${action.name}"`);
         console.log(`  Steps: ${action.steps.length} steps`);
-        console.log(`  Has followup: ${!!action.followup_question}`);
+        console.log(`  Has followup: ${!!action.followup_question} `);
 
         return {
             handled: true,
@@ -867,8 +917,8 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     // Handle QUESTION (cause.key_question or followup)
     if (nextStep?.kind === 'question') {
         const nextQ = nextStep.question;
-        console.log(`[KBFlow] ❓ NEXT QUESTION:`);
-        console.log(`  ID: ${nextQ.id}`);
+        console.log(`[KBFlow] ❓ NEXT QUESTION: `);
+        console.log(`  ID: ${nextQ.id} `);
         console.log(`  Text: "${nextQ.text}"`);
         console.log(`  Options: [${nextQ.options.join(', ')}]`);
         console.log(`  Asked so far: [${askedIds.join(', ')}]`);
@@ -1016,7 +1066,7 @@ export async function handleScenarioStep(req: RequestContext): Promise<FlowResul
             handled: true,
             response: NextResponse.json({
                 type: 'diagnosis_report',
-                title: `🔍 אבחון: ${report.topSuspect}`,
+                title: `🔍 אבחון: ${report.topSuspect} `,
                 confidence: Math.min(0.9, 0.5 + report.score * 0.1),
                 summary: { detected: newReport.verified, reported: newReport.criticalFindings },
                 results: [
@@ -1096,7 +1146,7 @@ export async function callExpertAI(body: any): Promise<any> {
 
     const hasImages = images.length > 0;
 
-    console.log(`[Expert AI] 🧠 Mode: ${hasImages ? 'IMAGE' : detectedLight ? 'KB' : 'EXPERT'}`);
+    console.log(`[Expert AI] 🧠 Mode: ${hasImages ? 'IMAGE' : detectedLight ? 'KB' : 'EXPERT'} `);
 
     const prompt = (hasImages || detectedLight)
         ? buildChatPrompt(currentInput, answers, hasImages, answers.length, detectedLight)
@@ -1122,7 +1172,7 @@ export async function callExpertAI(body: any): Promise<any> {
 
         if (typeof lightType === 'string') lightType = lightType.trim();
 
-        console.log(`[Expert AI] 🔍 Detected light: ${lightType || 'none'}`);
+        console.log(`[Expert AI] 🔍 Detected light: ${lightType || 'none'} `);
 
         // If we identified a known light, jump to KB flow
         if (lightType && (warningLightsKB as any)[lightType]) {
@@ -1182,7 +1232,7 @@ export function handleWarningLightDetection(lightId: string, severity: string): 
     const name = lightData.names?.he?.[0] || lightId;
     const isCritical = (CRITICAL_LIGHTS as any).includes(lightId);
     const questionOptions = q.options?.map((o: any) => o.label || o) || ['כן', 'לא', 'לא בטוח'];
-    const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text}`;
+    const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text} `;
 
     return NextResponse.json({
         type: 'question',
@@ -1209,7 +1259,7 @@ export function handleScenarioStart(scenarioId: string): any {
     const scenario: Scenario | undefined = (SCENARIOS as any)[scenarioId];
     if (!scenario) return null;
 
-    console.log(`[FlowHandler] 🎬 Starting scenario: ${scenario.title}`);
+    console.log(`[FlowHandler] 🎬 Starting scenario: ${scenario.title} `);
     const firstStep = scenario.steps[scenario.startingStepId];
     const suspects: Record<string, number> = {};
     scenario.suspects.forEach(s => (suspects[s.id] = 0));
@@ -1232,7 +1282,7 @@ export function handleScenarioStart(scenarioId: string): any {
 }
 
 export function handleSafetyStop(rule: SafetyRule): any {
-    console.log(`[FlowHandler] 🚨 CRITICAL SAFETY STOP: ${rule.id}`);
+    console.log(`[FlowHandler] 🚨 CRITICAL SAFETY STOP: ${rule.id} `);
 
     // Rule-specific emergency instructions
     const ruleConfigs: Record<string, {

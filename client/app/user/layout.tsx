@@ -14,6 +14,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const router = useRouter();
   const isHomePage = pathname === "/user";
   const isConsultPage = pathname?.startsWith("/user/consult");
+  const isGaragesPage = pathname?.startsWith("/user/garages");
 
   const menu = [
     { name: "היסטוריית פניות", href: "/user/dashboard" },
@@ -22,8 +23,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
     { name: "הגדרות", href: "/user/settings" },
   ];
 
-  // If on home page or consult pages, render children full-screen without sidebar/header
-  if (isHomePage || isConsultPage) {
+  // If on home page, consult pages, or garages page, render children full-screen without sidebar/header
+  if (isHomePage || isConsultPage || isGaragesPage) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0a1120] via-[#0f1a2e] to-[#0a1120]">
         {children}
@@ -49,11 +50,10 @@ export default function UserLayout({ children }: UserLayoutProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative p-3 rounded-xl block font-medium transition-all duration-300 ${
-                  isActive
-                    ? "bg-[#4A90E2]/20 text-white shadow-lg shadow-[#4A90E2]/30 ring-1 ring-[#4A90E2]/50"
-                    : "text-white/70 hover:text-white hover:bg-white/5 hover:shadow-md hover:shadow-white/5"
-                }`}
+                className={`relative p-3 rounded-xl block font-medium transition-all duration-300 ${isActive
+                  ? "bg-[#4A90E2]/20 text-white shadow-lg shadow-[#4A90E2]/30 ring-1 ring-[#4A90E2]/50"
+                  : "text-white/70 hover:text-white hover:bg-white/5 hover:shadow-md hover:shadow-white/5"
+                  }`}
               >
                 {isActive && (
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#4A90E2]/10 to-transparent blur-sm"></div>
