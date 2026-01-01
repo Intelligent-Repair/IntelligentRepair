@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Camera, Image as ImageIcon, X, CheckCircle2, Upload as UploadIcon } from "lucide-react";
 
 type UploadStatus = "uploading" | "uploaded" | "error";
 
@@ -42,6 +43,8 @@ export default function ImageUploader(props: ImageUploaderProps) {
   const { requestId, onImagesChange } = props;
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef<Set<string>>(new Set());
@@ -149,8 +152,16 @@ export default function ImageUploader(props: ImageUploaderProps) {
         )
       );
 
+      // Show success message
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 3000); // Hide after 3 seconds
+
       if (!uploadedUrl) {
         setFeedback("התמונה הועלתה, מחכים לכתובת תצוגה מהשרת.");
+      } else {
+        setFeedback(null); // Clear any previous feedback
       }
     } catch (err) {
       console.error("Error uploading image:", err);
@@ -177,12 +188,47 @@ export default function ImageUploader(props: ImageUploaderProps) {
     });
   };
 
-  const triggerInput = (ref: React.RefObject<HTMLInputElement | null>) => {
+  const triggerInput = (ref: React.RefObject<HTMLInputElement>) => {
     if (!canUploadMore) {
       setFeedback(`ניתן להעלות עד ${MAX_IMAGES} תמונות בלבד.`);
       return;
     }
     ref.current?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (canUploadMore && requestId) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (!requestId) {
+      setFeedback("לא ניתן להעלות תמונות בלי מזהה טיוטה.");
+      return;
+    }
+
+    if (!canUploadMore) {
+      setFeedback(`ניתן להעלות עד ${MAX_IMAGES} תמונות בלבד.`);
+      return;
+    }
+
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      handleFiles(droppedFiles);
+    }
   };
 
   const disabledReason = !requestId
@@ -192,56 +238,11 @@ export default function ImageUploader(props: ImageUploaderProps) {
     : "";
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-5 backdrop-blur-xl">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <div className="text-white font-bold text-lg">הוספת תמונות</div>
-          <p className="text-white/60 text-sm">
-            עד {MAX_IMAGES} תמונות | JPG או PNG | העלאה מיידית
-          </p>
-        </div>
-        <div className="text-white/50 text-sm">
-          {images.length}/{MAX_IMAGES}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={() => triggerInput(fileInputRef)}
-          disabled={!requestId || !canUploadMore}
-          className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border border-white/15 bg-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          title={disabledReason || "בחירת תמונות"}
-        >
-          📎 הוספת תמונה
-        </motion.button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPT_ATTR}
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            handleFiles(e.target.files);
-            if (e.target) e.target.value = "";
-          }}
-        />
-      </div>
-
-      {feedback && (
-        <div className="text-sm text-yellow-200 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-3">
-          {feedback}
-        </div>
-      )}
-
-      {images.length === 0 ? (
-        <div className="border border-dashed border-white/15 rounded-xl p-4 text-white/60 text-sm text-center">
-          ניתן לצלם או לבחור תמונות לתיאור התקלה. ההעלאה מתבצעת מיד.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    <div>
+      {/* Horizontal Grid of Images */}
+      {images.length > 0 && (
+        <div className="flex flex-row flex-wrap gap-3 mb-4">
+          {/* Image Previews */}
           <AnimatePresence>
             {images.map((img) => (
               <motion.div
@@ -249,42 +250,57 @@ export default function ImageUploader(props: ImageUploaderProps) {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="relative group"
+                className="relative group h-24 w-24"
               >
-                <div className="overflow-hidden rounded-xl border border-white/15 bg-black/20">
+                <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900 h-full w-full relative">
                   <img
                     src={img.url || img.preview}
                     alt={img.name || "תמונה שהועלתה"}
-                    className="h-32 w-full object-cover"
+                    className="h-full w-full object-cover"
                   />
-                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(img.id)}
-                      className="bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 border border-white/20"
-                      aria-label="הסר תמונה"
+                  
+                  {/* Upload Status Indicator */}
+                  {img.status === "uploading" && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Success Badge */}
+                  {img.status === "uploaded" && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1 shadow-lg"
                     >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="text-white/70 text-xs truncate">{img.name}</span>
-                  <span
-                    className={`text-[10px] px-2 py-1 rounded-full border ${
-                      img.status === "uploaded"
-                        ? "text-green-200 border-green-400/40 bg-green-500/10"
-                        : img.status === "uploading"
-                        ? "text-blue-200 border-blue-400/40 bg-blue-500/10"
-                        : "text-red-200 border-red-400/40 bg-red-500/10"
-                    }`}
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </motion.div>
+                  )}
+                  
+                  {/* Error Badge */}
+                  {img.status === "error" && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute bottom-1 right-1 bg-red-500 rounded-full p-1 shadow-lg"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </motion.div>
+                  )}
+                  
+                  {/* Remove Button - Top Corner */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(img.id)}
+                    className="absolute top-1 right-1 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 border border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    aria-label="הסר תמונה"
                   >
-                    {img.status === "uploaded"
-                      ? "הועלה"
-                      : img.status === "uploading"
-                      ? "מעלה..."
-                      : "שגיאה"}
-                  </span>
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -292,8 +308,118 @@ export default function ImageUploader(props: ImageUploaderProps) {
         </div>
       )}
 
+      {/* Modern Upload Buttons - Side by Side */}
+      {canUploadMore && (
+        <div className="flex flex-row gap-3">
+          {/* Camera Button */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              // For camera, we can use the same file input but with capture attribute
+              if (fileInputRef.current) {
+                fileInputRef.current.setAttribute("capture", "environment");
+                fileInputRef.current.click();
+                // Reset after click
+                setTimeout(() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.removeAttribute("capture");
+                  }
+                }, 100);
+              }
+            }}
+            disabled={!requestId || !canUploadMore}
+            className="flex-1 flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={disabledReason || "צלם תמונה"}
+          >
+            <Camera className="w-5 h-5" />
+            <span className="text-sm font-medium">צלם תמונה</span>
+          </motion.button>
+
+          {/* Gallery Button - Dropzone */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => triggerInput(fileInputRef)}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            disabled={!requestId || !canUploadMore}
+            className={`flex-1 flex flex-col items-center justify-center gap-1.5 p-4 rounded-xl border-2 border-dashed transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isDragOver
+                ? "border-blue-500 bg-blue-500/10 text-blue-300"
+                : "border-slate-600 hover:border-slate-400 text-slate-400 hover:text-slate-200 bg-transparent"
+            }`}
+            title={disabledReason || "מהגלריה"}
+          >
+            <ImageIcon className="w-5 h-5" />
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-sm font-medium">מהגלריה</span>
+              <span className="text-xs opacity-60">או גרור לכאן</span>
+            </div>
+          </motion.button>
+        </div>
+      )}
+
+      {/* Hidden File Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPT_ATTR}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          if (e.target) e.target.value = "";
+        }}
+      />
+
+      {/* Success Message - Shows when image is uploaded */}
+      <AnimatePresence>
+        {showSuccessMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-3 flex items-center gap-2 text-sm text-green-200 bg-green-500/10 border border-green-500/30 rounded-xl p-3"
+          >
+            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+            <span>התמונה הועלתה בהצלחה!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Feedback Message (for errors or info) */}
+      {feedback && !showSuccessMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3"
+        >
+          {feedback}
+        </motion.div>
+      )}
+      
+      {/* Upload Count Info */}
+      {images.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-3 text-xs text-slate-400 flex items-center gap-1.5"
+        >
+          <UploadIcon className="w-3.5 h-3.5" />
+          <span>
+            {images.filter(img => img.status === "uploaded").length} מתוך {images.length} תמונות הועלו
+            {images.some(img => img.status === "uploading") && " • מעלה..."}
+          </span>
+        </motion.div>
+      )}
+
+      {/* Request ID Error */}
       {!requestId && (
-        <div className="mt-4 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+        <div className="mt-3 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
           נדרש מזהה פנייה תקף כדי להעלות תמונות. ודא שהגעת מהזרימה הנכונה.
         </div>
       )}

@@ -102,6 +102,10 @@ export function useAIStateMachine() {
       dispatch({ type: "ADD_MESSAGE", payload } as AIAction);
     }, []),
 
+    removeLastAnswer: useCallback(() => {
+      dispatch({ type: "REMOVE_LAST_ANSWER" });
+    }, []),
+
     reset: useCallback(() => {
       dispatch({ type: "RESET" });
     }, []),

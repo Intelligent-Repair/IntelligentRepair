@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -34,7 +34,7 @@ interface SummaryViewModel {
   disclaimer: string | null;
 }
 
-function SummaryContent() {
+export default function SummaryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [viewModel, setViewModel] = useState<SummaryViewModel | null>(null);
@@ -325,20 +325,6 @@ function SummaryContent() {
         </motion.div>
       </div>
     </div>
-  );
-}
-
-export default function SummaryPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center p-6" dir="rtl">
-          <div className="text-white/70 text-lg">טוען סיכום...</div>
-        </div>
-      }
-    >
-      <SummaryContent />
-    </Suspense>
   );
 }
 

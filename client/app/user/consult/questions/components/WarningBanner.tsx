@@ -2,7 +2,9 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, AlertCircle } from "lucide-react";
+
+
 
 interface WarningBannerProps {
   message: string;
@@ -24,33 +26,29 @@ export default function WarningBanner({ message, type, onClose }: WarningBannerP
           stiffness: 300,
           damping: 25,
         }}
-        className={`mb-4 rounded-2xl p-5 shadow-lg ${
-          isDanger
-            ? "bg-gradient-to-r from-red-500/20 to-red-600/20 backdrop-blur-xl border-2 border-red-500/50"
-            : "bg-gradient-to-r from-orange-500/20 to-orange-600/20 backdrop-blur-xl border-2 border-orange-500/50"
-        }`}
+        className={`mb-4 rounded-2xl p-5 shadow-lg ${isDanger
+          ? "bg-gradient-to-r from-red-500/20 to-red-600/20 backdrop-blur-xl border-2 border-red-500/50"
+          : "bg-gradient-to-r from-orange-500/20 to-orange-600/20 backdrop-blur-xl border-2 border-orange-500/50"
+          }`}
         dir="rtl"
       >
         <div className="flex items-start gap-4">
           <div
-            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-2xl ${
-              isDanger ? "bg-red-500/30 text-red-300" : "bg-orange-500/30 text-orange-300"
-            }`}
+            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isDanger ? "bg-red-500/30 text-red-300" : "bg-orange-500/30 text-orange-300"
+              }`}
           >
-            {isDanger ? "🔴" : "🟠"}
+            <AlertCircle size={24} />
           </div>
           <div className="flex-1">
             <h3
-              className={`font-bold text-lg mb-2 ${
-                isDanger ? "text-red-200" : "text-orange-200"
-              }`}
+              className={`font-bold text-lg mb-2 ${isDanger ? "text-red-200" : "text-orange-200"
+                }`}
             >
-              {isDanger ? "אזהרת בטיחות קריטית" : "הודעת זהירות"}
+              {isDanger ? "שים לב ! אזהרת בטיחות קריטית !" : "שים לב !"}
             </h3>
             <p
-              className={`leading-relaxed ${
-                isDanger ? "text-red-100" : "text-orange-100"
-              }`}
+              className={`leading-relaxed ${isDanger ? "text-red-100" : "text-orange-100"
+                }`}
             >
               {message}
             </p>
@@ -58,11 +56,10 @@ export default function WarningBanner({ message, type, onClose }: WarningBannerP
           {onClose && (
             <button
               onClick={onClose}
-              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                isDanger
-                  ? "hover:bg-red-500/30 text-red-300"
-                  : "hover:bg-orange-500/30 text-orange-300"
-              }`}
+              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isDanger
+                ? "hover:bg-red-500/30 text-red-300"
+                : "hover:bg-orange-500/30 text-orange-300"
+                }`}
               aria-label="סגור"
             >
               <X size={18} />

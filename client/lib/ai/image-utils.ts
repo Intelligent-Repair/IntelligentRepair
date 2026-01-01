@@ -4,9 +4,9 @@ import type { InlineDataPart } from "./types";
 // ChatGPT API limit is 20MB, but we want to be conservative
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
-// Minimum image size: 5KB (to avoid empty or corrupted images)
-// Reduced from 10KB to allow smaller valid images
-const MIN_IMAGE_SIZE = 5 * 1024; // 5KB
+// Minimum image size: 1KB (to avoid empty or corrupted images)
+// Very small images (like icons or compressed PNGs) can be valid
+const MIN_IMAGE_SIZE = 1 * 1024; // 1KB
 
 // Fetch an image and return as OpenAI inlineData part (validated).
 export async function fetchImageAsInlineData(url: string): Promise<InlineDataPart> {
