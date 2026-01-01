@@ -51,10 +51,13 @@ export default function ImageUploader(props: ImageUploaderProps) {
 
   useEffect(() => {
     return () => {
-      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrlsRef.current.clear();
+      if (typeof window !== "undefined") {
+        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewUrlsRef.current.clear();
+      }
     };
   }, []);
+  
 
   useEffect(() => {
     if (!onImagesChange) return;
@@ -94,7 +97,10 @@ export default function ImageUploader(props: ImageUploaderProps) {
       }
 
       const tempId = createId();
-      const previewUrl = URL.createObjectURL(file);
+      const previewUrl =
+  typeof window !== "undefined"
+    ? URL.createObjectURL(file)
+    : "";
       previewUrlsRef.current.add(previewUrl);
 
       const pendingImage: UploadedImage = {
@@ -180,15 +186,18 @@ export default function ImageUploader(props: ImageUploaderProps) {
     setImages((prev) => {
       const next = prev.filter((img) => img.id !== id);
       const removed = prev.find((img) => img.id === id);
-      if (removed) {
+  
+      if (removed && typeof window !== "undefined") {
         URL.revokeObjectURL(removed.preview);
         previewUrlsRef.current.delete(removed.preview);
       }
+  
       return next;
     });
   };
+  
 
-  const triggerInput = (ref: React.RefObject<HTMLInputElement>) => {
+  const triggerInput = (ref: React.RefObject<HTMLInputElement | null>) => {
     if (!canUploadMore) {
       setFeedback(`ניתן להעלות עד ${MAX_IMAGES} תמונות בלבד.`);
       return;
