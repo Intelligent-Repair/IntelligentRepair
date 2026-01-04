@@ -8,7 +8,7 @@ export type Message = {
   id: string;
   sender: "user" | "ai" | "system";
   text: string;
-  type?: "text" | "safety_alert" | "safety_instruction" | "mechanic_report" | "instruction";
+  type?: string;
   images?: string[];
   meta?: any; // For holding extra data like mechanic report details
   isInstruction?: boolean; // Flag for special styling
@@ -43,7 +43,7 @@ export function useHybridFlow() {
   });
 
   const isProcessing = useRef(false);
-  // 🔧 FIX: Use ref to track messages for sync access in useCallback
+  // 🔧 Source of truth: refs for sync access in useCallback
   const messagesRef = useRef<Message[]>([]);
   const contextRef = useRef<DiagnosticState>(INITIAL_CONTEXT);
 
@@ -57,13 +57,24 @@ export function useHybridFlow() {
     }));
   }, []);
 
+  // --- Helper to update context (single source of truth) ---
+  const updateContext = useCallback((patch: Partial<DiagnosticState>) => {
+    const merged = { ...contextRef.current, ...patch };
+    contextRef.current = merged;
+    setState(prev => ({ ...prev, context: merged }));
+  }, []);
+
   // --- Main API Call ---
   const sendMessage = useCallback(async (
     userText: string,
     images: string[] = [],
     vehicleInfo?: any
   ) => {
-    if (isProcessing.current) return;
+    // Prevent duplicate calls
+    if (isProcessing.current) {
+      console.warn("[HybridFlow] Already processing, ignoring duplicate call");
+      return;
+    }
     isProcessing.current = true;
 
     // 1. Add User Message (Optimistic UI)
@@ -74,8 +85,7 @@ export function useHybridFlow() {
     setState(prev => ({ ...prev, status: "PROCESSING", currentOptions: [] }));
 
     try {
-      // 🔧 FIX: Build Q&A pairs for prompt context
-      // The prompt expects: { question: "AI asked...", answer: "User replied..." }
+      // Build Q&A pairs from messagesRef (not state)
       const messages = messagesRef.current.filter(m => m.sender !== "system");
       const conversationHistory: { question: string; answer: string }[] = [];
 
@@ -95,81 +105,66 @@ export function useHybridFlow() {
         }
       }
 
-      console.log("[HybridFlow] Sending history:", conversationHistory.length, "Q&A pairs");
-
       // Get initial description (first user message) for context
       const firstUserMessage = messagesRef.current.find(m => m.sender === "user");
       const initialDescription = firstUserMessage?.text || "";
 
-      // 2. Call the Smart Router
-      // 🔧 FIX: ALWAYS send context - it contains critical state like detectedLightType
-      console.log("[HybridFlow] 📤 Sending context:", {
-        detectedLightType: contextRef.current.detectedLightType,
-        currentLightScenario: contextRef.current.currentLightScenario,
-        currentScenarioId: contextRef.current.currentScenarioId,
-        currentStepId: contextRef.current.currentStepId,
-        causeScores: contextRef.current.causeScores
+      // Read from contextRef (source of truth)
+      const currentContext = contextRef.current;
+
+      console.log("[HybridFlow] 📤 Sending:", {
+        userText: userText.slice(0, 50),
+        historyPairs: conversationHistory.length,
+        detectedLightType: currentContext.detectedLightType,
+        activeFlow: currentContext.activeFlow
       });
 
+      // 2. Single API Call
       const response = await fetch("/api/ai/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userText,
-          description: initialDescription, // 🔧 FIX: Always send initial problem description
+          description: initialDescription,
           image_urls: images,
-          context: contextRef.current, // 🔧 CRITICAL: Always send full context
-          // 🔧 FIX: Always send conversation history for AI continuity
+          context: currentContext,
           answers: conversationHistory,
           vehicle: vehicleInfo
         })
       });
 
       const data = await response.json();
-      console.log("[HybridFlow] Server Response:", data);
+      console.log("[HybridFlow] 📥 Response type:", data.type);
 
-      // 🔧 FIX: Unified context merge using contextRef as source of truth
+      // 3. Merge context (once, consistently)
       const serverContext: Partial<DiagnosticState> = data.context ?? {};
-      const currentContext = contextRef.current;
 
-      // Patch שדות שעלולים להגיע בטופ-לבל (אצלכם לפעמים מגיעים גם מחוץ ל-context)
+      // Handle top-level fields that may come outside context
       const topLevelPatch: Partial<DiagnosticState> = {};
+      if (data.detectedLightType) topLevelPatch.detectedLightType = data.detectedLightType;
+      if (data.lightSeverity) topLevelPatch.lightSeverity = data.lightSeverity;
+      if (data.kbSource !== undefined) topLevelPatch.kbSource = data.kbSource;
+      if (data.isLightContext !== undefined) topLevelPatch.isLightContext = data.isLightContext;
 
-      const currentLight = currentContext.detectedLightType;
-      const newLightFromData = (data as any).detectedLightType;
-      const newLightFromContext = (serverContext as any).detectedLightType;
-      const newLight = newLightFromData || newLightFromContext;
-
-      const shouldPreserveCurrentLight =
-        currentLight &&
-        currentLight !== "unidentified_light" &&
-        newLight === "unidentified_light";
-
-      const shouldUpdateLight =
-        newLight &&
-        (!currentLight ||
-          (currentLight === "unidentified_light" && newLight !== "unidentified_light") ||
-          (currentLight !== "unidentified_light" && newLight !== "unidentified_light"));
-
-      if (shouldUpdateLight && !shouldPreserveCurrentLight) {
-        (topLevelPatch as any).detectedLightType = newLight;
-      }
-
-      if ((data as any).lightSeverity) (topLevelPatch as any).lightSeverity = (data as any).lightSeverity;
-      if ((data as any).kbSource !== undefined) (topLevelPatch as any).kbSource = (data as any).kbSource;
-      if ((data as any).isLightContext !== undefined) (topLevelPatch as any).isLightContext = (data as any).isLightContext;
+      // Preserve known light type when server returns unidentified
+      const finalLightType =
+        (topLevelPatch.detectedLightType === "unidentified_light" &&
+          currentContext.detectedLightType &&
+          currentContext.detectedLightType !== "unidentified_light")
+          ? currentContext.detectedLightType
+          : (topLevelPatch.detectedLightType || serverContext.detectedLightType || currentContext.detectedLightType);
 
       const mergedContext: DiagnosticState = {
         ...currentContext,
         ...serverContext,
         ...topLevelPatch,
-        ...(shouldPreserveCurrentLight ? { detectedLightType: currentLight } : {}),
+        detectedLightType: finalLightType
       };
 
-      // Single source of truth
+      // Update single source of truth
       contextRef.current = mergedContext;
 
-      // 3. Handle Response Types
+      // 4. Handle Response Types
 
       // --- A. Safety Alert (STOP) ---
       if (data.type === "safety_alert") {
@@ -186,29 +181,21 @@ export function useHybridFlow() {
           }
         });
 
-        // If finalCard is present, add it as a diagnosis report message
         if (data.finalCard) {
           setTimeout(() => {
             addMessage({
               sender: "ai",
               type: "mechanic_report",
               text: data.finalCard.summary?.detected?.join(', ') || 'מצב חירום',
-              meta: {
-                diagnosis: data.finalCard
-              }
+              meta: { diagnosis: data.finalCard }
             });
           }, 1000);
         }
 
-        // If endConversation or stopChat is true, finish (no further API calls)
         if (data.endConversation || data.stopChat) {
-          // Add the follow-up message as a system message
           if (data.followUpMessage) {
             setTimeout(() => {
-              addMessage({
-                sender: "system",
-                text: data.followUpMessage
-              });
+              addMessage({ sender: "system", text: data.followUpMessage });
             }, 1500);
           }
           setState(prev => ({
@@ -218,29 +205,21 @@ export function useHybridFlow() {
             context: mergedContext
           }));
         } else {
-          // Safety warning but conversation can continue (e.g., overheating -> scenario)
           setState(prev => ({
             ...prev,
             status: "WAITING_USER",
             currentOptions: ["הבנתי, אמשיך בזהירות"],
-            // Store nextScenarioId in context for later use
-            context: {
-              ...mergedContext,
-              pendingScenarioId: data.nextScenarioId
-            }
+            context: { ...mergedContext, pendingScenarioId: data.nextScenarioId }
           }));
         }
-        return; // 🔴 CRITICAL: Exit early to prevent falling through
+        return;
       }
 
-      // --- B. Scenario Step (Next Question) ---
-      else if (data.type === "scenario_step" || data.type === "scenario_start") {
-        // Update context from server
-        const newContext = mergedContext;
-        const stepData = data.step || data.data; // Handle different payload structures
+      // --- B. Scenario Step ---
+      if (data.type === "scenario_step" || data.type === "scenario_start") {
+        const stepData = data.step || data.data;
         const stepText = stepData?.text || stepData?.question || "שאלה הבאה...";
 
-        // Extract options - handle both 'options' array of strings or objects
         let options: string[] = [];
         if (Array.isArray(stepData?.options)) {
           options = stepData.options.map((opt: any) => typeof opt === 'string' ? opt : opt.label);
@@ -248,77 +227,67 @@ export function useHybridFlow() {
           options = data.options;
         }
 
-        addMessage({
-          sender: "ai",
-          text: stepText
-        });
+        addMessage({ sender: "ai", text: stepText });
 
         setState(prev => ({
           ...prev,
           status: "WAITING_USER",
-          context: newContext,
+          context: mergedContext,
           currentOptions: options,
-          currentStepId: newContext.currentStepId
+          currentStepId: mergedContext.currentStepId ?? undefined
         }));
+        return;
       }
 
-      // --- C. CRITICAL SAFETY INSTRUCTION ---
-      // 🚨 NEW: Handle immediate_action instructions with high priority
-      else if (data.type === "safety_instruction") {
-        console.log("[HybridFlow] 🚨 CRITICAL SAFETY INSTRUCTION received!");
+      // --- C. Safety Instruction ---
+      if (data.type === "safety_instruction") {
+        // Only mark as instruction if we have valid content
+        const hasValidInstruction = data.instruction || data.text;
 
         addMessage({
           sender: "ai",
-          text: data.text || data.instruction,
+          text: hasValidInstruction || "הוראות בטיחות",
           type: "safety_instruction",
-          isInstruction: true,
+          isInstruction: !!hasValidInstruction,
           meta: {
             isCritical: true,
             actionType: 'critical',
             actionId: data.actionId,
             risk: data.risk,
             riskExplanation: data.riskExplanation,
-            status: data.status
+            steps: data.steps,
+            rawText: hasValidInstruction
           }
         });
 
-        // Add the followup question after a delay
+        const finalOptions = data.options || ['כן, עצרתי', 'אני בדרך לעצור', 'לא יכול לעצור'];
+        const finalContext = { ...mergedContext, lastActionType: "critical" as const };
+
         if (data.question) {
           setTimeout(() => {
-            addMessage({
-              sender: "ai",
-              text: data.question,
-              type: "text"
-            });
+            addMessage({ sender: "ai", text: data.question, type: "text" });
             setState(prev => ({
               ...prev,
               status: "WAITING_USER",
-              currentOptions: data.options || ['כן, עצרתי', 'אני בדרך לעצור', 'לא יכול לעצור'],
-              context: {
-                ...mergedContext,
-                lastActionType: "critical"
-              }
+              currentOptions: finalOptions,
+              context: finalContext
             }));
-          }, 2000); // 2 second delay for critical safety messages
+          }, 2000);
         } else {
           setState(prev => ({
             ...prev,
             status: "WAITING_USER",
-            currentOptions: data.options || ['הבנתי', 'צריך עזרה נוספת'],
-            context: {
-              ...mergedContext,
-              lastActionType: "critical"
-            }
+            currentOptions: finalOptions,
+            context: finalContext
           }));
         }
+        return;
       }
 
-      // --- D. Mechanic Report (Finish) ---
-      else if (data.type === "diagnosis_report" || data.type === "diagnosis") {
-        // Normalize diagnosis structure
+      // --- D. Diagnosis Report (Finish) ---
+      if (data.type === "diagnosis_report" || data.type === "diagnosis") {
         const diagnosisData = data.diagnosis || data;
 
-        // Handle summary - can be string or object { detected: [], reported: [] }
         let summaryText = "אבחון הושלם";
         if (typeof data.summary === 'string') {
           summaryText = data.summary;
@@ -330,117 +299,102 @@ export function useHybridFlow() {
           summaryText = diagnosisData.summary;
         }
 
-        // Use title if available
-        const displayTitle = data.title || "אבחון סופי";
-
         addMessage({
           sender: "ai",
           type: "mechanic_report",
           text: summaryText,
-          meta: {
-            diagnosis: data,  // Store full diagnosis data for FinalDiagnosisCard
-            title: displayTitle
-          }
+          meta: { diagnosis: data, title: data.title || "אבחון סופי" }
         });
 
         setState(prev => ({
           ...prev,
           status: "FINISHED",
-          currentOptions: [], // No more questions
+          currentOptions: [],
           context: mergedContext
         }));
+        return;
       }
 
-      // --- D. Legacy AI Format (next_question) ---
-      // 🔧 FIX: Handle legacy AI response format with next_question instead of type
-      else if (data.next_question && !data.type) {
-        console.log("[HybridFlow] Legacy format detected - next_question:", data.next_question.substring(0, 50));
-
-        addMessage({
-          sender: "ai",
-          text: data.next_question,
-          type: "text"
-        });
-
-        // Extract options from possible_causes if available
-        const options: string[] = [];
-        if (data.possible_causes && Array.isArray(data.possible_causes)) {
-          // Try to extract meaningful options from causes
-          // For now, provide generic confirmation options
-        }
-
-        // Default options for yes/no questions
-        const defaultOptions = ["כן", "לא", "לא יודע"];
+      // --- E. Legacy AI Format (next_question) ---
+      if (data.next_question && !data.type) {
+        addMessage({ sender: "ai", text: data.next_question, type: "text" });
 
         setState(prev => ({
           ...prev,
           status: "WAITING_USER",
-          currentOptions: options.length > 0 ? options : defaultOptions,
+          currentOptions: ["כן", "לא", "לא יודע"],
           context: mergedContext
         }));
+        return;
       }
 
-      // --- E. AI Fallback / Instruction ---
-      else if (data.type === "question" || data.type === "instruction") {
+      // --- F. Question or Instruction ---
+      if (data.type === "question" || data.type === "instruction") {
         const isInstruction = data.type === "instruction";
-        // 🔧 FIX: Support all possible field names from AI: question, message, text, content
         const text = isInstruction
-          ? (data.instruction || data.text)  // 🔧 FIX: Also accept 'text' for instructions
+          ? (data.instruction || data.text)
           : (data.question || data.message || data.text || data.content);
         const options = data.options || [];
+
+        // Only set isInstruction=true if we have actual instruction content/steps
+        const hasInstructionContent = isInstruction && (data.steps?.length > 0 || data.instruction);
 
         addMessage({
           sender: "ai",
           text: text,
-          isInstruction: isInstruction,
+          isInstruction: hasInstructionContent,
           type: isInstruction ? "instruction" : "text",
-          // 🔧 NEW: Store instruction metadata for UI rendering
-          meta: isInstruction ? {
+          meta: hasInstructionContent ? {
             actionType: data.actionType,
             actionId: data.actionId,
             steps: data.steps,
-            name: data.name
+            name: data.name,
+            rawText: text
           } : undefined
         });
 
-        // If instruction, we might get a follow-up question immediately or need to re-ask
+        const instructionContext = isInstruction
+          ? { ...mergedContext, lastActionType: data.actionType }
+          : mergedContext;
+
         if (isInstruction && data.question) {
-          // Add the follow-up question as a separate message after a delay
           setTimeout(() => {
-            addMessage({
-              sender: "ai",
-              text: data.question,
-              type: "text" // Follow-up question after instruction
-            });
+            addMessage({ sender: "ai", text: data.question, type: "text" });
             setState(prev => ({
               ...prev,
               status: "WAITING_USER",
               currentOptions: data.options || ['הצלחתי', 'לא הצלחתי', 'צריך עזרה'],
-              context: {
-                ...mergedContext,
-                ...(isInstruction ? { lastActionType: data.actionType } : {})
-              }
+              context: instructionContext
             }));
-          }, 1500); // 🔧 Increased delay to give user time to read instruction
+          }, 1500);
         } else {
           setState(prev => ({
             ...prev,
             status: "WAITING_USER",
             currentOptions: isInstruction
-              ? ['הצלחתי לבצע', 'לא הצלחתי', 'צריך עזרה נוספת']  // 🔧 Default options for instructions
+              ? ['הצלחתי לבצע', 'לא הצלחתי', 'צריך עזרה נוספת']
               : options,
-            context: {
-              ...mergedContext,
-              ...(isInstruction ? { lastActionType: data.actionType } : {})
-            }
+            context: instructionContext
           }));
         }
+        return;
       }
+
+      // --- G. Unknown type fallback ---
+      console.warn("[HybridFlow] Unknown response type:", data.type);
+      const fallbackText = data.text || data.message || data.question || "המשך...";
+      addMessage({ sender: "ai", text: fallbackText });
+      setState(prev => ({
+        ...prev,
+        status: "WAITING_USER",
+        currentOptions: data.options || [],
+        context: mergedContext
+      }));
 
     } catch (error) {
       console.error("[HybridFlow] Error:", error);
       addMessage({ sender: "system", text: "אירעה שגיאה בתקשורת. נסה שוב." });
-      setState(prev => ({ ...prev, status: "ERROR" }));
+      setState(prev => ({ ...prev, status: "ERROR", context: contextRef.current }));
     } finally {
       isProcessing.current = false;
     }
@@ -455,7 +409,7 @@ export function useHybridFlow() {
     state,
     initFlow,
     sendMessage,
-    addMessage
+    addMessage,
+    updateContext
   };
 }
-

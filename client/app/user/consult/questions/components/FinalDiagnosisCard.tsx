@@ -15,12 +15,12 @@ import {
   Droplets,
   Settings2,
   Info,
-  MapPin,
   Truck,
   X,
   Phone,
   HelpCircle
 } from "lucide-react";
+import { towingCompanies, formatTelLink } from "@/lib/ui/towingCompanies";
 
 
 // --- Types ---
@@ -154,31 +154,6 @@ function getContextualSuggestions(ctx?: DiagnosisContext, topIssue?: string): Se
   return suggestions;
 }
 
-// --- Towing Companies Data ---
-const towingCompanies = [
-  {
-    name: "שגריר",
-    number: "*8888",
-    displayNumber: "8888*",  // RTL display
-    color: "from-red-600 to-red-700",
-    logo: "/towing/shagrir.jpg"
-  },
-  {
-    name: "דרכים",
-    number: "*2008",
-    displayNumber: "2008*",
-    color: "from-orange-500 to-orange-600",
-    logo: "/towing/Drachim.png"
-  },
-  {
-    name: "ממסי שירותי גרירה",
-    number: "*5202",
-    displayNumber: "5202*",
-    color: "from-slate-800 to-slate-900",
-    logo: "/towing/Memsi.png"
-  },
-];
-
 // --- Animation Variants ---
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -271,12 +246,10 @@ const actionTypeIcons: Record<string, React.ElementType> = {
 function TowingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen) return null;
 
-  const handleCall = (number: string) => {
-    window.location.href = `tel:${encodeURIComponent(number)}`;
-  };
+  const [logoErrors, setLogoErrors] = React.useState<Record<string, boolean>>({});
 
-  const handleOther = () => {
-    window.location.href = "tel:";
+  const handleLogoError = (companyName: string) => {
+    setLogoErrors(prev => ({ ...prev, [companyName]: true }));
   };
 
   return (
@@ -329,9 +302,9 @@ function TowingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
               {/* Company Options */}
               <div className="p-4 space-y-3">
                 {towingCompanies.map((company) => (
-                  <button
+                  <a
                     key={company.name}
-                    onClick={() => handleCall(company.number)}
+                    href={formatTelLink(company.number)}
                     className={`
                       w-full flex items-center justify-between p-4 rounded-2xl
                       bg-gradient-to-l ${company.color}
@@ -340,19 +313,18 @@ function TowingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                     `}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Company Logo */}
+                      {/* Company Logo with fallback */}
                       <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden p-1">
-                        <img
-                          src={company.logo}
-                          alt={company.name}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            // Fallback to phone icon if logo not found
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                        <Phone size={20} className="text-gray-600 hidden" />
+                        {!logoErrors[company.name] ? (
+                          <img
+                            src={company.logo}
+                            alt={company.name}
+                            className="w-full h-full object-contain"
+                            onError={() => handleLogoError(company.name)}
+                          />
+                        ) : (
+                          <Phone size={20} className="text-gray-600" />
+                        )}
                       </div>
                       <div className="text-right">
                         <span className="text-base font-bold text-white block">
@@ -364,12 +336,12 @@ function TowingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                       </div>
                     </div>
                     <ChevronLeft size={20} className="text-white/60 group-hover:translate-x-[-4px] transition-transform" />
-                  </button>
+                  </a>
                 ))}
 
                 {/* Other Option */}
-                <button
-                  onClick={handleOther}
+                <a
+                  href="tel:"
                   className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
                 >
                   <div className="flex items-center gap-3">
@@ -381,7 +353,7 @@ function TowingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                     </span>
                   </div>
                   <ChevronLeft size={20} className="text-white/40 group-hover:translate-x-[-4px] transition-transform" />
-                </button>
+                </a>
               </div>
 
               {/* Footer Tip */}

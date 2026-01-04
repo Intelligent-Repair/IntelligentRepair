@@ -49,6 +49,37 @@ export interface RequestContext {
 const mergeContext = (base: any, patch: any) => ({ ...(base ?? {}), ...(patch ?? {}) });
 
 // =============================================================================
+// BRIDGE MODE HELPERS
+// =============================================================================
+
+/**
+ * Build a picker list of warning lights sorted by severity.
+ * Used when bridge questions fail to identify the light.
+ */
+function buildLightPickerOptions(): string[] {
+    const entries = Object.entries(warningLightsKB as any);
+    const weight = (sev: string) =>
+        sev === 'critical' ? 0 : sev === 'high' ? 1 : sev === 'moderate' ? 2 : 3;
+
+    return entries
+        .sort((a, b) => weight(String((a[1] as any)?.severity)) - weight(String((b[1] as any)?.severity)))
+        .slice(0, 10)
+        .map(([id, data]) => {
+            const he = (data as any)?.names?.he?.[0] ?? id;
+            return `${he} (${id})`;
+        })
+        .concat(['נורה אחרת / לא בטוח - אתאר במילים']);
+}
+
+/**
+ * Extract lightId from a picker option string like "נורת שמן (oil_pressure_light)"
+ */
+function extractLightIdFromPicker(text: string): string | null {
+    const m = String(text || '').match(/\(([\w_]+)\)/);
+    return m?.[1] ?? null;
+}
+
+// =============================================================================
 // RESOLVED/SUCCESS OPTION DETECTION
 // =============================================================================
 
@@ -1145,6 +1176,14 @@ export async function callExpertAI(body: any): Promise<any> {
     const currentInput = message || description || '';
     const detectedLight = context?.detectedLightType;
 
+    // 🔧 CHECK: If user picked a light from the picker, jump directly to KB
+    const pickedId = extractLightIdFromPicker(currentInput || '');
+    if (pickedId && (warningLightsKB as any)[pickedId]) {
+        const sev = (warningLightsKB as any)[pickedId]?.severity ?? 'low';
+        console.log(`[Expert AI] 🎯 User picked light from picker: ${pickedId}`);
+        return handleWarningLightDetection(pickedId, sev === 'critical' ? 'danger' : 'caution', context);
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         return NextResponse.json(
@@ -1161,11 +1200,21 @@ export async function callExpertAI(body: any): Promise<any> {
 
     const hasImages = images.length > 0;
 
-    console.log(`[Expert AI] 🧠 Mode: ${hasImages ? 'IMAGE' : detectedLight ? 'KB' : 'EXPERT'} `);
+    // 🔧 BRIDGE MODE: Text-only goes through bridge first (up to 3 questions)
+    const bridgeCount = Number(context?.bridgeQuestionCount ?? 0);
+    const canBridge = !hasImages && !detectedLight && bridgeCount < 3;
 
-    const prompt = (hasImages || detectedLight)
-        ? buildChatPrompt(currentInput, answers, hasImages, answers.length, detectedLight)
-        : buildGeneralExpertPrompt(currentInput, answers, hasImages);
+    const ctx = {
+        mode: canBridge ? ('bridge' as const) : ('expert' as const),
+        bridgeQuestionCount: bridgeCount
+    };
+
+    console.log(`[Expert AI] 🧠 Mode: ${hasImages ? 'IMAGE' : detectedLight ? 'KB' : canBridge ? 'BRIDGE' : 'EXPERT'}, bridgeCount: ${bridgeCount}`);
+
+    // 🔧 All modes use buildChatPrompt for consistent JSON output
+    const prompt = (hasImages || detectedLight || canBridge)
+        ? buildChatPrompt(currentInput, answers, hasImages, answers.length, detectedLight ?? null, ctx)
+        : buildChatPrompt(currentInput, answers, hasImages, answers.length, null, { mode: 'expert' as const });
 
     try {
         const raw = await client.generateContent(prompt, {
@@ -1187,12 +1236,23 @@ export async function callExpertAI(body: any): Promise<any> {
 
         if (typeof lightType === 'string') lightType = lightType.trim();
 
-        console.log(`[Expert AI] 🔍 Detected light: ${lightType || 'none'} `);
+        console.log(`[Expert AI] 🔍 Detected light: ${lightType || 'none'}`);
 
         // If we identified a known light, jump to KB flow
         if (lightType && (warningLightsKB as any)[lightType]) {
             const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
             return handleWarningLightDetection(lightType, severity, context);
+        }
+
+        // 🔧 BRIDGE EXHAUSTED: Show light picker if bridge questions are exhausted
+        if (!lightType && bridgeCount >= 3 && !context?.lightPickerShown) {
+            console.log('[Expert AI] 🎨 Bridge exhausted, showing light picker');
+            return NextResponse.json({
+                type: 'question',
+                text: 'כדי לדייק: איזו נורת אזהרה ראית? אם אתה לא בטוח, בחר את הקרובה ביותר.',
+                options: buildLightPickerOptions(),
+                context: mergeContext(context, { lightPickerShown: true, activeFlow: null })
+            });
         }
 
         // Handle diagnosis_report or ai_response - ensure conversation ends
@@ -1203,6 +1263,19 @@ export async function callExpertAI(body: any): Promise<any> {
                 type: result.type === 'ai_response' ? 'diagnosis_report' : result.type,
                 endConversation: true,
                 context: mergeContext(context, result?.context)
+            });
+        }
+
+        // 🔧 BRIDGE QUESTION: Increment counter for bridge questions
+        if (result.type === 'question' && canBridge) {
+            return NextResponse.json({
+                ...result,
+                context: mergeContext(context, {
+                    bridgeQuestionCount: bridgeCount + 1,
+                    isSymptomFlow: true,
+                    activeFlow: null,
+                    ...(result?.context ?? {})
+                })
             });
         }
 
@@ -1224,13 +1297,12 @@ export async function callExpertAI(body: any): Promise<any> {
             return NextResponse.json({
                 type: 'question',
                 text: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים? (למשל: צורת הסמל, הצבע, מתי הופיעה)',
-                options: ['נורה אדומה בצורת מצבר', 'נורה כתומה בצורת מנוע', 'נורה אדומה בצורת בלם', 'נורה אדומה בצורת פך שמן', 'נורה אחרת - אתאר'],
+                options: buildLightPickerOptions(),
                 context: mergeContext(context, {
                     activeFlow: null,
                     detectedLightType: 'unidentified_light',
                     isSymptomFlow: true,
-                    currentQuestionText: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים? (למשל: צורת הסמל, הצבע, מתי הופיעה)',
-                    currentQuestionOptions: ['נורה אדומה בצורת מצבר', 'נורה כתומה בצורת מנוע', 'נורה אדומה בצורת בלם', 'נורה אדומה בצורת פך שמן', 'נורה אחרת - אתאר']
+                    bridgeQuestionCount: 0
                 })
             });
         }

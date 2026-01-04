@@ -2786,5 +2786,782 @@
                 }
             }
         }
+    },
+    "fuel_level_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת דלק",
+                "דלק נמוך",
+                "נורת משאבת דלק",
+                "אייקון משאבת דלק"
+            ],
+            "en": [
+                "Fuel",
+                "Fuel Level",
+                "Low Fuel",
+                "Fuel Pump Light"
+            ]
+        },
+        "symbol": "fuel_pump",
+        "colors": [
+            "yellow",
+            "orange"
+        ],
+        "color_meaning": {
+            "yellow": "דלק נמוך - בדרך כלל ניתן להמשיך בזהירות ולתדלק בהקדם.",
+            "orange": "דלק נמוך/אזהרה - מומלץ לתדלק בהקדם."
+        },
+        "importance": "בדרך כלל זו לא תקלה מכנית. אם הנורה נדלקת למרות שיש דלק לפי המד, ייתכן חיישן/מצוף או תקלה חשמלית.",
+        "first_question": {
+            "text": "האם מד הדלק באמת קרוב לריק (או שהנורה נדלקה למרות שיש דלק)?",
+            "options": [
+                {
+                    "id": "yes_low",
+                    "label": "כן, המד על ריק/קרוב לריק"
+                },
+                {
+                    "id": "no_has_fuel",
+                    "label": "לא, יש דלק לפי המד"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "yes_low": {
+                "severity": "low",
+                "description": "סביר שמדובר בדלק נמוך. מומלץ לתדלק בהקדם במקום בטוח.",
+                "risk": "נסיעה עד ריק עלולה להשבית את הרכב במקום לא נוח/מסוכן.",
+                "causes": [
+                    {
+                        "id": "low_fuel",
+                        "name": "דלק נמוך",
+                        "probability": 0.9
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "refuel",
+                        "name": "תדלוק",
+                        "steps": [
+                            "תדלק במקום בטוח",
+                            "כבה/הדלק את הרכב לאחר התדלוק",
+                            "ודא שהנורה כבתה תוך זמן קצר"
+                        ],
+                        "followup_question": {
+                            "text": "מה המצב אחרי תדלוק?",
+                            "options": [
+                                {
+                                    "id": "resolved",
+                                    "label": "הנורה כבתה"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "cant_refuel",
+                                    "label": "לא הצלחתי לתדלק עכשיו"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "recommendation": "לתדלק בהקדם. אם הנורה נשארת דולקת אחרי תדלוק, ייתכן חיישן/מצוף וצריך בדיקה."
+            },
+            "no_has_fuel": {
+                "severity": "low",
+                "description": "אם הנורה נדלקת למרות שיש דלק לפי המד, ייתכן חיישן/מצוף דלק או תקלה חשמלית.",
+                "risk": "ייתכן שהמד/הנורה לא משקפים את כמות הדלק האמיתית.",
+                "causes": [
+                    {
+                        "id": "fuel_sender_fault",
+                        "name": "חיישן/מצוף דלק תקול",
+                        "probability": 0.6
+                    },
+                    {
+                        "id": "cluster_or_wiring",
+                        "name": "תקלה בלוח מחוונים/חיווט",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אבל מומלץ לתדלק מוקדם ולא להסתמך על המד עד בדיקה במוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח מה מצב הדלק, עדיף להתייחס לזה כדלק נמוך ולתדלק בהקדם במקום בטוח.",
+                "risk": "אם הדלק באמת נמוך מאוד, הרכב עלול להיתקע.",
+                "causes": [
+                    {
+                        "id": "unknown_fuel_level",
+                        "name": "מצב דלק לא ברור",
+                        "probability": 0.7
+                    }
+                ],
+                "recommendation": "תדלוק בהקדם הוא הפתרון הבטוח."
+            }
+        }
+    },
+    "abs_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת ABS",
+                "ABS"
+            ],
+            "en": [
+                "ABS",
+                "Anti-lock Braking System"
+            ]
+        },
+        "symbol": "abs",
+        "colors": [
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "orange": "תקלה במערכת ABS - הבלימה הבסיסית לרוב עדיין עובדת, אך ללא ABS.",
+            "yellow": "אזהרת ABS - מומלץ לבדוק."
+        },
+        "importance": "ABS מסייע למנוע נעילת גלגלים בבלימה חזקה. לרוב אפשר להמשיך בזהירות.",
+        "first_question": {
+            "text": "האם יש גם נורת בלם אדומה/BRAKE או הודעת תקלה חמורה בבלמים?",
+            "options": [
+                {
+                    "id": "abs_only",
+                    "label": "רק נורת ABS דולקת"
+                },
+                {
+                    "id": "brake_together",
+                    "label": "יש גם נורת בלם אדומה/BRAKE"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "abs_only": {
+                "severity": "low",
+                "description": "סביר שיש תקלה במערכת ABS/חיישן מהירות גלגל. הבלמים בדרך כלל עובדים.",
+                "risk": "בבלימה חזקה עלול להיות קל יותר להגיע לנעילת גלגלים.",
+                "causes": [
+                    {
+                        "id": "wheel_speed_sensor",
+                        "name": "חיישן מהירות גלגל תקול",
+                        "probability": 0.55
+                    },
+                    {
+                        "id": "abs_ring_or_wiring",
+                        "name": "טבעת/חיווט ABS פגומים",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אך מומלץ בדיקת מחשב ABS במוסך."
+            },
+            "brake_together": {
+                "severity": "critical",
+                "description": "שילוב של ABS עם נורת בלם אדומה עלול להעיד על בעיית בלמים.",
+                "risk": "תקלה במערכת הבלמים היא סכנת חיים.",
+                "immediate_action": "עצור במקום בטוח בהקדם. בדוק נוזל בלמים אם זה בטוח.",
+                "causes": [
+                    {
+                        "id": "brake_fluid_low",
+                        "name": "נוזל בלמים נמוך/נזילה",
+                        "probability": 0.5
+                    },
+                    {
+                        "id": "hydraulic_or_module",
+                        "name": "תקלה במודול ABS/הידראוליקה",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "להימנע מהמשך נסיעה עד בדיקת מערכת הבלמים."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח אם יש גם נורת בלמים אדומה, עדיף לנהוג בזהירות ולעצור לבדיקה.",
+                "risk": "אם אכן יש תקלה בבלמים, המשך נסיעה עלול להיות מסוכן.",
+                "causes": [
+                    {
+                        "id": "uncertain_brake_status",
+                        "name": "סטטוס בלמים לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם יש נורת בלמים אדומה — להתייחס כקריטי. אם רק ABS — ניתן להמשיך בזהירות."
+            }
+        }
+    },
+    "airbag_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת כרית אוויר",
+                "נורת AIRBAG",
+                "נורת SRS"
+            ],
+            "en": [
+                "Airbag",
+                "SRS",
+                "Airbag Warning"
+            ]
+        },
+        "symbol": "airbag",
+        "colors": [
+            "red",
+            "orange"
+        ],
+        "color_meaning": {
+            "red": "תקלה אפשרית במערכת כריות האוויר/מותחנים.",
+            "orange": "אזהרת SRS/מערכת בטיחות - מומלץ בדיקה."
+        },
+        "importance": "מערכת כריות האוויר ומותחני חגורות היא מערכת בטיחות.",
+        "first_question": {
+            "text": "האם הנורה נשארת דולקת קבוע בזמן נסיעה, או שהיא נכבית אחרי כמה שניות מההתנעה?",
+            "options": [
+                {
+                    "id": "stays_on",
+                    "label": "נשארת דולקת בזמן נסיעה"
+                },
+                {
+                    "id": "goes_off",
+                    "label": "נכבית אחרי ההתנעה"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "stays_on": {
+                "severity": "moderate",
+                "description": "סביר שיש תקלה במערכת SRS (חיישן, חיבור מתחת למושב, מותחן חגורה).",
+                "risk": "ייתכן שמערכת כריות האוויר לא תפעל כראוי בעת תאונה.",
+                "causes": [
+                    {
+                        "id": "seat_connector",
+                        "name": "חיבור/שקע מתחת למושב רופף",
+                        "probability": 0.35
+                    },
+                    {
+                        "id": "srs_sensor_or_module",
+                        "name": "חיישן/מודול SRS תקול",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "מומלץ בדיקת מחשב במוסך."
+            },
+            "goes_off": {
+                "severity": "low",
+                "description": "אם הנורה נכבית כמה שניות אחרי התנעה — לרוב זה תקין (בדיקת מערכת).",
+                "risk": "אם הנורה חוזרת במהלך נסיעה, יש להתייחס לכך כתקלה.",
+                "causes": [
+                    {
+                        "id": "normal_self_check",
+                        "name": "בדיקת מערכת תקינה בהתנעה",
+                        "probability": 0.8
+                    }
+                ],
+                "recommendation": "אם הנורה לא חוזרת — אין פעולה דחופה."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, מומלץ להסתכל שוב בעת התנעה.",
+                "risk": "אם הנורה נשארת דולקת, ייתכן שהמערכת לא תפעל כראוי.",
+                "causes": [
+                    {
+                        "id": "uncertain_airbag_status",
+                        "name": "סטטוס SRS לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם היא נשארת דולקת — בדיקה במוסך מומלצת."
+            }
+        }
+    },
+    "power_steering_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת הגה",
+                "נורת הגה כוח",
+                "Power Steering",
+                "נורת EPS"
+            ],
+            "en": [
+                "Power Steering",
+                "EPS",
+                "Steering Warning"
+            ]
+        },
+        "symbol": "steering_wheel",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "תקלה אפשרית בהגה כוח - ייתכן שההגה יהיה כבד מאוד.",
+            "orange": "אזהרת הגה כוח/מערכת היגוי - מומלץ בדיקה.",
+            "yellow": "אזהרת EPS - ייתכן ירידה בסיוע ההיגוי."
+        },
+        "importance": "אובדן סיוע היגוי יכול להפתיע ולהקשות על שליטה ברכב.",
+        "first_question": {
+            "text": "האם ההגה נהיה כבד/קשה לסיבוב באופן פתאומי בזמן נסיעה?",
+            "options": [
+                {
+                    "id": "heavy_now",
+                    "label": "כן, ההגה כבד עכשיו"
+                },
+                {
+                    "id": "light_normal",
+                    "label": "לא, ההגה מרגיש רגיל"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "heavy_now": {
+                "severity": "moderate",
+                "description": "ייתכן שיש תקלה במערכת הגה כוח (הידראולית/חשמלית).",
+                "risk": "היגוי כבד עלול להקשות על תמרונים.",
+                "immediate_action": "אם זה בטוח, האט ועצור במקום בטוח.",
+                "causes": [
+                    {
+                        "id": "eps_fault",
+                        "name": "תקלה במערכת EPS",
+                        "probability": 0.45
+                    },
+                    {
+                        "id": "belt_or_pump",
+                        "name": "רצועה/משאבת הגה כוח",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "בדיקת מוסך מומלצת. אם ההיגוי כבד מאוד — הזמנת גרר."
+            },
+            "light_normal": {
+                "severity": "low",
+                "description": "אם ההגה מרגיש רגיל למרות הנורה, ייתכן חיישן/תקלה חשמלית.",
+                "risk": "הסיוע יכול להיפגע פתאום.",
+                "causes": [
+                    {
+                        "id": "intermittent_sensor",
+                        "name": "חיישן/תקלה רגעית",
+                        "probability": 0.4
+                    }
+                ],
+                "recommendation": "להמשיך בזהירות ולבדוק בהקדם."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, נסה להרגיש אם יש שינוי בסיוע ההיגוי במהירות נמוכה.",
+                "risk": "אם יש אובדן סיוע, היגוי יכול להיות כבד.",
+                "causes": [
+                    {
+                        "id": "uncertain_steering",
+                        "name": "סטטוס היגוי לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם ההגה כבד — לעצור במקום בטוח ולבדוק."
+            }
+        }
+    },
+    "transmission_temperature_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת טמפרטורת גיר",
+                "גיר חם",
+                "AT OIL TEMP",
+                "Transmission Temp"
+            ],
+            "en": [
+                "Transmission Temp",
+                "AT OIL TEMP",
+                "Transmission Overheat"
+            ]
+        },
+        "symbol": "transmission_temp",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "טמפרטורת גיר גבוהה מאוד - עלול לגרום לנזק.",
+            "orange": "טמפרטורת גיר גבוהה - מומלץ לקרר ולהיבדק.",
+            "yellow": "אזהרת טמפרטורת גיר/שמן גיר - תשומת לב."
+        },
+        "importance": "התחממות גיר (במיוחד אוטומטי) עלולה לגרום להחלקות ולנזק.",
+        "first_question": {
+            "text": "האם אתה מרגיש החלקות/ריח שרוף/העברות הילוך לא תקינות יחד עם הנורה?",
+            "options": [
+                {
+                    "id": "hot_with_symptoms",
+                    "label": "כן, יש החלקות/ריח שרוף"
+                },
+                {
+                    "id": "hot_no_symptoms",
+                    "label": "לא, אין שינוי מורגש בהילוכים"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "hot_with_symptoms": {
+                "severity": "moderate",
+                "description": "סביר שהגיר התחמם ויש גם סימפטומים תפעוליים.",
+                "risk": "המשך נסיעה תחת עומס עלול להחמיר נזק.",
+                "immediate_action": "עצור במקום בטוח, העבר ל-P, אפשר למנוע לעבוד בסרק.",
+                "causes": [
+                    {
+                        "id": "overheat_load",
+                        "name": "עומס/טמפרטורה גבוהה",
+                        "probability": 0.45
+                    },
+                    {
+                        "id": "low_or_old_atf",
+                        "name": "שמן גיר נמוך/ישן",
+                        "probability": 0.3
+                    }
+                ],
+                "recommendation": "אם הנורה חוזרת או יש החלקות — בדיקת מוסך בהקדם."
+            },
+            "hot_no_symptoms": {
+                "severity": "low",
+                "description": "ייתכן שהגיר התחמם זמנית ללא סימפטומים בולטים.",
+                "risk": "התחממות חוזרת עלולה להפוך לתקלה תפעולית.",
+                "causes": [
+                    {
+                        "id": "temporary_overheat",
+                        "name": "התחממות זמנית עקב תנאים",
+                        "probability": 0.5
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "cool_down",
+                        "name": "קירור והפחתת עומס",
+                        "steps": [
+                            "עצור במקום בטוח אם אפשר",
+                            "הפחת עומס (כבה מזגן אם צריך)",
+                            "המשך בנסיעה רגועה לאחר שהנורה נכבית"
+                        ]
+                    }
+                ],
+                "recommendation": "אם הנורה חוזרת לעיתים קרובות — בדיקת שמן גיר במוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, מומלץ להתייחס בזהירות: להפחית עומס.",
+                "risk": "אם יש התחממות אמיתית, המשך עומס עלול להחמיר.",
+                "causes": [
+                    {
+                        "id": "uncertain_transmission",
+                        "name": "סטטוס גיר לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם מופיעים סימפטומים — עצור ובדוק."
+            }
+        }
+    },
+    "esp_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת בקרת יציבות",
+                "ESP",
+                "ESC",
+                "Traction Control"
+            ],
+            "en": [
+                "ESP",
+                "ESC",
+                "Traction Control",
+                "Stability Control"
+            ]
+        },
+        "symbol": "slip",
+        "colors": [
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "orange": "בקרת יציבות/אחיזה פעילה או תקלה במערכת.",
+            "yellow": "אזהרת בקרת יציבות/אחיזה - מומלץ בדיקה אם קבוע."
+        },
+        "importance": "כאשר המערכת פעילה (מהבהב) זה יכול להיות תקין בתנאי אחיזה נמוכים.",
+        "first_question": {
+            "text": "האם הנורה מהבהבת בזמן נסיעה, או דולקת קבוע?",
+            "options": [
+                {
+                    "id": "flashing",
+                    "label": "מהבהבת בזמן נסיעה"
+                },
+                {
+                    "id": "steady",
+                    "label": "דולקת קבוע"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "flashing": {
+                "severity": "low",
+                "description": "מהבהב בדרך כלל אומר שהמערכת פועלת כדי למנוע החלקה (תקין).",
+                "risk": "תנאי אחיזה נמוכים יכולים להיות מסוכנים.",
+                "causes": [
+                    {
+                        "id": "low_traction",
+                        "name": "אחיזה נמוכה",
+                        "probability": 0.7
+                    }
+                ],
+                "recommendation": "נהג בעדינות. אם הנורה נהיית קבועה — בדיקה במוסך."
+            },
+            "steady": {
+                "severity": "low",
+                "description": "נורה קבועה יכולה להעיד שהמערכת כבויה או שיש תקלה.",
+                "risk": "ייתכן שלא תהיה בקרת יציבות בעת החלקה.",
+                "causes": [
+                    {
+                        "id": "disabled_by_button",
+                        "name": "המערכת כבויה ידנית",
+                        "probability": 0.35
+                    },
+                    {
+                        "id": "sensor_related",
+                        "name": "תקלה בחיישן/ABS",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אם לא כיבית ידנית — מומלץ בדיקת מוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, נסה לשים לב האם זה מהבהב רק בפעולות מסוימות או דולק תמיד.",
+                "risk": "אם דולק קבוע — ייתכן שהמערכת לא פעילה.",
+                "causes": [
+                    {
+                        "id": "uncertain_esp",
+                        "name": "סטטוס ESP לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם מתברר שזה קבוע — בדיקה במוסך מומלצת."
+            }
+        }
+    },
+    "immobilizer_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת אימובילייזר",
+                "נורת מפתח",
+                "רכב לא מזהה מפתח"
+            ],
+            "en": [
+                "Immobilizer",
+                "Key",
+                "Security Light"
+            ]
+        },
+        "symbol": "key",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "בעיה בזיהוי מפתח/מערכת אבטחה - הרכב עלול לא להניע.",
+            "orange": "אזהרת אבטחה/אימובילייזר - מומלץ בדיקה.",
+            "yellow": "אזהרת מפתח/אבטחה - לעיתים קשור לסוללת מפתח."
+        },
+        "importance": "אם האימובילייזר לא מזהה את המפתח, הרכב לא יניע.",
+        "first_question": {
+            "text": "האם הרכב מניע כרגיל, או שהוא לא מניע/נכבה מיד אחרי התנעה?",
+            "options": [
+                {
+                    "id": "wont_start",
+                    "label": "לא מניע / נכבה מיד"
+                },
+                {
+                    "id": "starts_but_light_on",
+                    "label": "מניע אבל הנורה דולקת"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "wont_start": {
+                "severity": "moderate",
+                "description": "סביר שהרכב לא מזהה את המפתח/שלט.",
+                "risk": "הרכב עלול להיתקע ולא להניע.",
+                "causes": [
+                    {
+                        "id": "key_battery_low",
+                        "name": "סוללת שלט חלשה",
+                        "probability": 0.4
+                    },
+                    {
+                        "id": "key_not_detected",
+                        "name": "מפתח לא מזוהה",
+                        "probability": 0.3
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "try_spare_or_close",
+                        "name": "נסיונות בסיסיים",
+                        "steps": [
+                            "נסה מפתח רזרבי אם יש",
+                            "נסה להצמיד את השלט למקום הזיהוי ברכב",
+                            "כבה/הדלק מחדש"
+                        ]
+                    }
+                ],
+                "recommendation": "אם לא מניע — פנה לשירותי דרך/מוסך."
+            },
+            "starts_but_light_on": {
+                "severity": "low",
+                "description": "אם הרכב מניע והנורה דולקת, ייתכן אזהרה או תקלה רגעית.",
+                "risk": "ייתכן שהתקלה תחזור ותמנע התנעה בעתיד.",
+                "causes": [
+                    {
+                        "id": "intermittent_security",
+                        "name": "תקלה רגעית/חיישן",
+                        "probability": 0.35
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אך מומלץ בדיקה אם הנורה נשארת קבועה."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, נסה לבדוק האם הרכב מניע.",
+                "risk": "אם זו בעיית זיהוי מפתח, הרכב עלול לא להניע.",
+                "causes": [
+                    {
+                        "id": "uncertain_immobilizer",
+                        "name": "סטטוס אימובילייזר לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם יש קושי התנעה — שירותי דרך/מוסך."
+            }
+        }
+    },
+    "washer_fluid_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת נוזל שמשות",
+                "מים לשמשות",
+                "נוזל שפריצר"
+            ],
+            "en": [
+                "Washer Fluid",
+                "Low Washer Fluid"
+            ]
+        },
+        "symbol": "washer",
+        "colors": [
+            "yellow",
+            "orange"
+        ],
+        "color_meaning": {
+            "yellow": "נוזל שמשות נמוך - מומלץ למלא.",
+            "orange": "אזהרת נוזל שמשות נמוך - למלא בהקדם."
+        },
+        "importance": "זה לא מסוכן בפני עצמו, אבל שמשות מלוכלכות יכולות לפגוע בראות.",
+        "first_question": {
+            "text": "האם יש לך אפשרות למלא נוזל שמשות עכשיו?",
+            "options": [
+                {
+                    "id": "can_fill",
+                    "label": "כן, אני יכול/ה למלא עכשיו"
+                },
+                {
+                    "id": "cannot_now",
+                    "label": "לא, לא יכול/ה עכשיו"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "can_fill": {
+                "severity": "low",
+                "description": "כנראה חסר נוזל שמשות. מילוי בדרך כלל פותר את הנורה.",
+                "risk": "ראות יכולה להיפגע אם השמשה מתלכלכת.",
+                "causes": [
+                    {
+                        "id": "low_washer_fluid",
+                        "name": "נוזל שמשות נמוך",
+                        "probability": 0.85
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "fill_washer",
+                        "name": "מילוי נוזל שמשות",
+                        "steps": [
+                            "מצא את מיכל נוזל השמשות",
+                            "מלא מים/נוזל מתאים עד לקו המומלץ",
+                            "הפעל שפריצר ובדוק שהנורה כבתה"
+                        ]
+                    }
+                ],
+                "recommendation": "אם הנורה נשארת דולקת למרות שמילאת, ייתכן חיישן/נזילה."
+            },
+            "cannot_now": {
+                "severity": "low",
+                "description": "אפשר להמשיך בנסיעה, אך מומלץ למלא בהזדמנות הקרובה.",
+                "risk": "במזג אוויר רע, הראות עלולה להיפגע.",
+                "causes": [
+                    {
+                        "id": "needs_refill",
+                        "name": "נדרש מילוי נוזל שמשות",
+                        "probability": 0.8
+                    }
+                ],
+                "recommendation": "מלא נוזל שמשות בהקדם האפשרי."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, אפשר לבדוק אם השפריצר עובד.",
+                "risk": "חוסר נוזל יכול לפגוע בראות.",
+                "causes": [
+                    {
+                        "id": "uncertain_washer",
+                        "name": "מצב נוזל שמשות לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "מומלץ למלא בכל מקרה אם יש ספק."
+            }
+        }
     }
 }

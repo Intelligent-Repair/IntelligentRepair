@@ -103,6 +103,10 @@ export interface DiagnosticState {
 
   // 🔧 NEW: Active flow tracking to prevent KB vs SCENARIO conflicts
   activeFlow?: "KB" | "SCENARIO" | null;
+
+  // 🔧 NEW: Bridge flow tracking
+  bridgeQuestionCount?: number;
+  lightPickerShown?: boolean;
 }
 
 // --- עדכון 3: שדות שליטה בחוקי בטיחות ---

@@ -52,7 +52,7 @@ function buildAnswersContext(answers: UserAnswer[]): string {
 /**
  * Surgical KB injection:
  * - If targetLightId exists, inject ONLY that light JSON.
- * - Else inject a minimal list for identification.
+ * - Else inject a minimal list for identification (with symbol/colors for BRIDGE mode).
  */
 function buildKnowledgeBaseContext(targetLightId?: string | null): string {
   const lights = warningLightsKB as Record<string, any>;
@@ -62,10 +62,13 @@ function buildKnowledgeBaseContext(targetLightId?: string | null): string {
     return JSON.stringify({ lightId: targetLightId, lightData }, null, 2);
   }
 
+  // 🔧 Enhanced: Include symbol and colors for identification in BRIDGE mode
   const list = Object.entries(lights).map(([lightId, lightData]) => ({
     lightId,
     names_he: lightData?.names?.he ?? [],
-    names_en: lightData?.names?.en ?? []
+    names_en: lightData?.names?.en ?? [],
+    symbol: lightData?.symbol ?? '',
+    colors: lightData?.colors ?? []
   }));
 
   return JSON.stringify({ available_lights: list }, null, 2);
@@ -261,12 +264,28 @@ Followup hint (if present): ${followup?.text ? `"${followup.text}"` : 'none'}
 ` : ''}
 
 ${mode === 'BRIDGE_TO_KB' ? `
-Instructions for BRIDGE_TO_KB:
-- Your goal: identify which warning_light (from available_lights) matches the user's problem.
-- You may ask UP TO ${remainingBridgeQuestions} more bridging question(s).
-- Do NOT diagnose or give technical advice.
-- If you identify a warning_light, include it in your response.
-- Keep questions short and focused.
+Instructions for BRIDGE_TO_KB (CRITICAL - READ CAREFULLY):
+
+⚠️ FORBIDDEN in BRIDGE_TO_KB mode:
+- You MUST NOT output type="diagnosis_report" or type="mechanic_report"
+- You MUST NOT give technical advice or diagnose the problem
+- You MUST NOT invent warning lights not in available_lights
+
+✅ ALLOWED outputs (choose ONE):
+A) If you are HIGHLY CONFIDENT which warning light matches:
+   Return { type: "question", warning_light: "<lightId from available_lights>", text: "<first KB question>", options: [...] }
+
+B) If you need more information to identify the light:
+   Return { type: "question", text: "<clarifying question in Hebrew>", options: ["<max 4 short Hebrew phrases>"] }
+
+Clarifying questions should focus on:
+- Symbol shape (e.g., "האם הסמל נראה כמו סוללה? מנוע? טיפת שמן?")
+- Color (e.g., "באיזה צבע הנורה דולקת - אדום, כתום, או צהוב?")
+- Behavior (e.g., "האם הנורה דולקת קבוע או מהבהבת?")
+- When it appeared (e.g., "האם הנורה נדלקה תוך כדי נסיעה או בהתנעה?")
+
+Remaining bridge questions allowed: ${remainingBridgeQuestions}
+If remainingBridgeQuestions is 0 and you still cannot identify, return type="question" with warning_light="unidentified_light".
 ` : ''}
 
 KB Context (JSON):

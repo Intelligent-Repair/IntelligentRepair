@@ -266,16 +266,30 @@ export default function QuestionsPage() {
               }
 
               // 📋 Instruction Messages - use InstructionBubble with steps
-              if (msg.type === "instruction" || msg.isInstruction) {
+              // 🔧 FIX: Only use InstructionBubble if we have steps, otherwise ChatBubble handles it
+              if ((msg.type === "instruction" || msg.isInstruction) && msg.meta?.steps?.length > 0) {
                 const instructionMeta = msg.meta || {};
                 return (
                   <InstructionBubble
                     key={msg.id}
                     title={instructionMeta.name || "הוראות בדיקה"}
                     message={msg.text}
-                    steps={instructionMeta.steps || []}
+                    steps={instructionMeta.steps}
                     actionType={instructionMeta.actionType || "inspect"}
                     isCritical={instructionMeta.actionType === "critical" || instructionMeta.isCritical}
+                  />
+                );
+              }
+
+              // 🚨 Safety Instruction without steps - use ChatBubble with special styling
+              if (msg.type === "safety_instruction" || (msg.isInstruction && !msg.meta?.steps?.length)) {
+                return (
+                  <ChatBubble
+                    key={msg.id}
+                    message={msg.text}
+                    isUser={false}
+                    type="safety_instruction"
+                    meta={msg.meta}
                   />
                 );
               }

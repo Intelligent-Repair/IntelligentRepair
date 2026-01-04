@@ -268,7 +268,17 @@
             "לא סגרתי פקק",
             "מכסה דלק לא סגור",
             "פקק דלק לא סגור",
-            "נורת מנוע אחרי תדלוק"
+            "נורת מנוע אחרי תדלוק",
+            "נורת מנוע",
+            "סמל מנוע",
+            "מנוע כתום",
+            "מנוע צהוב",
+            "צ׳ק אנג׳ין",
+            "צק אנגין",
+            "Check Engine",
+            "MIL",
+            "מנוע מהבהב",
+            "נורת מנוע מהבהבת"
           ],
           "targetId": "check_engine_light",
           "type": "light"
@@ -292,6 +302,112 @@
           ],
           "targetId": "oil_pressure_light",
           "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת דלק",
+            "דלק נמוך",
+            "משאבת דלק",
+            "אייקון משאבת דלק",
+            "סמל משאבת דלק",
+            "נגמר הדלק",
+            "מכל ריק",
+            "Fuel",
+            "Low Fuel"
+          ],
+          "type": "light",
+          "targetId": "fuel_level_light"
+        },
+        {
+          "keywords": [
+            "נורת ABS",
+            "ABS",
+            "נורית ABS",
+            "סמל ABS",
+            "בלמים ABS",
+            "Anti-lock",
+            "Anti lock"
+          ],
+          "type": "light",
+          "targetId": "abs_light"
+        },
+        {
+          "keywords": [
+            "נורת כרית אוויר",
+            "כרית אוויר",
+            "AIRBAG",
+            "SRS",
+            "נורית SRS",
+            "סמל כרית אוויר"
+          ],
+          "type": "light",
+          "targetId": "airbag_light"
+        },
+        {
+          "keywords": [
+            "נורת הגה",
+            "נורת הגה כוח",
+            "הגה כבד",
+            "Power Steering",
+            "EPS",
+            "נורית EPS",
+            "Steering"
+          ],
+          "type": "light",
+          "targetId": "power_steering_light"
+        },
+        {
+          "keywords": [
+            "טמפרטורת גיר",
+            "נורת גיר",
+            "גיר חם",
+            "שמן גיר חם",
+            "AT OIL TEMP",
+            "Transmission Temp",
+            "Transmission Overheat"
+          ],
+          "type": "light",
+          "targetId": "transmission_temperature_light"
+        },
+        {
+          "keywords": [
+            "בקרת יציבות",
+            "בקרת אחיזה",
+            "ESP",
+            "ESC",
+            "Traction",
+            "Stability Control",
+            "TC OFF",
+            "ESP OFF"
+          ],
+          "type": "light",
+          "targetId": "esp_light"
+        },
+        {
+          "keywords": [
+            "אימובילייזר",
+            "נורת מפתח",
+            "סמל מפתח",
+            "רכב לא מזהה מפתח",
+            "Immobilizer",
+            "Security Light",
+            "Key Not Detected"
+          ],
+          "type": "light",
+          "targetId": "immobilizer_light"
+        },
+        {
+          "keywords": [
+            "נוזל שמשות",
+            "מים לשמשות",
+            "נוזל שפריצר",
+            "שפריצר",
+            "washer fluid",
+            "Low Washer Fluid",
+            "נורת שפריצר"
+          ],
+          "type": "light",
+          "targetId": "washer_fluid_light"
         }
       ]
     }

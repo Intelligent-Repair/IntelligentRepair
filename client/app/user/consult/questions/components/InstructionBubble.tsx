@@ -8,7 +8,7 @@ import { Eye, Wrench, Droplets, Settings2, AlertTriangle, CheckCircle2 } from "l
 
 interface InstructionStep {
   step: string;
-  actionType?: 'inspect' | 'fill' | 'adjust' | 'check' | 'warning' | 'default';
+  actionType?: 'inspect' | 'fill' | 'adjust' | 'check' | 'warning' | 'critical' | 'default';
 }
 
 interface InstructionBubbleProps {
@@ -92,8 +92,11 @@ export default function InstructionBubble({
   const colors = actionColors[effectiveType] || actionColors.default;
   const Icon = actionIcons[effectiveType] || actionIcons.default;
 
-  // Parse steps from message if not provided
-  const instructionSteps: InstructionStep[] = steps
+  // 🔧 FIX: Treat empty array as no steps provided
+  const hasSteps = steps && steps.length > 0;
+
+  // Parse steps - if steps is empty/undefined, try to extract from message
+  const instructionSteps: InstructionStep[] = hasSteps
     ? (steps as any[]).map(s => typeof s === 'string' ? { step: s } : s)
     : message
       ? message.split('\n')
@@ -102,8 +105,14 @@ export default function InstructionBubble({
         .map(line => ({ step: line }))
       : [];
 
+  // 🔧 FIX: Show message text above steps if both exist
+  const showMessageAbove = hasSteps && message && message.trim().length > 0;
+
   // Title text - format emojis properly
   const titleText = title || (isCritical ? 'פעולה מיידית נדרשת!' : 'הוראות בדיקה');
+
+  // 🔧 FIX: Handle completely empty state
+  const hasContent = instructionSteps.length > 0 || (message && message.trim().length > 0);
 
   return (
     <motion.div
@@ -137,47 +146,59 @@ export default function InstructionBubble({
           </span>
         </div>
 
+        {/* 🔧 FIX: Show message text above steps when both exist */}
+        {showMessageAbove && (
+          <div className="mb-4 pb-3 border-b border-white/10">
+            <p className="text-sm leading-relaxed">{message}</p>
+          </div>
+        )}
+
         {/* Steps list */}
-        <div className="space-y-2">
-          {instructionSteps.map((item, index) => {
-            const stepType = item.actionType || effectiveType;
-            const StepIcon = actionIcons[stepType] || actionIcons.default;
-            const stepColors = actionColors[stepType] || colors;
+        {instructionSteps.length > 0 ? (
+          <div className="space-y-2">
+            {instructionSteps.map((item, index) => {
+              const stepType = item.actionType || effectiveType;
+              const StepIcon = actionIcons[stepType] || actionIcons.default;
+              const stepColors = actionColors[stepType] || colors;
 
-            // Check if line is a numbered step
-            const isNumbered = /^\d+\./.test(item.step);
-            const cleanStep = item.step.replace(/^\d+\.\s*/, '');
+              // Check if line is a numbered step
+              const isNumbered = /^\d+\./.test(item.step);
+              const cleanStep = item.step.replace(/^\d+\.\s*/, '');
 
-            return (
-              <div
-                key={index}
-                className="flex items-start gap-3 flex-row-reverse"
-              >
-                {/* Step icon on RIGHT */}
-                <div className={`
-                  flex-shrink-0 w-7 h-7 rounded-full 
-                  ${stepColors.bg} border ${stepColors.border}
-                  flex items-center justify-center mt-0.5
-                `}>
-                  {isNumbered ? (
-                    <span className={`text-xs font-bold ${stepColors.icon}`}>
-                      {item.step.match(/^\d+/)?.[0]}
+              return (
+                <div
+                  key={index}
+                  className="flex items-start gap-3 flex-row-reverse"
+                >
+                  {/* Step icon on RIGHT */}
+                  <div className={`
+                    flex-shrink-0 w-7 h-7 rounded-full 
+                    ${stepColors.bg} border ${stepColors.border}
+                    flex items-center justify-center mt-0.5
+                  `}>
+                    {isNumbered ? (
+                      <span className={`text-xs font-bold ${stepColors.icon}`}>
+                        {item.step.match(/^\d+/)?.[0]}
+                      </span>
+                    ) : (
+                      <StepIcon size={14} className={stepColors.icon} />
+                    )}
+                  </div>
+
+                  {/* Step text */}
+                  <div className="flex-1 text-right">
+                    <span className="text-sm leading-relaxed">
+                      {isNumbered ? cleanStep : item.step}
                     </span>
-                  ) : (
-                    <StepIcon size={14} className={stepColors.icon} />
-                  )}
+                  </div>
                 </div>
-
-                {/* Step text */}
-                <div className="flex-1 text-right">
-                  <span className="text-sm leading-relaxed">
-                    {isNumbered ? cleanStep : item.step}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : !hasContent ? (
+          /* 🔧 FIX: Empty state fallback */
+          <p className="text-sm text-white/60 text-center">לא התקבלו הוראות</p>
+        ) : null}
 
         {/* Critical warning footer */}
         {isCritical && (

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Wrench } from "lucide-react"; // אייקונים חדשים
+import { AlertTriangle, Wrench } from "lucide-react";
 
 
 interface ChatBubbleProps {
@@ -12,7 +12,7 @@ interface ChatBubbleProps {
   delay?: number;
   typewriter?: boolean; // Enable typewriter effect for AI messages
   typewriterSpeed?: number; // Speed in ms per character
-  type?: "text" | "safety_alert" | "safety_instruction" | "mechanic_report" | "instruction"; // תמיכה בסוגים החדשים
+  type?: string;
   meta?: any; // מידע נוסף (כותרת אזהרה, דוח מוסך וכו')
 }
 
@@ -225,11 +225,12 @@ export default function ChatBubble({
           </div>
         )}
 
-        {isUser && hasImages && (
+        {/* 🔧 FIX: Show images for any sender, not just user */}
+        {hasImages && (
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {images!.slice(0, 3).map((url) => (
-              <div key={url} className="overflow-hidden rounded-xl border border-white/15 bg-black/10">
-                <img src={url} alt="תמונה שנשלחה" className="w-full h-24 object-cover" />
+            {images!.slice(0, 3).map((url, idx) => (
+              <div key={`${url}-${idx}`} className="overflow-hidden rounded-xl border border-white/15 bg-black/10">
+                <img src={url} alt="תמונה" className="w-full h-24 object-cover" />
               </div>
             ))}
           </div>
