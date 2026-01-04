@@ -117,6 +117,18 @@ export const SCENARIOS: Record<string, Scenario> = {
           },
           createSkipOption('finish_report')
         ]
+      },
+      finish_report: {
+        id: 'finish_report',
+        text: 'סיכום: על סמך התשובות, נאספו ממצאים רלוונטיים לאבחון. מומלץ לפנות למוסך לבדיקה מקצועית.',
+        options: [
+          {
+            label: 'סיים',
+            nextStepId: null,
+            actions: [{ type: 'INFO' }],
+            logText: 'סיום תרחיש רכב לא מניע'
+          }
+        ]
       }
     }
   },
@@ -152,7 +164,7 @@ export const SCENARIOS: Record<string, Scenario> = {
       },
       check_coolant: {
         id: 'check_coolant',
-        text: 'המתן שהמנוע יתקרר! (לפחות 15 דק׳). גש למיכל העיבוי (מיכל פלסטיק שקוף). האם מפלס המים נמוך מהמינימום?',
+        text: 'המתן שהמנוע יתקרר! (לפחות 20–30 דקות). גש למיכל העיבוי (מיכל פלסטיק שקוף). האם מפלס המים נמוך מהמינימום?',
         options: [
           {
             label: 'כן, חסרים מים',
@@ -204,6 +216,18 @@ export const SCENARIOS: Record<string, Scenario> = {
             }
           }
         ]
+      },
+      finish_report: {
+        id: 'finish_report',
+        text: 'סיכום: על סמך התשובות, נאספו ממצאים. מומלץ להמתין שהמנוע יתקרר ולפנות למוסך לבדיקה מקצועית.',
+        options: [
+          {
+            label: 'סיים',
+            nextStepId: null,
+            actions: [{ type: 'INFO' }],
+            logText: 'סיום תרחיש התחממות'
+          }
+        ]
       }
     }
   },
@@ -247,7 +271,7 @@ export const SCENARIOS: Record<string, Scenario> = {
             nextStepId: 'call_rescue',
             actions: [{ type: 'INFO' }]
           },
-          createSkipOption('call_rescue') 
+          createSkipOption('call_rescue')
         ]
       },
       // צעד חסר: התחלת מדריך החלפה
@@ -275,9 +299,21 @@ export const SCENARIOS: Record<string, Scenario> = {
         options: [
           {
             label: 'הבנתי, אזמין עזרה',
-            nextStepId: null, // סיום השיחה
+            nextStepId: 'finish_report',
             actions: [{ type: 'INFO' }],
             logText: 'הלקוח הופנה להזמנת שירותי דרך'
+          }
+        ]
+      },
+      finish_report: {
+        id: 'finish_report',
+        text: 'סיכום: הנחיות נרשמו. אם החלפת בעצמך — המשך בזהירות. אם הזמנת עזרה — הם בדרך.',
+        options: [
+          {
+            label: 'סיים',
+            nextStepId: null,
+            actions: [{ type: 'INFO' }],
+            logText: 'סיום תרחיש פנצר'
           }
         ]
       }

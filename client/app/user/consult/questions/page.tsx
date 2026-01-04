@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { CarFront, ArrowRight } from "lucide-react";
+import { CarFront } from "lucide-react";
 
 // Components
 import ChatBubble from "./components/ChatBubble";
@@ -45,6 +45,10 @@ export default function QuestionsPage() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
+
+  const vehicleInfo = vehicle
+    ? { manufacturer: vehicle.manufacturer, model: vehicle.model, year: vehicle.year }
+    : undefined;
 
   // Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -323,13 +327,13 @@ export default function QuestionsPage() {
             {state.currentOptions.length > 0 && !isProcessing && (
               <MultiChoiceButtons
                 options={state.currentOptions}
-                onSelect={(opt) => sendMessage(opt)}
+                onSelect={(opt) => sendMessage(opt, [], vehicleInfo)}
                 disabled={isProcessing}
               />
             )}
 
             <FreeTextInput
-              onSubmit={(text) => sendMessage(text)}
+              onSubmit={(text) => sendMessage(text, [], vehicleInfo)}
               disabled={isProcessing}
               placeholder={
                 state.currentOptions.length > 0

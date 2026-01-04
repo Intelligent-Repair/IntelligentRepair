@@ -31,14 +31,22 @@ function containsNonNegatedKeyword(text: string, keyword: string): boolean {
   const k = normalizeText(keyword);
   if (!t || !k) return false;
 
+  const hasNegationNearEnd = (prefix: string): boolean => {
+    // check last ~3 words only, exact-word match (prevents "לאחר" triggering "לא")
+    const words = prefix.split(' ').filter(Boolean);
+    const tail = words.slice(-3);
+    return tail.some(w => NEGATION_WORDS.includes(w));
+  };
+
   let idx = t.indexOf(k);
   while (idx !== -1) {
-    const windowStart = Math.max(0, idx - 14);
-    const prefix = t.slice(windowStart, idx);
-    const isNegated = NEGATION_WORDS.some(w => prefix.includes(w));
+    const windowStart = Math.max(0, idx - 20);
+    const prefix = t.slice(windowStart, idx).trim();
+    const isNegated = hasNegationNearEnd(prefix);
     if (!isNegated) return true;
     idx = t.indexOf(k, idx + 1);
   }
+
   return false;
 }
 

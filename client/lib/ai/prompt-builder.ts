@@ -88,7 +88,9 @@ Schema for OPTION_MAPPER mode:
 
 Rules:
 - selectedOptionLabel MUST be exactly one of the provided option labels, or null if no match.
-- If null, provide a short clarification question in needClarification.
+- If you are not 100% sure which option matches, return selectedOptionLabel: null.
+- If selectedOptionLabel is null, needClarification MUST be a short question in Hebrew that helps choose between the options.
+- If selectedOptionLabel is not null, needClarification MUST be null.
 `.trim();
   }
 
@@ -118,7 +120,9 @@ Rules:
  * - old: first_question.followup_for_steady / followup_for_flashing
  */
 function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | null {
-  const last = (lastAnswerRaw || '').toLowerCase();
+  const last = (lastAnswerRaw || '').toLowerCase().trim();
+  const idxNum = Number(last);
+  const isIndexChoice = Number.isFinite(idxNum) && idxNum >= 1 && idxNum <= 20;
 
   const firstQ = lightData?.first_question;
   if (!firstQ) return null;
@@ -128,11 +132,13 @@ function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | n
   const followups = firstQ.followups;
 
   if (followups && typeof followups === 'object' && options.length > 0) {
-    const matched = options.find((o: any) => {
-      const id = String(o?.id ?? '').toLowerCase();
-      const label = String(o?.label ?? o ?? '').toLowerCase();
-      return (id && last.includes(id)) || (label && last.includes(label));
-    });
+    const matched = isIndexChoice
+      ? options[Math.max(0, idxNum - 1)]
+      : options.find((o: any) => {
+        const id = String(o?.id ?? '').toLowerCase();
+        const label = String(o?.label ?? o ?? '').toLowerCase();
+        return (id && last.includes(id)) || (label && last.includes(label));
+      });
 
     if (matched) {
       const f = followups[String(matched.id)];

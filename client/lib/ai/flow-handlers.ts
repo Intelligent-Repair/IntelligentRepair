@@ -13,7 +13,7 @@
 import { NextResponse } from 'next/server';
 import { createOpenAIClient } from '@/lib/ai/client';
 import { fetchImageAsInlineData } from '@/lib/ai/image-utils';
-import { extractJSON } from '@/app/api/ai/aiUtils';
+import { extractJSON } from '@/lib/ai/json-utils';
 import { buildChatPrompt, buildGeneralExpertPrompt } from '@/lib/ai/prompt-builder';
 import type { UserAnswer } from '@/lib/ai/types';
 import warningLightsKB from '@/lib/knowledge/warning-lights.json';
@@ -227,7 +227,9 @@ function handleResolutionPath(
 ): FlowResult | null {
     const mergedContext = mergeContext(context, {
         currentLightScenario: scenarioId,
-        causeScores: updatedScores
+        causeScores: updatedScores,
+        pendingResolutionPaths: null,
+        awaitingInstructionResult: false
     });
 
     // RESOLVED statuses -> diagnosis_report
@@ -837,7 +839,8 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     }
 
     // Build askedIds BEFORE checking shouldDiagnose
-    const askedIds = [...(context.askedQuestionIds || []), lastQuestionId];
+    const askedIds = [...(context.askedQuestionIds || [])];
+    if (!askedIds.includes(lastQuestionId)) askedIds.push(lastQuestionId);
 
     // FIXED: Use askedIds.length (KB questions only) instead of answers.length (all answers including AI Expert)
     // This prevents premature diagnosis when KB flow starts after several AI Expert questions
@@ -1096,7 +1099,14 @@ export async function handleScenarioStep(req: RequestContext): Promise<FlowResul
                 towConditions: report.towConditions,
                 showTowButton: hasCritical || report.severity === 'high',
                 severity: report.severity,
-                context: mergeContext(context, { suspects: newScores, reportData: newReport })
+                endConversation: true,
+                context: mergeContext(context, {
+                    suspects: newScores,
+                    reportData: newReport,
+                    currentScenarioId: null,
+                    currentStepId: null,
+                    activeFlow: null
+                })
             })
         };
     }
@@ -1136,7 +1146,12 @@ export async function callExpertAI(body: any): Promise<any> {
     const detectedLight = context?.detectedLightType;
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'No API Key' }, { status: 500 });
+    if (!apiKey) {
+        return NextResponse.json(
+            { error: 'No API Key', context: mergeContext(context, { lastError: 'NO_API_KEY' }) },
+            { status: 500 }
+        );
+    }
 
     const client: any = createOpenAIClient(apiKey, 'gpt-4o', { responseFormat: { type: 'json_object' } });
 
@@ -1177,7 +1192,7 @@ export async function callExpertAI(body: any): Promise<any> {
         // If we identified a known light, jump to KB flow
         if (lightType && (warningLightsKB as any)[lightType]) {
             const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
-            return handleWarningLightDetection(lightType, severity);
+            return handleWarningLightDetection(lightType, severity, context);
         }
 
         // Handle diagnosis_report or ai_response - ensure conversation ends
@@ -1209,14 +1224,22 @@ export async function callExpertAI(body: any): Promise<any> {
             return NextResponse.json({
                 type: 'question',
                 text: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים? (למשל: צורת הסמל, הצבע, מתי הופיעה)',
-                options: ['נורה אדומה בצורת מצבר', 'נורה כתומה בצורת מנוע', 'נורה אדומה בצורת בלם', 'נורה אדומה בצורת פך שמן', 'נורה אחרת - אתאר']
+                options: ['נורה אדומה בצורת מצבר', 'נורה כתומה בצורת מנוע', 'נורה אדומה בצורת בלם', 'נורה אדומה בצורת פך שמן', 'נורה אחרת - אתאר'],
+                context: mergeContext(context, {
+                    activeFlow: null,
+                    detectedLightType: 'unidentified_light',
+                    isSymptomFlow: true,
+                    currentQuestionText: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים? (למשל: צורת הסמל, הצבע, מתי הופיעה)',
+                    currentQuestionOptions: ['נורה אדומה בצורת מצבר', 'נורה כתומה בצורת מנוע', 'נורה אדומה בצורת בלם', 'נורה אדומה בצורת פך שמן', 'נורה אחרת - אתאר']
+                })
             });
         }
 
         return NextResponse.json({
             type: 'question',
             text: 'נתקלתי בבעיה. נסה לתאר שוב את הבעיה.',
-            options: ['אנסה שוב', 'אעדיף לגשת למוסך']
+            options: ['אנסה שוב', 'אעדיף לגשת למוסך'],
+            context: mergeContext(context, { lastError: 'EXPERT_AI_ERROR' })
         });
     }
 }
@@ -1224,7 +1247,7 @@ export async function callExpertAI(body: any): Promise<any> {
 // =============================================================================
 // Initial flow starters
 // =============================================================================
-export function handleWarningLightDetection(lightId: string, severity: string): any {
+export function handleWarningLightDetection(lightId: string, severity: string, existingContext?: any): any {
     const lightData = (warningLightsKB as any)[lightId];
     if (!lightData?.first_question) return null;
 
@@ -1234,6 +1257,19 @@ export function handleWarningLightDetection(lightId: string, severity: string): 
     const questionOptions = q.options?.map((o: any) => o.label || o) || ['כן', 'לא', 'לא בטוח'];
     const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text} `;
 
+    const newContext = {
+        detectedLightType: lightId,
+        lightSeverity: isCritical ? 'danger' : severity,
+        isLightContext: true,
+        askedQuestionIds: ['first_question'],
+        currentQuestionId: 'first_question',
+        causeScores: {},
+        currentQuestionText: questionText,
+        currentQuestionOptions: questionOptions,
+        optionMapAttempts: 0,
+        activeFlow: "KB" as const
+    };
+
     return NextResponse.json({
         type: 'question',
         text: questionText,
@@ -1241,17 +1277,7 @@ export function handleWarningLightDetection(lightId: string, severity: string): 
         detectedLightType: lightId,
         lightSeverity: isCritical ? 'danger' : severity,
         kbSource: true,
-        context: {
-            detectedLightType: lightId,
-            lightSeverity: isCritical ? 'danger' : severity,
-            isLightContext: true,
-            askedQuestionIds: ['first_question'],
-            currentQuestionId: 'first_question',
-            causeScores: {},
-            currentQuestionText: questionText,
-            currentQuestionOptions: questionOptions,
-            optionMapAttempts: 0
-        }
+        context: { ...(existingContext ?? {}), ...newContext }
     });
 }
 
@@ -1276,7 +1302,8 @@ export function handleScenarioStart(scenarioId: string): any {
             reportData: { verified: [], ruledOut: [], skipped: [], criticalFindings: [] },
             currentQuestionText: firstStep.text,
             currentQuestionOptions: stepOptions,
-            optionMapAttempts: 0
+            optionMapAttempts: 0,
+            activeFlow: "SCENARIO" as const
         }
     });
 }

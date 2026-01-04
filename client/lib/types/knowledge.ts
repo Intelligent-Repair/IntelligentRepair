@@ -69,7 +69,7 @@ export interface DiagnosticState {
   optionMapAttempts?: number;
 
   // 🔧 Flow control fields for instruction handling
-  lastActionType?: 'fill' | 'inspect' | 'safety' | 'adjust'; // Type of last instruction
+  lastActionType?: 'fill' | 'inspect' | 'safety' | 'adjust' | 'critical'; // Type of last instruction
   awaitingLightConfirmation?: boolean;  // Waiting for light status after fill
 
   // 🔧 Scenario transition field (used after safety warnings)
@@ -100,6 +100,9 @@ export interface DiagnosticState {
     year?: number;
     plate?: string;
   };
+
+  // 🔧 NEW: Active flow tracking to prevent KB vs SCENARIO conflicts
+  activeFlow?: "KB" | "SCENARIO" | null;
 }
 
 // --- עדכון 3: שדות שליטה בחוקי בטיחות ---

@@ -29,6 +29,8 @@ export async function POST(req: Request) {
     const context = body.context ?? {};
     const image_urls = body.image_urls ?? [];
 
+    const activeFlow = context?.activeFlow ?? null;
+
     // Normalize user text (message/description/last answer)
     let userText = body.message || body.description || '';
     if (!userText && answers.length > 0) {
@@ -37,11 +39,9 @@ export async function POST(req: Request) {
     }
 
     const hasImage = image_urls.length > 0;
-    const hasKnownLight = !!context?.detectedLightType && context.detectedLightType !== 'unidentified_light';
-    const hasScenario = !!context?.currentScenarioId;
 
     console.log(
-      `[Router] 📥 "${(userText || '').slice(0, 60)}" | light=${context?.detectedLightType ?? 'none'} | scenario=${context?.currentScenarioId ?? 'none'} | image=${hasImage}`
+      `[Router] 📥 "${(userText || '').slice(0, 60)}" | flow=${activeFlow ?? 'none'} | light=${context?.detectedLightType ?? 'none'} | scenario=${context?.currentScenarioId ?? 'none'} | image=${hasImage}`
     );
 
     // Build request context
@@ -54,26 +54,27 @@ export async function POST(req: Request) {
     if (safetyRule) return handleSafetyStop(safetyRule);
 
     // =========================================================================
-    // Step 2: Continue existing flows
+    // Step 2: Continue existing flows (prefer activeFlow, fallback to legacy flags)
     // =========================================================================
-    if (hasKnownLight) {
-      const result = await handleKBFlow(reqContext);
-      if (result.handled) return result.response;
-      // If KB couldn't handle (rare), fall back to AI but KEEP context
-      return await callExpertAI({ ...body, context: mergeContext(context, { isLightContext: true }) });
+    const legacyHasKnownLight =
+      !!context?.detectedLightType && context.detectedLightType !== "unidentified_light";
+    const legacyHasScenario = !!context?.currentScenarioId;
+
+    if (activeFlow === "KB" || (!activeFlow && legacyHasKnownLight)) {
+      const kbResult = await handleKBFlow(reqContext);
+      if (kbResult.handled) return kbResult.response;
     }
 
-    if (hasScenario) {
-      const result = await handleScenarioStep(reqContext);
-      if (result.handled) return result.response;
-      return await callExpertAI({ ...body, context: mergeContext(context, { isSymptomFlow: true }) });
+    if (activeFlow === "SCENARIO" || (!activeFlow && legacyHasScenario)) {
+      const scenarioResult = await handleScenarioStep(reqContext);
+      if (scenarioResult.handled) return scenarioResult.response;
     }
 
     // =========================================================================
     // Step 3: Image path (no flow yet)
     // =========================================================================
     if (hasImage) {
-      return await callExpertAI({ ...body, context: mergeContext(context, { isLightContext: true }) });
+      return await callExpertAI({ ...body, context: mergeContext(context, { isSymptomFlow: true }) });
     }
 
     // =========================================================================
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
     }
 
     if (analysis.type === 'WARNING_LIGHT') {
-      const kbStart = handleWarningLightDetection(analysis.lightId, analysis.severity);
+      const kbStart = handleWarningLightDetection(analysis.lightId, analysis.severity, context);
       if (kbStart) return kbStart;
 
       // If KB can't start (missing light), fall back to AI but persist detectedLightType
@@ -112,7 +113,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       type: 'question',
       text: 'נתקלתי בשגיאה. תוכל לתאר שוב את הבעיה?',
-      options: ['אנסה שוב', 'אעדיף לגשת למוסך']
+      options: ['אנסה שוב', 'אעדיף לגשת למוסך'],
+      context: { lastError: 'ROUTE_ERROR' }
     });
   }
 }

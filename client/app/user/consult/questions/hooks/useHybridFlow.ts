@@ -45,6 +45,7 @@ export function useHybridFlow() {
   const isProcessing = useRef(false);
   // 🔧 FIX: Use ref to track messages for sync access in useCallback
   const messagesRef = useRef<Message[]>([]);
+  const contextRef = useRef<DiagnosticState>(INITIAL_CONTEXT);
 
   // --- Helper to add messages ---
   const addMessage = useCallback((msg: Omit<Message, "id">) => {
@@ -54,32 +55,6 @@ export function useHybridFlow() {
       ...prev,
       messages: messagesRef.current
     }));
-  }, []);
-
-  // --- Success Detection: Check if last AI messages include instruction ---
-  const wasLastMessageInstruction = useCallback((): boolean => {
-    const messages = messagesRef.current;
-    console.log("[HybridFlow] Checking for instruction. Total messages:", messages.length);
-
-    // 🔧 FIX: Check last TWO AI messages (instruction + follow-up question)
-    // Because instruction is followed by "האם הצלחת לבצע?" which is not marked as instruction
-    let aiMessagesFound = 0;
-    for (let i = messages.length - 1; i >= 0 && aiMessagesFound < 2; i--) {
-      const msg = messages[i];
-
-      if (msg.sender === "ai") {
-        aiMessagesFound++;
-        console.log(`[HybridFlow] AI Message ${aiMessagesFound}: type=${msg.type}, isInstruction=${msg.isInstruction}`);
-
-        // If any of the last 2 AI messages is an instruction, return true
-        if (msg.type === "instruction" || msg.isInstruction === true) {
-          console.log("[HybridFlow] Found instruction in recent messages!");
-          return true;
-        }
-      }
-    }
-    console.log("[HybridFlow] No instruction found in last 2 AI messages");
-    return false;
   }, []);
 
   // --- Main API Call ---
@@ -96,107 +71,7 @@ export function useHybridFlow() {
       addMessage({ sender: "user", text: userText, images });
     }
 
-    // 🔧 FIX: Intercept success responses after instructions to ask about light
-    const successPhrases = [
-      "כן, הצלחתי", "הצלחתי",
-      "כן, עשיתי", "עשיתי",
-      "כן, מילאתי", "מילאתי",
-      "כן, ניסיתי", "ניסיתי",
-      "כן, בדקתי", "בדקתי",
-      "כן, ביצעתי", "ביצעתי"
-    ];
-    const isSuccessResponse = successPhrases.some(phrase =>
-      userText.includes(phrase) || userText === phrase
-    );
-
-    if (isSuccessResponse && wasLastMessageInstruction()) {
-      // 🔧 NEW: Check actionType to determine flow
-      const actionType = state.context?.lastActionType;
-      console.log("[HybridFlow] Success after instruction - actionType:", actionType);
-
-      if (actionType === "fill") {
-        // Fill action - ask if light turned off
-        console.log("[HybridFlow] Fill action - asking about light status");
-        setTimeout(() => {
-          addMessage({
-            sender: "ai",
-            text: "מעולה! עכשיו בוא נוודא שהבעיה נפתרה. האם נורת האזהרה כבתה?",
-            type: "text"
-          });
-          setState(prev => ({
-            ...prev,
-            status: "WAITING_USER",
-            currentOptions: ["כן, הנורה כבתה", "לא, הנורה עדיין דולקת", "לא בטוח"],
-            context: { ...prev.context, awaitingLightConfirmation: true }
-          }));
-          isProcessing.current = false;
-        }, 500);
-        return; // Skip API call
-      } else {
-        // Inspect action or unknown - continue to AI for next step
-        console.log("[HybridFlow] Inspect action - continuing to AI for next step");
-        // Don't return - let API call continue for next diagnostic question
-      }
-    }
-
-    // 🔧 NEW: Handle failure responses after instructions - continue diagnosis
-    const failurePhrases = [
-      "לא הצלחתי", "לא, לא הצלחתי",
-      "לא עבד", "לא, לא עבד",
-      "הפעולה לא עזרה", "זה לא עזר",
-      "עדיין לא עובד", "לא פתר את הבעיה"
-    ];
-    const isFailureResponse = failurePhrases.some(phrase =>
-      userText.includes(phrase)
-    );
-
-    if (isFailureResponse && wasLastMessageInstruction()) {
-      console.log("[HybridFlow] Failure after instruction detected - continuing diagnosis");
-
-      // Ask AI what to do next, with context that the action failed
-      addMessage({
-        sender: "ai",
-        text: "הבנתי שהפעולה לא עזרה. בוא נבדוק אפשרויות נוספות...",
-        type: "text"
-      });
-
-      // Continue to API but with context that the action failed
-      setState(prev => ({ ...prev, status: "PROCESSING" }));
-      // Don't return - let the API call continue with original text
-      // The AI will understand from history that the action failed
-    }
-
-    // 🔧 FIX: Handle light confirmation responses - go to diagnosis
-    const lightConfirmPhrases = ["כן, הנורה כבתה", "הנורה כבתה", "כן, נעלמה", "נעלמה"];
-    const lightOffConfirmed = lightConfirmPhrases.some(phrase =>
-      userText.includes(phrase)
-    );
-
-    if (lightOffConfirmed) {
-      console.log("[HybridFlow] Light off confirmed - generating success diagnosis");
-
-      addMessage({
-        sender: "ai",
-        type: "mechanic_report",
-        text: "הבעיה נפתרה בהצלחה! הנורה כבתה, מה שמעיד שהפעולה שביצעת פתרה את התקלה.",
-        meta: {
-          diagnosis: {
-            diagnosis: ["הבעיה נפתרה בהצלחה"],
-            recommendations: ["המשך לעקוב אחרי לוח המחוונים", "אם הנורה חוזרת - פנה למוסך"],
-            safety_notice: null
-          }
-        }
-      });
-      setState(prev => ({
-        ...prev,
-        status: "FINISHED",
-        currentOptions: []
-      }));
-      isProcessing.current = false;
-      return;
-    }
-
-    setState(prev => ({ ...prev, status: "PROCESSING" }));
+    setState(prev => ({ ...prev, status: "PROCESSING", currentOptions: [] }));
 
     try {
       // 🔧 FIX: Build Q&A pairs for prompt context
@@ -204,18 +79,19 @@ export function useHybridFlow() {
       const messages = messagesRef.current.filter(m => m.sender !== "system");
       const conversationHistory: { question: string; answer: string }[] = [];
 
-      // Pair AI messages (questions) with following user messages (answers)
-      for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
-        if (msg.sender === "ai") {
-          // Find the next user message as the answer
-          const nextUserMsg = messages.slice(i + 1).find(m => m.sender === "user");
-          if (nextUserMsg) {
-            conversationHistory.push({
-              question: msg.text,
-              answer: nextUserMsg.text
-            });
-          }
+      for (let i = 0; i < messages.length - 1; i++) {
+        const q = messages[i];
+        const a = messages[i + 1];
+
+        const isAiQuestion =
+          q.sender === "ai" &&
+          q.type !== "instruction" &&
+          q.type !== "mechanic_report" &&
+          q.type !== "safety_instruction" &&
+          q.isInstruction !== true;
+
+        if (isAiQuestion && a.sender === "user") {
+          conversationHistory.push({ question: q.text, answer: a.text });
         }
       }
 
@@ -228,11 +104,11 @@ export function useHybridFlow() {
       // 2. Call the Smart Router
       // 🔧 FIX: ALWAYS send context - it contains critical state like detectedLightType
       console.log("[HybridFlow] 📤 Sending context:", {
-        detectedLightType: state.context.detectedLightType,
-        currentLightScenario: state.context.currentLightScenario,
-        currentScenarioId: state.context.currentScenarioId,
-        currentStepId: state.context.currentStepId,
-        causeScores: state.context.causeScores
+        detectedLightType: contextRef.current.detectedLightType,
+        currentLightScenario: contextRef.current.currentLightScenario,
+        currentScenarioId: contextRef.current.currentScenarioId,
+        currentStepId: contextRef.current.currentStepId,
+        causeScores: contextRef.current.causeScores
       });
 
       const response = await fetch("/api/ai/questions", {
@@ -242,7 +118,7 @@ export function useHybridFlow() {
           message: userText,
           description: initialDescription, // 🔧 FIX: Always send initial problem description
           image_urls: images,
-          context: state.context, // 🔧 CRITICAL: Always send full context
+          context: contextRef.current, // 🔧 CRITICAL: Always send full context
           // 🔧 FIX: Always send conversation history for AI continuity
           answers: conversationHistory,
           vehicle: vehicleInfo
@@ -252,72 +128,46 @@ export function useHybridFlow() {
       const data = await response.json();
       console.log("[HybridFlow] Server Response:", data);
 
-      // 🔧 FIX: Clean merge approach for context updates
-      // This handles all fields including hybrid mode (currentQuestionText, currentQuestionOptions, optionMapAttempts, mode, bridgeAttempts)
-      const serverContext = data.context ?? {};
+      // 🔧 FIX: Unified context merge using contextRef as source of truth
+      const serverContext: Partial<DiagnosticState> = data.context ?? {};
+      const currentContext = contextRef.current;
 
-      // Top-level fields that may exist on data directly (not nested in context)
+      // Patch שדות שעלולים להגיע בטופ-לבל (אצלכם לפעמים מגיעים גם מחוץ ל-context)
       const topLevelPatch: Partial<DiagnosticState> = {};
 
-      // Light type handling with smart protection
-      const currentLight = state.context.detectedLightType;
-      const newLightFromData = data.detectedLightType;
-      const newLightFromContext = serverContext.detectedLightType;
+      const currentLight = currentContext.detectedLightType;
+      const newLightFromData = (data as any).detectedLightType;
+      const newLightFromContext = (serverContext as any).detectedLightType;
       const newLight = newLightFromData || newLightFromContext;
 
-      // Only update light type if:
-      // - No current light, OR
-      // - Current is 'unidentified_light' and new is specific, OR
-      // - New is specific (not 'unidentified_light')
-      const shouldUpdateLight = newLight && (
-        !currentLight ||
-        (currentLight === 'unidentified_light' && newLight !== 'unidentified_light') ||
-        (currentLight !== 'unidentified_light' && newLight !== 'unidentified_light')
-      );
+      const shouldPreserveCurrentLight =
+        currentLight &&
+        currentLight !== "unidentified_light" &&
+        newLight === "unidentified_light";
 
-      // Don't let 'unidentified_light' overwrite a specific light type
-      const shouldPreserveCurrentLight = currentLight &&
-        currentLight !== 'unidentified_light' &&
-        newLight === 'unidentified_light';
+      const shouldUpdateLight =
+        newLight &&
+        (!currentLight ||
+          (currentLight === "unidentified_light" && newLight !== "unidentified_light") ||
+          (currentLight !== "unidentified_light" && newLight !== "unidentified_light"));
 
       if (shouldUpdateLight && !shouldPreserveCurrentLight) {
-        topLevelPatch.detectedLightType = newLight;
-        console.log("[HybridFlow] 💡 Updating light type:", currentLight, "→", newLight);
+        (topLevelPatch as any).detectedLightType = newLight;
       }
 
-      // Other top-level fields
-      if (data.lightSeverity) topLevelPatch.lightSeverity = data.lightSeverity;
-      if (data.kbSource !== undefined) topLevelPatch.kbSource = data.kbSource;
-      if (data.isLightContext !== undefined) topLevelPatch.isLightContext = data.isLightContext;
+      if ((data as any).lightSeverity) (topLevelPatch as any).lightSeverity = (data as any).lightSeverity;
+      if ((data as any).kbSource !== undefined) (topLevelPatch as any).kbSource = (data as any).kbSource;
+      if ((data as any).isLightContext !== undefined) (topLevelPatch as any).isLightContext = (data as any).isLightContext;
 
-      // Merge: prev.context <- serverContext <- topLevelPatch
-      // This preserves existing values while allowing server updates
       const mergedContext: DiagnosticState = {
-        ...state.context,
+        ...currentContext,
         ...serverContext,
-        ...topLevelPatch
+        ...topLevelPatch,
+        ...(shouldPreserveCurrentLight ? { detectedLightType: currentLight } : {}),
       };
 
-      // Protect light type from being overwritten by unidentified_light
-      if (shouldPreserveCurrentLight) {
-        mergedContext.detectedLightType = currentLight;
-      }
-
-      // Update state with merged context
-      const hasContextChanges = JSON.stringify(mergedContext) !== JSON.stringify(state.context);
-      if (hasContextChanges) {
-        setState(prev => ({
-          ...prev,
-          context: {
-            ...prev.context,
-            ...serverContext,
-            ...topLevelPatch,
-            // Protect light type
-            ...(shouldPreserveCurrentLight ? { detectedLightType: currentLight } : {})
-          }
-        }));
-        console.log("[HybridFlow] 📝 Context merged. New fields:", Object.keys(serverContext));
-      }
+      // Single source of truth
+      contextRef.current = mergedContext;
 
       // 3. Handle Response Types
 
@@ -364,7 +214,8 @@ export function useHybridFlow() {
           setState(prev => ({
             ...prev,
             status: "FINISHED",
-            currentOptions: []
+            currentOptions: [],
+            context: mergedContext
           }));
         } else {
           // Safety warning but conversation can continue (e.g., overheating -> scenario)
@@ -374,7 +225,7 @@ export function useHybridFlow() {
             currentOptions: ["הבנתי, אמשיך בזהירות"],
             // Store nextScenarioId in context for later use
             context: {
-              ...prev.context,
+              ...mergedContext,
               pendingScenarioId: data.nextScenarioId
             }
           }));
@@ -385,7 +236,7 @@ export function useHybridFlow() {
       // --- B. Scenario Step (Next Question) ---
       else if (data.type === "scenario_step" || data.type === "scenario_start") {
         // Update context from server
-        const newContext = data.context || state.context;
+        const newContext = mergedContext;
         const stepData = data.step || data.data; // Handle different payload structures
         const stepText = stepData?.text || stepData?.question || "שאלה הבאה...";
 
@@ -431,18 +282,6 @@ export function useHybridFlow() {
           }
         });
 
-        // Update context with safety instruction state
-        if (data.context) {
-          setState(prev => ({
-            ...prev,
-            context: {
-              ...prev.context,
-              ...data.context,
-              lastActionType: 'critical'
-            }
-          }));
-        }
-
         // Add the followup question after a delay
         if (data.question) {
           setTimeout(() => {
@@ -455,6 +294,10 @@ export function useHybridFlow() {
               ...prev,
               status: "WAITING_USER",
               currentOptions: data.options || ['כן, עצרתי', 'אני בדרך לעצור', 'לא יכול לעצור'],
+              context: {
+                ...mergedContext,
+                lastActionType: "critical"
+              }
             }));
           }, 2000); // 2 second delay for critical safety messages
         } else {
@@ -462,6 +305,10 @@ export function useHybridFlow() {
             ...prev,
             status: "WAITING_USER",
             currentOptions: data.options || ['הבנתי', 'צריך עזרה נוספת'],
+            context: {
+              ...mergedContext,
+              lastActionType: "critical"
+            }
           }));
         }
       }
@@ -499,7 +346,8 @@ export function useHybridFlow() {
         setState(prev => ({
           ...prev,
           status: "FINISHED",
-          currentOptions: [] // No more questions
+          currentOptions: [], // No more questions
+          context: mergedContext
         }));
       }
 
@@ -528,6 +376,7 @@ export function useHybridFlow() {
           ...prev,
           status: "WAITING_USER",
           currentOptions: options.length > 0 ? options : defaultOptions,
+          context: mergedContext
         }));
       }
 
@@ -554,25 +403,6 @@ export function useHybridFlow() {
           } : undefined
         });
 
-        // 🔧 NEW: Update context with instruction state from server
-        if (isInstruction && data.context) {
-          setState(prev => ({
-            ...prev,
-            context: {
-              ...prev.context,
-              ...data.context,
-              lastActionType: data.actionType
-            }
-          }));
-          console.log("[HybridFlow] 📋 Instruction context updated:", data.actionType, data.actionId);
-        } else if (isInstruction && data.actionType) {
-          setState(prev => ({
-            ...prev,
-            context: { ...prev.context, lastActionType: data.actionType }
-          }));
-          console.log("[HybridFlow] Stored actionType:", data.actionType);
-        }
-
         // If instruction, we might get a follow-up question immediately or need to re-ask
         if (isInstruction && data.question) {
           // Add the follow-up question as a separate message after a delay
@@ -586,6 +416,10 @@ export function useHybridFlow() {
               ...prev,
               status: "WAITING_USER",
               currentOptions: data.options || ['הצלחתי', 'לא הצלחתי', 'צריך עזרה'],
+              context: {
+                ...mergedContext,
+                ...(isInstruction ? { lastActionType: data.actionType } : {})
+              }
             }));
           }, 1500); // 🔧 Increased delay to give user time to read instruction
         } else {
@@ -595,6 +429,10 @@ export function useHybridFlow() {
             currentOptions: isInstruction
               ? ['הצלחתי לבצע', 'לא הצלחתי', 'צריך עזרה נוספת']  // 🔧 Default options for instructions
               : options,
+            context: {
+              ...mergedContext,
+              ...(isInstruction ? { lastActionType: data.actionType } : {})
+            }
           }));
         }
       }
@@ -606,7 +444,7 @@ export function useHybridFlow() {
     } finally {
       isProcessing.current = false;
     }
-  }, [state.context, addMessage]);
+  }, [addMessage]);
 
   // --- Initializer ---
   const initFlow = useCallback((description: string, images: string[], vehicle: any) => {

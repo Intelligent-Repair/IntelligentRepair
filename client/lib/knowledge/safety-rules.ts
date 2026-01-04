@@ -10,10 +10,10 @@ export const SAFETY_RULES: SafetyRule[] = [
   {
     id: 'brakes_fail',
     // מילות מפתח ספציפיות יותר כדי להימנע מ-false positives (לא רק "בלמים")
-    keywords: ['אין בלמים', 'הבלמים לא עובדים', 'דוושה רכה', 'לא עוצר', 'דוושה ירדה לרצפה', 'רעש מתכתי בבלימה', 'איבוד בלמים', 'אין ברקסים', 'בלמים נכשלו', 'בלמים לא תופסים'],
-    message: 'עצור מיד! בעיה בבלמים היא סכנת חיים מיידית. אין להמשיך בנסיעה אפילו מטר אחד. הזמן גרר.',
+    keywords: ['אין בלמים', 'הבלמים לא עובדים', 'בלמים לא עובדים', 'דוושה רכה', 'דוושה ספוגית', 'דוושה שוקעת', 'לא עוצר', 'דוושה ירדה לרצפה', 'איבוד בלמים', 'אין ברקסים', 'בלמים נכשלו', 'בלמים לא תופסים', 'אין עצירה'],
+    message: 'עצור במקום בטוח בהקדם! בעיה בבלמים היא סכנת חיים. אל תמשיך בנסיעה. הזמן גרר.',
     level: 'CRITICAL',
-    endConversation: true, // סוגר את הצ'אט כי אין מה לתקן לבד
+    endConversation: true,
     followUpMessage: 'מצוין שעצרת. כיוון שמדובר בתקלת בטיחות קריטית בבלמים, לא נוכל להמשיך בדיאגנוסטיקה. אנא הזמן גרר והמתן במקום בטוח.'
   },
   {
@@ -27,16 +27,16 @@ export const SAFETY_RULES: SafetyRule[] = [
   {
     id: 'smoke_fire',
     // מילות מפתח לזיהוי עשן/אש - כוללות גם וריאציות נפוצות
-    keywords: ['יוצא עשן', 'עשן מהמנוע', 'יש עשן', 'עשן יוצא', 'אש ברכב', 'שרוף', 'ריח שרוף', 'מנוע מעשן', 'להבות', 'גיצים', 'ריח של פלסטיק שרוף', 'עשן שחור', 'עשן לבן', 'רואה עשן'],
-    message: 'סכנת התלקחות! כבה את המנוע מיד, צא מהרכב, התרחק למרחק בטחון והזמן מכבי אש (102).',
+    keywords: ['יוצא עשן', 'עשן מהמנוע', 'יש עשן', 'עשן יוצא', 'אש ברכב', 'אש', 'מנוע מעשן', 'להבות', 'גיצים', 'ניצוצות', 'עשן שחור', 'רואה עשן'],
+    message: 'עצור במקום בטוח, כבה את המנוע מיד, צא מהרכב, התרחק למרחק בטחון והזמן מכבי אש (102).',
     level: 'CRITICAL',
     endConversation: true,
     followUpMessage: 'שמור מרחק מהרכב! אם יש נפגעים הזמן מד"א (101). אל תתקרב לרכב עד להגעת כוחות ההצלה.'
   },
   {
     id: 'fuel_leak',
-    keywords: ['ריח דלק', 'ריח בנזין', 'נזילת דלק', 'שלולית דלק', 'ריח חריף של דלק', 'ריח חזק של דלק'],
-    message: 'סכנת פיצוץ/דליקה! ריח חריף של דלק מעיד על דליפה. כבה מנוע מיד ואל תנסה להניע שוב. התרחק מהרכב.',
+    keywords: ['ריח דלק', 'ריח בנזין', 'ריח בנזין חזק', 'ריח סולר חזק', 'נזילת דלק', 'דלק מטפטף', 'שלולית דלק', 'ריח חריף של דלק', 'ריח חזק של דלק'],
+    message: 'חשד לדליפת דלק! כבה את המנוע מיד ואל תנסה להניע שוב. התרחק מהרכב ואל תעשן או תדליק אש בקרבתו.',
     level: 'CRITICAL',
     endConversation: true,
     followUpMessage: 'התרחק מהרכב ואל תעשן או תדליק אש בקרבתו. הזמן שירותי דרך לטיפול בדליפה.'
@@ -54,36 +54,33 @@ export const SAFETY_RULES: SafetyRule[] = [
       'רתיחה',
       'המנוע רותח',
       'מים רותחים',
-      'עשן לבן מהמנוע',
-      'עשן לבן יוצא',
       'נוזל קירור נשפך',
       'נוזל קירור על הרצפה',
       'מים יוצאים מהמנוע',
       'ריח מתוק חזק' // ריח נוזל קירור
     ],
-    message: '🚨 סכנה מיידית! עצור בצד הדרך מיד, כבה את המנוע ואל תפתח את מכסה המנוע בשום מצב! קיטור או אדים מעידים על רתיחה - סכנת כוויות קשה. התרחק מהרכב והזמן גרר.',
+    message: '🚨 חשד לרתיחה! עצור בצד הדרך מיד, כבה את המנוע ואל תפתח את מכסה המנוע בשום מצב! סכנת כוויות. התרחק מהרכב והזמן גרר.',
     level: 'CRITICAL',
-    endConversation: true, // סיום שיחה מיידי - אין מה לעשות לבד
-    followUpMessage: 'עצרת במקום בטוח? מצוין. אל תפתח את מכסה המנוע או פקק הרדיאטור עד שהמנוע יתקרר לחלוטין (לפחות 30 דקות). הזמן גרר למוסך - זו תקלה שמחייבת טיפול מקצועי.'
+    endConversation: true,
+    followUpMessage: 'עצרת במקום בטוח? מצוין. אל תפתח את מכסה המנוע או פקק הרדיאטור עד שהמנוע יתקרר לחלוטין (לפחות 30 דקות). הזמן גרר למוסך.'
   },
   {
     id: 'overheating_severe',
-    // מילות מפתח להתחממות שאינה רתיחה מוחלטת - ניתן להמשיך בזהירות
-    keywords: ['רכב מתחמם', 'המנוע מתחמם', 'מחוג חום באדום', 'נורת חום אדומה', 'התחממות יתר', 'נורת טמפרטורה אדומה', 'מד חום עולה', 'טמפרטורה גבוהה'],
-    message: 'סכנה למנוע ולנהג. עצור בצד בבטחה וכבה מנוע. זהירות: אסור לפתוח את פקק הרדיאטור כשהמנוע חם - סכנת כוויות קשה!',
+    // מילות מפתח להתחממות שאינה רתיחה - מד חום, נורה אדומה
+    keywords: ['מחוג חום באדום', 'נורת חום אדומה', 'נורת טמפרטורה אדומה', 'מד חום עולה', 'מד חום גבוה', 'מחוג באדום'],
+    message: 'חשד להתחממות יתר! עצור בצד בבטחה וכבה את המנוע. אסור לפתוח את פקק הרדיאטור כשהמנוע חם - סכנת כוויות.',
     level: 'CRITICAL',
-    // --- המקרה המיוחד: כאן אנחנו ממשיכים בשיחה ---
     endConversation: false,
-    nextScenarioId: 'overheating', // מפנה לתרחיש בדיקת מים/מאוורר
+    nextScenarioId: 'overheating',
     followUpMessage: 'יופי, עכשיו כשהרכב כבוי והמנוע מתקרר, נוכל לבצע אבחון בזהירות. בוא נתחיל.'
   },
   {
     id: 'oil_pressure',
-    keywords: ['נורת שמן אדומה', 'לחץ שמן', 'אין שמן', 'מנורת קומקום', 'נורת שמן מהבהבת', 'נורית שמן'],
-    message: 'סכנה מיידית למנוע! נורת לחץ שמן אדומה מעידה על חוסר שימון. המשך נסיעה (אפילו דקה) יהרוס את המנוע כליל. דומם מנוע מיד.',
+    keywords: ['נורת שמן אדומה', 'לחץ שמן', 'אין שמן', 'מנורת קומקום', 'נורת שמן מהבהבת', 'נורית שמן', 'מנורת אלדין אדומה'],
+    message: 'חשד לבעיית לחץ שמן קריטית! עצור וכבה את המנוע מיד. המשך נסיעה עלול לגרום לנזק חמור למנוע. הזמן גרר.',
     level: 'CRITICAL',
     endConversation: true,
-    followUpMessage: 'הצלת את המנוע שלך בכך שעצרת. הזמן גרר למוסך לטיפול בלחץ השמן.'
+    followUpMessage: 'עצרת? מצוין. הזמן גרר למוסך לטיפול בבעיית השימון.'
   },
 
   // =================================================================

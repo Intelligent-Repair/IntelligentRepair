@@ -63,19 +63,65 @@ function matchOption(questionOptions: unknown, userAnswer: string): { id?: strin
     const opts: KBOption[] = Array.isArray(questionOptions) ? questionOptions : [];
     if (opts.length === 0) return null;
 
-    // exact match by label
+    // 0) Numeric index selection ("1", "2", ...)
+    const idx = Number(ans);
+    if (Number.isFinite(idx) && idx >= 1 && idx <= opts.length) {
+        const opt = opts[idx - 1];
+        return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
+    }
+
+    // 1) exact match by label
     for (const opt of opts) {
         const label = norm(optionLabel(opt));
         if (!label) continue;
         if (ans === label) return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
     }
 
-    // partial match: user typed only part of label
+    // 2) partial match: answer contains label or a stable prefix of it
     for (const opt of opts) {
-        const label = norm(optionLabel(opt));
-        if (!label) continue;
-        if (label.length >= 6 && ans.includes(label.slice(0, 6))) return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
-        if (ans.includes(label)) return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
+        const labelNorm = norm(optionLabel(opt));
+        if (!labelNorm) continue;
+
+        // if user typed only the beginning of the label
+        if (labelNorm.length >= 6 && ans.includes(labelNorm.slice(0, 6))) {
+            return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
+        }
+
+        // if user included the whole label
+        if (ans.includes(labelNorm)) {
+            return { id: optionId(opt) ?? undefined, label: optionLabel(opt) };
+        }
+    }
+
+    return null;
+}
+
+function mapPolarityFromMapping(
+    mappingObj: any,
+    answerRaw: string
+): { polarity: 'yes' | 'no' | 'unknown' | 'uncertain_probable'; source: string } | null {
+    if (!mappingObj || typeof mappingObj !== 'object') return null;
+
+    const a = norm(answerRaw);
+    if (!a) return null;
+
+    // try exact key match by normalized keys
+    for (const [k, v] of Object.entries(mappingObj)) {
+        const key = norm(k);
+        if (!key) continue;
+
+        // exact match or answer begins-with key (e.g. "כן, ..." / "לא, ...")
+        if (a === key || a.startsWith(key + ' ')) {
+            const val = String(v);
+            if (val === 'confirms') return { polarity: 'yes', source: 'KB_answers' };
+            if (val === 'rules_out') return { polarity: 'no', source: 'KB_answers' };
+            if (val === 'unknown') return { polarity: 'unknown', source: 'KB_answers' };
+            if (val === 'uncertain_probable') return { polarity: 'uncertain_probable', source: 'KB_answers' };
+            // if mapping already stores polarity words:
+            if (val === 'yes') return { polarity: 'yes', source: 'KB_answers' };
+            if (val === 'no') return { polarity: 'no', source: 'KB_answers' };
+            return null;
+        }
     }
 
     return null;
@@ -202,34 +248,32 @@ export function updateScores(
         return newScores;
     }
 
-    // Check for explicit score_mapping in KB first
+    // Prefer explicit KB answer mapping (key_question.answers) when available
+    const answersMapping = cause.key_question?.answers;
     const scoreMapping = cause.key_question?.score_mapping;
-    let polarity: 'yes' | 'no' | 'unknown' | 'uncertain_probable';
+
+    let polarity: 'yes' | 'no' | 'unknown' | 'uncertain_probable' = 'unknown';
     let mappingSource = 'heuristic';
 
-    if (scoreMapping && typeof scoreMapping === 'object') {
-        const mapping = scoreMapping[answer];
-        if (mapping === 'confirms') {
-            polarity = 'yes';
-            mappingSource = 'KB_mapping';
-        } else if (mapping === 'rules_out') {
-            polarity = 'no';
-            mappingSource = 'KB_mapping';
-        } else if (mapping === 'unknown') {
-            polarity = 'unknown';
-            mappingSource = 'KB_mapping';
-        } else if (mapping === 'uncertain_probable') {
-            // NEW: For high-probability causes that can't be ruled out
-            // e.g., "לא בדקתי" for low_oil_level - doesn't confirm but doesn't rule out
-            polarity = 'uncertain_probable';
+    // 1) New/standard schema: key_question.answers: { "כן": "confirms", "לא": "rules_out", ... }
+    const fromAnswers = mapPolarityFromMapping(answersMapping, answer);
+    if (fromAnswers) {
+        polarity = fromAnswers.polarity;
+        mappingSource = fromAnswers.source;
+    } else if (scoreMapping && typeof scoreMapping === 'object') {
+        // 2) Optional schema: key_question.score_mapping
+        const fromScoreMap = mapPolarityFromMapping(scoreMapping, answer);
+        if (fromScoreMap) {
+            polarity = fromScoreMap.polarity;
             mappingSource = 'KB_mapping';
         } else {
-            // Fallback to heuristic (for backward compatibility)
             polarity = answerPolarity(answer);
+            mappingSource = 'heuristic';
         }
     } else {
-        // No score_mapping in KB, use heuristic
+        // 3) Heuristic fallback
         polarity = answerPolarity(answer);
+        mappingSource = 'heuristic';
     }
 
     const base = typeof cause.probability === 'number' ? cause.probability : 0.5;
@@ -263,12 +307,15 @@ export function updateScores(
  * 2. Either: high enough score OR max questions reached
  */
 export function shouldDiagnose(scores: Record<string, number>, count: number, severity: string): boolean {
-    const maxScore = Math.max(...Object.values(scores), 0);
-    const scoreCount = Object.values(scores).filter(s => s !== 0).length; // How many causes have non-zero scores
+    const values = Object.values(scores);
+    const maxScore = Math.max(...values, 0);
+
+    // count only "positive evidence" (ignore negative scores)
+    const positiveCount = values.filter(s => s > 0.25).length;
     const maxQ = severity === 'danger' ? MAX_QUESTIONS.danger : MAX_QUESTIONS.caution;
 
     // Log for debugging
-    console.log(`[shouldDiagnose] count=${count}/${maxQ} | maxScore=${maxScore.toFixed(2)} | scoredCauses=${scoreCount} | threshold=${DIAGNOSIS_THRESHOLD}`);
+    console.log(`[shouldDiagnose] count=${count}/${maxQ} | maxScore=${maxScore.toFixed(2)} | positiveCount=${positiveCount} | threshold=${DIAGNOSIS_THRESHOLD}`);
 
     // Don't diagnose until we've asked minimum questions (prevents premature diagnosis)
     if (count < MIN_QUESTIONS_BEFORE_DIAGNOSIS) {
@@ -280,7 +327,7 @@ export function shouldDiagnose(scores: Record<string, number>, count: number, se
     // - High score from multiple confirming answers
     // - OR max questions reached
     if (severity === 'danger') {
-        if (maxScore >= DIAGNOSIS_THRESHOLD && scoreCount >= 2) {
+        if (maxScore >= DIAGNOSIS_THRESHOLD && positiveCount >= 2) {
             console.log(`[shouldDiagnose] ✅ Danger mode: high score with multiple confirmations`);
             return true;
         }
