@@ -1,33 +1,16 @@
-/**
- * Prompt builder for AI consultation flow
- *
- * Anti-Gravity Design (Hybrid Modes):
- * - KB_COORDINATION: When detectedLightType exists → inject only that light's KB slice.
- * - OPTION_MAPPER: Map free-text answers to predefined option labels.
- * - BRIDGE_TO_KB: Ask up to 3 questions to identify warning_light or scenario.
- * - EXPERT_FALLBACK: General expertise when KB bridging fails.
- *
- * All modes return JSON only (no Markdown).
- */
+// Prompt builder for AI consultation flow
+// Modes: KB_COORDINATION (light detected), BRIDGE_TO_KB (identifying), EXPERT_FALLBACK
+// All modes return JSON only
 
 import type { UserAnswer } from './types';
 import { sanitizeInput } from './sanitize';
 import warningLightsKB from '@/lib/knowledge/warning-lights.json';
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
 export interface PromptContext {
-  mode?: 'option_map' | 'bridge' | 'expert' | null;
-  currentQuestionOptions?: string[];
+  mode?: 'bridge' | 'expert' | null;
   bridgeQuestionCount?: number;
   [key: string]: unknown;
 }
-
-// =============================================================================
-// INTERNAL HELPERS
-// =============================================================================
 
 const MAX_ANSWERS_CHARS = 2000;
 
@@ -39,21 +22,15 @@ function clampText(s: string, max: number): string {
 function buildAnswersContext(answers: UserAnswer[]): string {
   if (!answers || answers.length === 0) return 'אין תשובות קודמות.';
   const recent = answers.slice(-6);
-
   const lines = recent.map((a, idx) => {
     const q = clampText((a as any)?.question ?? '', 120);
     const ans = clampText((a as any)?.answer ?? '', 120);
     return `${idx + 1}) Q: "${q}" | A: "${ans}"`;
   });
-
   return clampText(lines.join('\n'), MAX_ANSWERS_CHARS);
 }
 
-/**
- * Surgical KB injection:
- * - If targetLightId exists, inject ONLY that light JSON.
- * - Else inject a minimal list for identification (with symbol/colors for BRIDGE mode).
- */
+// Inject KB context: full slice for detected light, or minimal list for identification
 function buildKnowledgeBaseContext(targetLightId?: string | null): string {
   const lights = warningLightsKB as Record<string, any>;
 
@@ -62,7 +39,6 @@ function buildKnowledgeBaseContext(targetLightId?: string | null): string {
     return JSON.stringify({ lightId: targetLightId, lightData }, null, 2);
   }
 
-  // 🔧 Enhanced: Include symbol and colors for identification in BRIDGE mode
   const list = Object.entries(lights).map(([lightId, lightData]) => ({
     lightId,
     names_he: lightData?.names?.he ?? [],
@@ -74,54 +50,36 @@ function buildKnowledgeBaseContext(targetLightId?: string | null): string {
   return JSON.stringify({ available_lights: list }, null, 2);
 }
 
-/**
- * JSON-only response contract shared by all modes.
- */
-function jsonOnlyContract(mode: string): string {
-  if (mode === 'OPTION_MAPPER') {
-    return `
-Return ONLY a valid JSON object. No markdown, no extra text.
-
-Schema for OPTION_MAPPER mode:
-{
-  "type": "option_map",
-  "selectedOptionLabel": "<exact label from options | null>",
-  "needClarification": "<clarifying question string | null>"
-}
-
-Rules:
-- selectedOptionLabel MUST be exactly one of the provided option labels, or null if no match.
-- If you are not 100% sure which option matches, return selectedOptionLabel: null.
-- If selectedOptionLabel is null, needClarification MUST be a short question in Hebrew that helps choose between the options.
-- If selectedOptionLabel is not null, needClarification MUST be null.
-`.trim();
-  }
-
+// JSON contract for AI responses
+function jsonOnlyContract(): string {
   return `
 Return ONLY a valid JSON object. No markdown, no extra text.
 
 Schema:
 {
   "type": "question" | "ai_response",
-  "warning_light"?: "<lightId>",
   "text": "<string>",
-  "options"?: ["<string>", ...]
+  "options"?: ["<string>", ...],
+
+  "candidate"?: {
+    "warning_light"?: "<lightId>",
+    "scenario_id"?: "<scenarioId>",
+    "confidence": 0.0,
+    "evidence": ["<short reason>", ...]
+  }
 }
 
 Rules:
-- Do NOT invent technical diagnosis.
-- If you choose a warning_light, it must be one of the provided KB IDs.
-- If detectedLightType exists, ONLY use the KB slice injected for that light.
-- Always include options as an array of strings when type is "question".
+- Return ONLY valid JSON. No markdown, no extra text.
+- Do NOT output hard diagnosis as fact. Treat everything as suggestion.
+- If you include candidate.warning_light it MUST be one of the provided KB IDs.
+- If detectedLightType exists (KB_COORDINATION), you may ONLY reference that injected light.
+- If type is "question", you MUST include "options" (array of strings).
+- Keep text concise and in Hebrew.
 `.trim();
 }
 
-/**
- * Try to pick a followup question based on the user's last answer and KB structure.
- * Supports:
- * - new: first_question.followups[optionId]
- * - old: first_question.followup_for_steady / followup_for_flashing
- */
+// Pick followup question based on option.id only (no text heuristics)
 function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | null {
   const last = (lastAnswerRaw || '').toLowerCase().trim();
   const idxNum = Number(last);
@@ -130,7 +88,6 @@ function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | n
   const firstQ = lightData?.first_question;
   if (!firstQ) return null;
 
-  // New structure: followups map keyed by optionId
   const options = Array.isArray(firstQ.options) ? firstQ.options : [];
   const followups = firstQ.followups;
 
@@ -140,7 +97,7 @@ function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | n
       : options.find((o: any) => {
         const id = String(o?.id ?? '').toLowerCase();
         const label = String(o?.label ?? o ?? '').toLowerCase();
-        return (id && last.includes(id)) || (label && last.includes(label));
+        return (id && last.includes(id)) || (label && last === label);
       });
 
     if (matched) {
@@ -149,32 +106,10 @@ function suggestFollowupQuestion(lightData: any, lastAnswerRaw: string): any | n
     }
   }
 
-  // Old structure fallback
-  if (last.includes('מהבהב') || last.includes('flashing')) {
-    const f = firstQ.followup_for_flashing;
-    if (f?.text) return f;
-  }
-  if (last.includes('קבוע') || last.includes('steady')) {
-    const f = firstQ.followup_for_steady;
-    if (f?.text) return f;
-  }
-
   return null;
 }
 
-// =============================================================================
-// MAIN EXPORTS
-// =============================================================================
-
-/**
- * Build prompt for chat-based AI coordination.
- *
- * Modes resolved internally:
- * - OPTION_MAPPER: ctx.mode === 'option_map' with ctx.currentQuestionOptions
- * - KB_COORDINATION: detectedLightType present
- * - IMAGE_IDENTIFICATION: hasImages && no detected light
- * - BRIDGE_TO_KB: no light, trying to identify
- */
+// Build prompt for chat AI coordination
 export function buildChatPrompt(
   description: string,
   answers: UserAnswer[],
@@ -186,36 +121,13 @@ export function buildChatPrompt(
   const sanitizedDescription = sanitizeInput(description || '', 1000);
   const answersContext = buildAnswersContext(answers);
 
-  // -------------------------------------------------------------------------
-  // MODE: OPTION_MAPPER
-  // -------------------------------------------------------------------------
-  if (ctx?.mode === 'option_map' && Array.isArray(ctx.currentQuestionOptions) && ctx.currentQuestionOptions.length > 0) {
-    const optionsList = ctx.currentQuestionOptions.map((o, i) => `${i + 1}. "${o}"`).join('\n');
-
-    return `
-You are an Option Mapper assistant.
-
-User's free-text answer:
-"${sanitizedDescription}"
-
-Available options (choose EXACTLY one label or null):
-${optionsList}
-
-${jsonOnlyContract('OPTION_MAPPER')}
-`.trim();
-  }
-
-  // -------------------------------------------------------------------------
-  // MODE: KB_COORDINATION / IMAGE_IDENTIFICATION / BRIDGE_TO_KB
-  // -------------------------------------------------------------------------
   const lights = warningLightsKB as Record<string, any>;
   const lightData = detectedLightType ? lights[detectedLightType] : null;
   const lightHebrewName = lightData?.names?.he?.[0] || detectedLightType || '';
 
   const kbContext = buildKnowledgeBaseContext(detectedLightType);
 
-  const needsImageIdentification =
-    hasImages && (!detectedLightType || detectedLightType === 'unidentified_light');
+  const needsImageIdentification = hasImages && !detectedLightType;
 
   const lastAnswer = (answers?.[answers.length - 1] as any)?.answer ?? '';
   const followup = lightData ? suggestFollowupQuestion(lightData, lastAnswer) : null;
@@ -223,7 +135,7 @@ ${jsonOnlyContract('OPTION_MAPPER')}
   let mode: string;
   if (needsImageIdentification) {
     mode = 'IMAGE_IDENTIFICATION';
-  } else if (detectedLightType && detectedLightType !== 'unidentified_light') {
+  } else if (detectedLightType) {
     mode = 'KB_COORDINATION';
   } else {
     mode = 'BRIDGE_TO_KB';
@@ -248,7 +160,7 @@ Detected warning light (if any): ${detectedLightType ? `"${detectedLightType}" (
 ${mode === 'IMAGE_IDENTIFICATION' ? `
 Instructions for IMAGE_IDENTIFICATION:
 - Identify the warning_light ID from the provided available_lights list.
-- Return a JSON object with type="question", include warning_light, and ask the first KB question if possible.
+- Return JSON with type="question", include candidate.warning_light with confidence and evidence.
 - Do NOT guess if unclear; ask the user to describe the light.
 ` : ''}
 
@@ -264,16 +176,16 @@ Followup hint (if present): ${followup?.text ? `"${followup.text}"` : 'none'}
 ` : ''}
 
 ${mode === 'BRIDGE_TO_KB' ? `
-Instructions for BRIDGE_TO_KB (CRITICAL - READ CAREFULLY):
+Instructions for BRIDGE_TO_KB:
 
-⚠️ FORBIDDEN in BRIDGE_TO_KB mode:
+⚠️ FORBIDDEN:
 - You MUST NOT output type="diagnosis_report" or type="mechanic_report"
 - You MUST NOT give technical advice or diagnose the problem
 - You MUST NOT invent warning lights not in available_lights
 
-✅ ALLOWED outputs (choose ONE):
+✅ ALLOWED outputs:
 A) If you are HIGHLY CONFIDENT which warning light matches:
-   Return { type: "question", warning_light: "<lightId from available_lights>", text: "<first KB question>", options: [...] }
+   Return { type: "question", candidate: { warning_light: "<lightId>", confidence: 0.8, evidence: ["reason"] }, text: "<first KB question>", options: [...] }
 
 B) If you need more information to identify the light:
    Return { type: "question", text: "<clarifying question in Hebrew>", options: ["<max 4 short Hebrew phrases>"] }
@@ -285,26 +197,19 @@ Clarifying questions should focus on:
 - When it appeared (e.g., "האם הנורה נדלקה תוך כדי נסיעה או בהתנעה?")
 
 Remaining bridge questions allowed: ${remainingBridgeQuestions}
-If remainingBridgeQuestions is 0 and you still cannot identify, return type="question" with warning_light="unidentified_light".
+If remainingBridgeQuestions is 0 and you still cannot identify: return type="question" WITHOUT warning_light, and include options asking the user to choose a light from available_lights.
 ` : ''}
 
 KB Context (JSON):
 ${kbContext}
 
-${jsonOnlyContract(mode)}
+${jsonOnlyContract()}
 `.trim();
 
   return instruction;
 }
 
-/**
- * Build prompt for expert fallback mode.
- *
- * Used when:
- * - context-analyzer returns CONSULT_AI
- * - No recognized light or scenario in KB
- * - Bridge attempts exhausted
- */
+// Build prompt for expert fallback mode
 export function buildGeneralExpertPrompt(
   description: string,
   answers: UserAnswer[],
@@ -316,71 +221,89 @@ export function buildGeneralExpertPrompt(
   const kbContext = buildKnowledgeBaseContext(null);
   const questionCount = answers.length;
 
+  // Build detailed conversation history like mechanic-summary does
+  const conversationHistory = answers.length > 0
+    ? answers.map(a => `שאלה: ${a.question}\nתשובה: ${a.answer}`).join('\n\n')
+    : 'אין שאלות קודמות';
+
   const instruction = `
-You are an EXPERT_FALLBACK assistant for car diagnostics.
+אתה מומחה לאבחון רכב. תפקידך לאבחן בעיות ברכב על סמך תיאור המשתמש.
 
-Mode: EXPERT_FALLBACK
-
-User input:
+## הבעיה שהמשתמש מתאר
 "${sanitizedDescription}"
 
-Recent Q/A history (${questionCount} questions asked so far):
-${answersContext}
+## היסטוריית שיחה (${questionCount} שאלות נשאלו)
+${conversationHistory}
 
-${hasImages ? 'Note: User provided an image. Describe what you see if relevant.\n' : ''}
+${hasImages ? '## תמונה: המשתמש צירף תמונה. נתח אותה לזיהוי נזק, נזילות, או נורות אזהרה.\n' : ''}
 
-Instructions:
-${questionCount >= 5 ? `
-- You have gathered enough information (${questionCount} questions). NOW provide a diagnosis_report.
-- Return type: "diagnosis_report" with results array.
+## כללים חשובים
+1. **זהה את הקטגוריה**: האם הבעיה קשורה לגיר/תמסורת, מנוע, בלמים, חשמל, היגוי, או קירור?
+2. **שאל שאלות ממוקדות**: שאל רק שאלות רלוונטיות לקטגוריה שזיהית.
+3. **תן אפשרויות ספציפיות**: לא "כן/לא" גנריות, אלא אפשרויות שמתארות מצבים אמיתיים.
+4. **אחרי 3-5 שאלות**: תן אבחון ספציפי עם אחוז סבירות.
+
+## דוגמאות לזיהוי קטגוריה ושאלות רלוונטיות
+
+### אם המשתמש מזכיר: הילוך, גיר, תקוע על הילוך, לא עולה הילוך →  קטגוריה: תמסורת
+שאלות לשאול:
+- "האם הגיר שלך אוטומטי או ידני?" → אפשרויות: ["גיר אוטומטי", "גיר ידני", "לא בטוח"]
+- "האם יש נורת אזהרה דולקת בלוח המחוונים?" → אפשרויות: ["כן, נורה צהובה/כתומה", "כן, נורה אדומה", "לא, אין נורות", "לא שמתי לב"]
+- "האם יש ריח חריגה או נזילה מתחת לרכב?" → אפשרויות: ["כן, יש ריח שריפה", "כן, יש נזילה", "לא, הכל נראה תקין"]
+
+### אם המשתמש מזכיר: רעש, רעידות, צפצוף →  קטגוריה: מנוע/בלמים/מתלים
+שאלות לשאול:
+- "מתי אתה שומע את הרעש?" → אפשרויות: ["בהתנעה", "בנהיגה", "בבלימה", "תמיד"]
+- "איך נשמע הרעש?" → אפשרויות: ["נקישות מתכתיות", "חריקה", "שריקה", "דפיקות מהמנוע"]
+
+### אם המשתמש מזכיר: לא נדלק, מצבר, התנעה →  קטגוריה: חשמל
+שאלות לשאול:
+- "מה קורה כשמנסה להתניע?" → אפשרויות: ["שקט מוחלט", "שומע קליקים", "המנוע מסתובב אבל לא נדלק", "הכל עובד חוץ מהמנוע"]
+
+## מה לעשות עכשיו
+${questionCount >= 4 ? `
+שאלת ${questionCount} שאלות - זה מספיק מידע. עכשיו תן אבחון!
+חובה: החזר type: "diagnosis_report" עם:
+- results: רשימה של אבחונים עם probability (למשל: "תקלה בתיבת ההילוכים האוטומטית" 0.65)
+- אסור לכתוב "נדרש אבחון מקצועי" כאבחון ראשי! תן אבחון אמיתי בהתבסס על מה שלמדת.
+` : questionCount >= 2 ? `
+יש לך קצת מידע. שאל עוד 1-2 שאלות ממוקדות לפני האבחון.
 ` : `
-- Ask clarifying questions to understand the problem better.
-- IMPORTANT: Provide 3-4 VARIED options, NOT just "כן/לא". Include specific symptoms, actions, or descriptions.
-- Example good options: ["כן, יש טפטוף קבוע", "לא, אבל יש כתם על הרצפה", "לא בדקתי", "לא בטוח"]
-- If the user indicates they want to go to a mechanic or end the conversation, provide a diagnosis_report.
+זו תחילת השיחה. זהה את הקטגוריה ושאל שאלה ראשונה רלוונטית.
 `}
-- If you can map the description to a warning_light ID from available_lights, include warning_light in the JSON.
-- Be safety-conscious: if something sounds dangerous, immediately advise stopping and return diagnosis_report.
 
-Available lights (JSON):
-${kbContext}
+## פורמט תגובה (JSON בלבד!)
 
-Return ONLY a valid JSON object. No markdown, no extra text.
-
-Schema for questions:
+לשאלה:
 {
   "type": "question",
-  "text": "<question string>",
-  "options": ["<varied option 1>", "<varied option 2>", "<varied option 3>", "<varied option 4>"]
+  "text": "שאלה בעברית",
+  "options": ["אפשרות ספציפית 1", "אפשרות ספציפית 2", "אפשרות ספציפית 3", "לא בטוח"]
 }
 
-Schema for diagnosis (use when ${questionCount >= 5 ? 'NOW - enough questions asked' : 'user wants to end or dangerous situation'}):
+לאבחון (אחרי ${questionCount >= 4 ? 'עכשיו!' : '3-5 שאלות'}):
 {
   "type": "diagnosis_report",
-  "title": "אבחון: <problem summary>",
+  "title": "אבחון: <תיאור ספציפי של הבעיה>",
   "results": [
-    { "issue": "<diagnosis 1>", "probability": 0.7, "explanation": "<why>" },
-    { "issue": "<diagnosis 2>", "probability": 0.2, "explanation": "<why>" }
+    {"issue": "תקלה בתיבת ההילוכים האוטומטית", "probability": 0.65, "explanation": "בהתבסס על כך שהרכב תקוע על הילוך 1"},
+    {"issue": "בעיה במערכת ההידראולית של הגיר", "probability": 0.25, "explanation": "סיבה אפשרית נוספת"}
   ],
-  "confidence": 0.75,
-  "status": { "color": "yellow", "text": "<severity text>", "instruction": "<action to take>" },
-  "nextSteps": "<recommended next steps>",
-  "recommendations": ["<specific check 1>", "<specific check 2>"],
+  "confidence": 0.7,
+  "status": {"color": "yellow", "text": "מומלץ בדיקה במוסך", "instruction": "פנה למוסך לאבחון תיבת הילוכים"},
+  "nextSteps": "פנה למוסך מומחה לתיבות הילוכים",
+  "recommendations": ["בדוק שמן גיר", "אל תנסה לכפות החלפת הילוכים"],
   "endConversation": true
 }
+
+## נורות אזהרה זמינות (לרפרנס)
+${kbContext}
 `.trim();
 
   return instruction;
 }
 
-// =============================================================================
-// SHORT DESCRIPTION PROMPT (for from-draft route)
-// =============================================================================
-
-/**
- * Builds a prompt to generate a short description from a diagnosis.
- * Used by /api/requests/from-draft to create a summary for the request.
- */
+// Build prompt to generate short description from diagnosis
 export function buildShortDescriptionPrompt(diagnosis: string): string {
   const safeDiagnosis = sanitizeInput(diagnosis, 2000);
 

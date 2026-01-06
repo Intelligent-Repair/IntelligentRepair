@@ -114,45 +114,6 @@ interface FinalDiagnosisCardProps {
   onOpenMechanicRequest?: () => void;
 }
 
-// Helper: Generate contextual suggestions based on diagnosis
-function getContextualSuggestions(ctx?: DiagnosisContext, topIssue?: string): SelfFixStep[] {
-  const suggestions: SelfFixStep[] = [];
-
-  // Oil-related suggestions
-  if (ctx?.needsOil || ctx?.lightType === 'oil_pressure_light' || topIssue?.includes('oil') || topIssue?.includes("שמן")) {
-    suggestions.push(
-      { step: "בדוק מה סוג השמן שהרכב שלך צריך - זה כתוב על מכסה השמן או במדריך לרכב", actionType: "inspect" },
-      { step: "התקשר לחבר או בן משפחה שירכוש שמן מתחנת דלק ויביא אליך", actionType: "fill" },
-      { step: "אם יש לך שמן - מלא עד לסימן MAX ונסה להניע", actionType: "fill" }
-    );
-  }
-
-  // Tow-needed suggestions
-  if (ctx?.needsTow) {
-    suggestions.push(
-      { step: "הזמן גרר דרך האפליקציה או הלחצן למטה", actionType: "safety" },
-      { step: "הדלק אורות חירום וחכה במקום בטוח", actionType: "safety" }
-    );
-  }
-
-  // Can drive suggestions
-  if (ctx?.canDrive) {
-    suggestions.push(
-      { step: "ניתן לנסוע בזהירות למוסך קרוב", actionType: "inspect" },
-      { step: "קבע תור למוסך מוכר תוך 1-2 ימים", actionType: "inspect" }
-    );
-  }
-
-  // General suggestions if nothing specific
-  if (suggestions.length === 0) {
-    suggestions.push(
-      { step: "צלם תמונה של לוח מכשירים למוסך", actionType: "inspect" },
-      { step: "התקשר למוסך מוכר לקביעת תור", actionType: "inspect" }
-    );
-  }
-
-  return suggestions;
-}
 
 // --- Animation Variants ---
 const containerVariants = {
@@ -400,28 +361,30 @@ export default function FinalDiagnosisCard({
       ? summary
       : [...(summary?.detected || []), ...(summary?.reported || [])].join('. '));
 
+  // Sort results by probability (descending) for reliability
   const safeResults = Array.isArray(results) ? results : [];
-  const topDiagnosis = safeResults[0];
-  const additionalResults = safeResults.slice(1); // Show ALL additional results
+  const normProb = (p: number) => {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 0;
+    const v = n > 1 ? n / 100 : n;
+    return Math.max(0, Math.min(1, v));
+  };
+  const sortedResults = [...safeResults].sort((a, b) => normProb(b.probability) - normProb(a.probability));
+  const topDiagnosis = sortedResults[0];
+  const additionalResults = sortedResults.slice(1);
 
-  // Probability helpers
-  const normProb = (p: number) => (p > 1 ? p / 100 : p);
+  // Probability to percentage helper
   const pct = (p: number) => Math.round(normProb(p) * 100);
 
-  // Normalize selfFix to handle string[] or object[]
-  const providedSelfFix = (Array.isArray(selfFix) ? selfFix : [])
+  // Normalize selfFix to handle string[] or object[] - NO client-side generation
+  const normalizedSelfFix = (Array.isArray(selfFix) ? selfFix : [])
     .map(item => typeof item === "string" ? { step: item, actionType: "inspect" } : item)
     .filter((x: any) => typeof x?.step === "string" && x.step.trim().length > 0);
 
-  // Use contextual suggestions if no selfFix provided
-  const contextualSuggestions = getContextualSuggestions(diagnosisContext, topDiagnosis?.issue);
-  const normalizedSelfFix = providedSelfFix.length > 0 ? providedSelfFix : contextualSuggestions;
-
-  // Filter recommendations - remove generic "go to mechanic" items
+  // Filter recommendations - dedupe and trim only, keep all real recommendations
   const filteredRecommendations = Array.isArray(recommendations)
     ? [...new Set(recommendations)]
       .filter(x => typeof x === "string" && x.trim().length > 0)
-      .filter(x => !/(מומלץ לפנות למוסך|פנה למוסך|לך למוסך)/i.test(x))
     : [];
 
   // Get status config with fallback
@@ -534,7 +497,7 @@ export default function FinalDiagnosisCard({
                     <Stethoscope size={24} className="text-blue-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-white truncate">{cleanTitle}</h3>
+                    <h3 className="text-lg font-bold text-white truncate">אבחון תקלה</h3>
                   </div>
                 </div>
 
@@ -549,20 +512,6 @@ export default function FinalDiagnosisCard({
 
             {/* Content */}
             <div className="p-6 space-y-5">
-
-              {/* Summary Card - What was detected/reported */}
-              {summaryText && summaryText.trim().length > 0 && (
-                <motion.div
-                  variants={itemVariants}
-                  className="rounded-xl p-4 bg-white/[0.03] border border-white/10"
-                >
-                  <div className="flex items-center gap-2 mb-2 text-white/60">
-                    <Info size={16} />
-                    <span className="text-sm font-medium">אז מה זיהינו בעצם?</span>
-                  </div>
-                  <p className="text-sm text-white/70 leading-relaxed">{summaryText}</p>
-                </motion.div>
-              )}
 
               {/* Top Diagnosis */}
               {topDiagnosis && (
@@ -605,6 +554,22 @@ export default function FinalDiagnosisCard({
                       <p className="text-sm text-white/60 leading-relaxed">{reasoning}</p>
                     </div>
                   </div>
+                </motion.div>
+              )}
+
+              {/* Mechanic Summary Preview - transparency for what gets sent */}
+              {conversationSummaries?.mechanic?.formattedText && (
+                <motion.div
+                  variants={itemVariants}
+                  className="rounded-xl p-4 bg-white/[0.02] border border-white/5"
+                >
+                  <div className="flex items-center gap-2 mb-2 text-white/50">
+                    <Wrench size={14} />
+                    <span className="text-xs font-medium">מה יישלח למוסך?</span>
+                  </div>
+                  <p className="text-xs text-white/40 leading-relaxed whitespace-pre-wrap">
+                    {conversationSummaries.mechanic.formattedText}
+                  </p>
                 </motion.div>
               )}
 
@@ -719,15 +684,17 @@ export default function FinalDiagnosisCard({
                 </motion.div>
               )}
 
-              {/* Action Buttons - mechanic button always visible */}
+              {/* Action Buttons - hide mechanic button when resolved */}
               <motion.div variants={itemVariants} className="flex gap-3 pt-2">
-                <button
-                  onClick={onOpenMechanicRequest}
-                  className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
-                >
-                  <span>פתח פנייה למוסך</span>
-                  <Wrench size={18} />
-                </button>
+                {status?.color !== 'green' && (
+                  <button
+                    onClick={onOpenMechanicRequest}
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
+                  >
+                    <span>פתח פנייה למוסך</span>
+                    <Wrench size={18} />
+                  </button>
+                )}
                 {shouldShowTow && (
                   <button
                     onClick={() => setShowTowingModal(true)}

@@ -1,4 +1,5 @@
 {
+    "schemaVersion": 2,
     "battery_light": {
         "severity": "critical",
         "names": {
@@ -122,29 +123,41 @@
                         "followup_question": {
                             "text": "מה המצב?",
                             "options": [
-                                "כיביתי הכל ובדרך למוסך",
-                                "הרכב כבה לפני שהגעתי",
-                                "עדיין בדרך",
-                                "אני לא יכול להגיע למוסך"
+                                {
+                                    "id": "on_way_to_mechanic",
+                                    "label": "כיביתי הכל ובדרך למוסך"
+                                },
+                                {
+                                    "id": "car_died",
+                                    "label": "הרכב כבה לפני שהגעתי"
+                                },
+                                {
+                                    "id": "still_driving",
+                                    "label": "עדיין בדרך"
+                                },
+                                {
+                                    "id": "cant_reach_mechanic",
+                                    "label": "אני לא יכול להגיע למוסך"
+                                }
                             ],
                             "resolution_paths": {
-                                "כיביתי הכל ובדרך למוסך": {
+                                "on_way_to_mechanic": {
                                     "status": "resolved_temp",
                                     "diagnosis": "✅ פעלת נכון - הפחתת עומס מרוויחה זמן",
                                     "recommendation": "המשך ישירות למוסך. אל תכבה את המנוע עד שמגיע!"
                                 },
-                                "הרכב כבה לפני שהגעתי": {
+                                "car_died": {
                                     "status": "needs_tow",
                                     "diagnosis": "המצבר התרוקן - האלטרנטור לא טען",
-                                    "recommendation": "הזמן גרר. אל תנסה להניע עם כבלים - הרכב יכבה שוב בנסיעה."
+                                    "recommendation": "הזמן גרר."
                                 },
-                                "עדיין בדרך": {
+                                "still_driving": {
                                     "status": "pending",
-                                    "message": "המשך למקום בטוח/מוסך קרוב ככל האפשר. אם מתחילים סימנים של היחלשות חשמל (אורות נחלשים/לוח מחוונים כבה/הגה נהיה כבד) — עצור במקום בטוח והזמן גרר."
+                                    "message": "המשך למוסך. אם אורות נחלשים — עצור והזמן גרר."
                                 },
-                                "אני לא יכול להגיע למוסך": {
+                                "cant_reach_mechanic": {
                                     "status": "needs_tow",
-                                    "recommendation": "עצור במקום בטוח והזמן גרר. נסיעה ממושכת תגרום לרכב לכבות."
+                                    "recommendation": "עצור במקום בטוח והזמן גרר."
                                 }
                             }
                         }
@@ -164,30 +177,42 @@
                         "followup_question": {
                             "text": "האם הרצועה נראית שלמה או קרועה?",
                             "options": [
-                                "שלמה ומתוחה",
-                                "קרועה או חסרה",
-                                "רפויה מאוד",
-                                "לא מצאתי אותה"
+                                {
+                                    "id": "intact",
+                                    "label": "שלמה ומתוחה"
+                                },
+                                {
+                                    "id": "torn_missing",
+                                    "label": "קרועה או חסרה"
+                                },
+                                {
+                                    "id": "loose",
+                                    "label": "רפויה מאוד"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי אותה"
+                                }
                             ],
                             "resolution_paths": {
-                                "שלמה ומתוחה": {
+                                "intact": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "רצועה תקינה - ייתכן אלטרנטור תקול",
-                                    "recommendation": "הזמן גרר למוסך. האלטרנטור לא עובד."
+                                    "recommendation": "הזמן גרר למוסך."
                                 },
-                                "קרועה או חסרה": {
+                                "torn_missing": {
                                     "status": "needs_tow",
                                     "diagnosis": "⛔ רצועה קרועה - אסור להניע!",
-                                    "recommendation": "הזמן גרר מיד. ללא רצועה, גם הגה הכוח ומשאבת המים לא יעבדו!"
+                                    "recommendation": "הזמן גרר מיד."
                                 },
-                                "רפויה מאוד": {
+                                "loose": {
                                     "status": "needs_tow",
-                                    "diagnosis": "רצועה רפויה - לא מסובבת את האלטרנטור כראוי",
-                                    "recommendation": "הזמן גרר. נסיעה עם רצועה רפויה תגרום לה להיקרע."
+                                    "diagnosis": "רצועה רפויה",
+                                    "recommendation": "הזמן גרר."
                                 },
-                                "לא מצאתי אותה": {
+                                "not_found": {
                                     "status": "needs_tow",
-                                    "recommendation": "הזמן גרר למוסך לאבחון מקצועי."
+                                    "recommendation": "הזמן גרר למוסך."
                                 }
                             }
                         },
@@ -208,30 +233,42 @@
                         "followup_question": {
                             "text": "מה מצאת בבדיקת החיבורים?",
                             "options": [
-                                "חיבור רופף - הידקתי",
-                                "יש קורוזיה (אבקה לבנה/ירקרקה)",
-                                "הכל נראה תקין",
-                                "לא הצלחתי לבדוק"
+                                {
+                                    "id": "tightened",
+                                    "label": "חיבור רופף - הידקתי"
+                                },
+                                {
+                                    "id": "corrosion",
+                                    "label": "יש קורוזיה (אבקה לבנה/ירקרקה)"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "הכל נראה תקין"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
                             ],
                             "resolution_paths": {
-                                "חיבור רופף - הידקתי": {
+                                "tightened": {
                                     "status": "needs_verification",
                                     "next_action": "verify_terminals_fixed",
                                     "message": "הנע את הרכב ובדוק אם הנורה כבתה."
                                 },
-                                "יש קורוזיה (אבקה לבנה/ירקרקה)": {
+                                "corrosion": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "קורוזיה על חיבורי המצבר",
-                                    "recommendation": "ניתן לנקות עם סודה ומים, אך מומלץ לפנות למוסך לניקוי מקצועי."
+                                    "recommendation": "מומלץ לפנות למוסך לניקוי."
                                 },
-                                "הכל נראה תקין": {
+                                "all_ok": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "ייתכן אלטרנטור או מצבר תקולים",
-                                    "recommendation": "פנה למוסך לבדיקת מערכת הטעינה."
+                                    "recommendation": "פנה למוסך לבדיקה."
                                 },
-                                "לא הצלחתי לבדוק": {
+                                "cant_check": {
                                     "status": "needs_mechanic",
-                                    "recommendation": "פנה למוסך לבדיקה מקצועית."
+                                    "recommendation": "פנה למוסך לבדיקה."
                                 }
                             }
                         }
@@ -250,24 +287,33 @@
                         "followup_question": {
                             "text": "מה קרה אחרי ההתנעה?",
                             "options": [
-                                "✅ הנורה כבתה!",
-                                "הנורה עדיין דולקת",
-                                "לא ניסיתי עדיין"
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_try",
+                                    "label": "לא ניסיתי עדיין"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הנורה כבתה!": {
+                                "light_off": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: חיבורי מצבר היו רופפים",
-                                    "recommendation": "נסע למוסך לבדיקה מקצועית של החיבורים. ייתכן שצריך ניקוי או החלפה."
+                                    "recommendation": "נסע למוסך לבדיקה."
                                 },
-                                "הנורה עדיין דולקת": {
+                                "still_on": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "הבעיה לא בחיבורי המצבר - ייתכן אלטרנטור או מצבר תקולים",
-                                    "recommendation": "פנה למוסך לבדיקת מערכת הטעינה."
+                                    "diagnosis": "הבעיה לא בחיבורי המצבר",
+                                    "recommendation": "פנה למוסך לבדיקה."
                                 },
-                                "לא ניסיתי עדיין": {
+                                "didnt_try": {
                                     "status": "pending",
-                                    "message": "הנע את הרכב ובדוק אם הנורה כבתה. אם כבתה - נפתר! אם לא - פנה למוסך."
+                                    "message": "הנע את הרכב ובדוק אם הנורה כבתה."
                                 }
                             }
                         }
@@ -357,32 +403,39 @@
                         "followup_question": {
                             "text": "מה מצב חיבורי המצבר?",
                             "options": [
-                                "יש אבקה לבנה/ירקרקה",
-                                "חיבורים רופפים",
-                                "הכל נראה תקין ומהודק",
-                                "לא הצלחתי לבדוק"
+                                {
+                                    "id": "has_corrosion",
+                                    "label": "יש אבקה לבנה/ירקרקה"
+                                },
+                                {
+                                    "id": "loose",
+                                    "label": "חיבורים רופפים"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "הכל נראה תקין ומהודק"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
                             ],
                             "resolution_paths": {
-                                "יש אבקה לבנה/ירקרקה": {
+                                "has_corrosion": {
                                     "status": "needs_more_info",
                                     "next_action": "clean_terminals",
-                                    "message": "קורוזיה על הקטבים עלולה למנוע מעבר זרם. נסה לנקות."
+                                    "message": "קורוזיה עלולה למנוע מעבר זרם. נסה לנקות."
                                 },
-                                "חיבורים רופפים": {
+                                "loose": {
                                     "status": "needs_more_info",
-                                    "message": "נסה להדק את החיבורים ואז להניע.",
-                                    "next_steps": [
-                                        "הדק את הקטבים עם מפתח מתאים",
-                                        "נסה להניע את הרכב",
-                                        "אם הצליח - פנה למוסך לבדיקת החיבורים"
-                                    ]
+                                    "message": "נסה להדק את החיבורים ולהניע."
                                 },
-                                "הכל נראה תקין ומהודק": {
+                                "all_ok": {
                                     "status": "needs_more_info",
                                     "next_action": "jump_start",
                                     "message": "ייתכן שהמצבר פרוק. נסה הנעה עם כבלים."
                                 },
-                                "לא הצלחתי לבדוק": {
+                                "cant_check": {
                                     "status": "needs_more_info",
                                     "next_action": "jump_start",
                                     "message": "נסה הנעה עם כבלים."
@@ -408,22 +461,31 @@
                         "followup_question": {
                             "text": "מה קרה אחרי הניקוי?",
                             "options": [
-                                "✅ ניקיתי והרכב התניע!",
-                                "ניקיתי אבל עדיין לא מניע",
-                                "לא הצלחתי לנקות"
+                                {
+                                    "id": "cleaned_started",
+                                    "label": "✅ ניקיתי והרכב התניע!"
+                                },
+                                {
+                                    "id": "cleaned_not_started",
+                                    "label": "ניקיתי אבל עדיין לא מניע"
+                                },
+                                {
+                                    "id": "couldnt_clean",
+                                    "label": "לא הצלחתי לנקות"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ ניקיתי והרכב התניע!": {
+                                "cleaned_started": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: קורוזיה מנעה מעבר זרם",
-                                    "recommendation": "פנה למוסך לניקוי יסודי ובדיקת מצב המצבר. בדוק שוב בעוד יום-יומיים."
+                                    "recommendation": "פנה למוסך לניקוי יסודי."
                                 },
-                                "ניקיתי אבל עדיין לא מניע": {
+                                "cleaned_not_started": {
                                     "status": "needs_more_info",
                                     "next_action": "jump_start",
                                     "message": "המצבר כנראה פרוק. נסה הנעה עם כבלים."
                                 },
-                                "לא הצלחתי לנקות": {
+                                "couldnt_clean": {
                                     "status": "needs_more_info",
                                     "next_action": "jump_start",
                                     "message": "נסה הנעה עם כבלים."
@@ -448,34 +510,41 @@
                         "followup_question": {
                             "text": "מה קרה אחרי שניסית להתניע עם הכבלים?",
                             "options": [
-                                "✅ הרכב התניע והנורה כבתה",
-                                "הרכב התניע אבל הנורה עדיין דולקת",
-                                "הרכב לא התניע בכלל",
-                                "אין לי כבלים / רכב עזר"
+                                {
+                                    "id": "started_light_off",
+                                    "label": "✅ הרכב התניע והנורה כבתה"
+                                },
+                                {
+                                    "id": "started_light_on",
+                                    "label": "הרכב התניע אבל הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_start",
+                                    "label": "הרכב לא התניע בכלל"
+                                },
+                                {
+                                    "id": "no_cables",
+                                    "label": "אין לי כבלים / רכב עזר"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הרכב התניע והנורה כבתה": {
+                                "started_light_off": {
                                     "status": "resolved_temp",
                                     "diagnosis": "✅ נפתר זמנית: מצבר חלש/מפורק",
-                                    "recommendation": "נסע כ-20 דקות לטעינת המצבר. אם הנורה חוזרת בנסיעה = אלטרנטור תקול, פנה למוסך.",
-                                    "next_steps": [
-                                        "נסע 20 דקות רצופות לטעינה",
-                                        "אל תכבה את המנוע בדרך",
-                                        "פנה למוסך לבדיקת המצבר - ייתכן שצריך החלפה"
-                                    ]
+                                    "recommendation": "נסע כ-20 דקות לטעינה. אם הנורה חוזרת = אלטרנטור תקול."
                                 },
-                                "הרכב התניע אבל הנורה עדיין דולקת": {
+                                "started_light_on": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "האלטרנטור לא טוען - הרכב יכבה שוב בקרוב",
-                                    "recommendation": "נסע ישירות למוסך הקרוב. כבה צרכנים חשמליים. אל תכבה את המנוע עד שמגיע!",
+                                    "diagnosis": "האלטרנטור לא טוען",
+                                    "recommendation": "נסע ישירות למוסך. כבה צרכנים חשמליים.",
                                     "drive_ok": true
                                 },
-                                "הרכב לא התניע בכלל": {
+                                "didnt_start": {
                                     "status": "needs_tow",
-                                    "diagnosis": "מצבר גמור לחלוטין או סטארטר תקול",
-                                    "recommendation": "הזמן גרר למוסך. אם שומעים קליק אחד בלבד - ייתכן סטארטר."
+                                    "diagnosis": "מצבר גמור או סטרטר תקול",
+                                    "recommendation": "הזמן גרר."
                                 },
-                                "אין לי כבלים / רכב עזר": {
+                                "no_cables": {
                                     "status": "needs_tow",
                                     "recommendation": "התקשר לשירותי דרך או הזמן גרר."
                                 }
@@ -590,20 +659,33 @@
                         "followup_question": {
                             "text": "מה קרה אחרי שחרור בלם היד?",
                             "options": [
-                                "✅ הנורה כבתה!",
-                                "הנורה עדיין דולקת",
-                                "לא בטוח"
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הנורה כבתה!": {
+                                "light_off": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: בלם יד היה משוך",
-                                    "recommendation": "ניתן להמשיך בנסיעה כרגיל."
+                                    "recommendation": "ניתן להמשיך בנסיעה."
                                 },
-                                "הנורה עדיין דולקת": {
+                                "still_on": {
                                     "status": "needs_inspection",
                                     "next_action": "check_brake_fluid",
-                                    "note": "יש לבדוק מפלס נוזל בלמים"
+                                    "message": "יש לבדוק מפלס נוזל בלמים."
+                                },
+                                "unsure": {
+                                    "status": "needs_more_info",
+                                    "message": "בדוק אם בלם היד מורד לגמרי."
                                 }
                             }
                         }
@@ -621,20 +703,33 @@
                         "followup_question": {
                             "text": "מה מפלס הנוזל?",
                             "options": [
-                                "תקין (בין הסימונים)",
-                                "נמוך (מתחת ל-MIN או קרוב אליו)",
-                                "לא מצאתי את המכל"
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין הסימונים)"
+                                },
+                                {
+                                    "id": "low",
+                                    "label": "נמוך (מתחת ל-MIN או קרוב אליו)"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המכל"
+                                }
                             ],
                             "resolution_paths": {
-                                "תקין (בין הסימונים)": {
+                                "normal": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "נוזל תקין אבל הנורה דולקת - ייתכן חיישן או בעיה אחרת",
-                                    "recommendation": "פנה למוסך לבדיקה"
+                                    "diagnosis": "נוזל תקין אבל הנורה דולקת",
+                                    "recommendation": "פנה למוסך לבדיקה."
                                 },
-                                "נמוך (מתחת ל-MIN או קרוב אליו)": {
+                                "low": {
                                     "status": "needs_mechanic_urgent",
-                                    "diagnosis": "⚠️ נוזל בלמים נמוך - לא לנסות למלא לבד!",
-                                    "recommendation": "פנה למוסך מיד. נוזל נמוך עלול להעיד על נזילה או רפידות שחוקות."
+                                    "diagnosis": "⚠️ נוזל בלמים נמוך",
+                                    "recommendation": "פנה למוסך מיד."
+                                },
+                                "not_found": {
+                                    "status": "needs_mechanic",
+                                    "recommendation": "פנה למוסך."
                                 }
                             }
                         },
@@ -721,23 +816,32 @@
                         "followup_question": {
                             "text": "האם הצלחת לעצור בבטחה בצד הדרך?",
                             "options": [
-                                "כן, עצרתי בבטחה",
-                                "לא, עדיין בתנועה",
-                                "כמעט עצרתי"
+                                {
+                                    "id": "stopped_safely",
+                                    "label": "כן, עצרתי בבטחה"
+                                },
+                                {
+                                    "id": "still_moving",
+                                    "label": "לא, עדיין בתנועה"
+                                },
+                                {
+                                    "id": "almost_stopped",
+                                    "label": "כמעט עצרתי"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, עצרתי בבטחה": {
+                                "stopped_safely": {
                                     "status": "wait_and_verify",
                                     "next_action": "check_pedal_feel",
                                     "message": "מצוין! עכשיו נבדוק את מצב הדוושה."
                                 },
-                                "לא, עדיין בתנועה": {
+                                "still_moving": {
                                     "status": "critical",
-                                    "message": "⛔ עצור מיד! השתמש בבלימת מנוע (הורד הילוכים) ובלום בעדינות."
+                                    "message": "⛔ עצור מיד! השתמש בבלימת מנוע."
                                 },
-                                "כמעט עצרתי": {
+                                "almost_stopped": {
                                     "status": "critical",
-                                    "message": "המשך לעצור לגמרי בצד הדרך. אל תמשיך לנסוע!"
+                                    "message": "המשך לעצור לגמרי בצד."
                                 }
                             }
                         }
@@ -755,30 +859,42 @@
                         "followup_question": {
                             "text": "איך הדוושה מרגישה?",
                             "options": [
-                                "הדוושה רכה מאוד או שוקעת עמוק",
-                                "הדוושה מרגישה רגילה",
-                                "צריך כמה לחיצות עד שמתקשה",
-                                "לא בטוח"
+                                {
+                                    "id": "soft_sinking",
+                                    "label": "הדוושה רכה מאוד או שוקעת עמוק"
+                                },
+                                {
+                                    "id": "normal_feel",
+                                    "label": "הדוושה מרגישה רגילה"
+                                },
+                                {
+                                    "id": "needs_pumping",
+                                    "label": "צריך כמה לחיצות עד שמתקשה"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
                             ],
                             "resolution_paths": {
-                                "הדוושה רכה מאוד או שוקעת עמוק": {
+                                "soft_sinking": {
                                     "status": "needs_tow",
-                                    "diagnosis": "⛔ כשל במערכת הבלימה - ייתכן נזילה או אוויר במערכת",
-                                    "recommendation": "הזמן גרר מיד! אסור לנסוע עם בלמים לא תקינים."
+                                    "diagnosis": "⛔ כשל במערכת הבלימה",
+                                    "recommendation": "הזמן גרר מיד!"
                                 },
-                                "הדוושה מרגישה רגילה": {
+                                "normal_feel": {
                                     "status": "needs_more_info",
                                     "next_action": "check_brake_fluid_level",
                                     "message": "הדוושה תקינה - נבדוק את מפלס הנוזל."
                                 },
-                                "צריך כמה לחיצות עד שמתקשה": {
+                                "needs_pumping": {
                                     "status": "needs_tow",
                                     "diagnosis": "אוויר במערכת הבלימה או נזילה",
-                                    "recommendation": "הזמן גרר. המערכת לא בטוחה לנסיעה."
+                                    "recommendation": "הזמן גרר."
                                 },
-                                "לא בטוח": {
+                                "unsure": {
                                     "status": "needs_tow",
-                                    "recommendation": "אם יש ספק לגבי הבלמים - הזמן גרר. אל תסתכן!"
+                                    "recommendation": "אם יש ספק לגבי הבלמים - הזמן גרר."
                                 }
                             }
                         }
@@ -796,25 +912,34 @@
                         "followup_question": {
                             "text": "מה מפלס נוזל הבלמים?",
                             "options": [
-                                "תקין (בין MIN ל-MAX)",
-                                "נמוך מאוד או ריק",
-                                "לא מצאתי את המכל"
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "very_low",
+                                    "label": "נמוך מאוד או ריק"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המכל"
+                                }
                             ],
                             "resolution_paths": {
-                                "תקין (בין MIN ל-MAX)": {
+                                "normal": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "נוזל תקין אך הנורה דולקת - ייתכן חיישן תקול או רפידות שחוקות",
-                                    "recommendation": "פנה למוסך בהקדם. אם הדוושה מרגישה רגילה - ניתן לנסוע בזהירות למוסך קרוב.",
+                                    "diagnosis": "נוזל תקין אך הנורה דולקת",
+                                    "recommendation": "פנה למוסך. אם הדוושה רגילה - אפשר לנסוע בזהירות.",
                                     "drive_ok": true
                                 },
-                                "נמוך מאוד או ריק": {
+                                "very_low": {
                                     "status": "needs_tow",
-                                    "diagnosis": "⚠️ נוזל בלמים נמוך - ייתכן נזילה או רפידות שחוקות מאוד",
-                                    "recommendation": "הזמן גרר! אל תמלא נוזל בעצמך - נוזל נמוך מעיד על בעיה שצריך לאבחן."
+                                    "diagnosis": "⚠️ נוזל בלמים נמוך",
+                                    "recommendation": "הזמן גרר!"
                                 },
-                                "לא מצאתי את המכל": {
+                                "not_found": {
                                     "status": "needs_tow",
-                                    "recommendation": "אם לא ניתן לבדוק ונורת בלמים דולקת - הזמן גרר לבטחון."
+                                    "recommendation": "הזמן גרר לבטחון."
                                 }
                             }
                         },
@@ -977,31 +1102,43 @@
                         "followup_question": {
                             "text": "מה המצב של השמן על המדיד?",
                             "options": [
-                                "באזור MAX - מפלס תקין",
-                                "באזור MIN או מתחתיו - חסר שמן",
-                                "המדיד יבש לחלוטין - אין שמן!",
-                                "לא הצלחתי לבדוק"
+                                {
+                                    "id": "at_max",
+                                    "label": "באזור MAX - מפלס תקין"
+                                },
+                                {
+                                    "id": "at_min",
+                                    "label": "באזור MIN או מתחתיו - חסר שמן"
+                                },
+                                {
+                                    "id": "dry",
+                                    "label": "המדיד יבש לחלוטין - אין שמן!"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
                             ],
                             "resolution_paths": {
-                                "באזור MAX - מפלס תקין": {
+                                "at_max": {
                                     "status": "needs_tow",
-                                    "diagnosis": "מפלס שמן תקין אך הנורה נדלקה בנסיעה - משאבת שמן או חיישן תקולים",
-                                    "recommendation": "הזמן גרר למוסך. אסור להניע את הרכב!"
+                                    "diagnosis": "מפלס תקין אך הנורה נדלקה - משאבת שמן או חיישן תקולים",
+                                    "recommendation": "הזמן גרר. אסור להניע!"
                                 },
-                                "באזור MIN או מתחתיו - חסר שמן": {
+                                "at_min": {
                                     "status": "needs_more_info",
-                                    "message": "יש למלא שמן אם יש לך. בדוק קודם אם יש נזילה מתחת לרכב.",
+                                    "message": "יש למלא שמן אם יש לך. בדוק קודם אם יש נזילה.",
                                     "next_action": "check_under_car"
                                 },
-                                "המדיד יבש לחלוטין - אין שמן!": {
+                                "dry": {
                                     "status": "needs_tow",
                                     "diagnosis": "⛔ המנוע עבד ללא שמן - ייתכן נזק חמור",
-                                    "recommendation": "הזמן גרר מיד. אסור להניע בשום אופן!"
+                                    "recommendation": "הזמן גרר מיד. אסור להניע!"
                                 },
-                                "לא הצלחתי לבדוק": {
+                                "cant_check": {
                                     "status": "needs_tow",
-                                    "diagnosis": "לא ניתן לאבחן את הבעיה",
-                                    "recommendation": "הזמן גרר למוסך לבדיקה מקצועית. אל תניע את הרכב."
+                                    "diagnosis": "לא ניתן לאבחן",
+                                    "recommendation": "הזמן גרר למוסך."
                                 }
                             }
                         }
@@ -1019,24 +1156,33 @@
                         "followup_question": {
                             "text": "האם אתה רואה נזילת שמן מתחת לרכב?",
                             "options": [
-                                "כן, יש נזילה או כתם שמן",
-                                "לא, הכל יבש",
-                                "לא בטוח"
+                                {
+                                    "id": "has_leak",
+                                    "label": "כן, יש נזילה או כתם שמן"
+                                },
+                                {
+                                    "id": "no_leak",
+                                    "label": "לא, הכל יבש"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, יש נזילה או כתם שמן": {
+                                "has_leak": {
                                     "status": "needs_tow",
                                     "diagnosis": "נזילת שמן פעילה - אסור להניע!",
-                                    "recommendation": "הזמן גרר מיד. מילוי שמן לא יעזור אם יש נזילה גדולה."
+                                    "recommendation": "הזמן גרר מיד."
                                 },
-                                "לא, הכל יבש": {
+                                "no_leak": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_oil_gradual_emergency",
-                                    "message": "אם יש לך שמן מתאים, נסה למלא בהדרגה ולבדוק אם הנורה נכבית לאחר התנעה קצרה."
+                                    "message": "אם יש לך שמן מתאים, נסה למלא בהדרגה."
                                 },
-                                "לא בטוח": {
+                                "unsure": {
                                     "status": "needs_tow",
-                                    "recommendation": "אם לא בטוח - הזמן גרר. אל תסתכן בהנעת הרכב."
+                                    "recommendation": "אם לא בטוח - הזמן גרר."
                                 }
                             }
                         }
@@ -1062,30 +1208,42 @@
                         "followup_question": {
                             "text": "מה קרה אחרי המילוי ההדרגתי וההתנעה הקצרה?",
                             "options": [
-                                "✅ מילאתי עד MAX, הנעתי והנורה כבתה!",
-                                "מילאתי אבל הנורה עדיין דולקת",
-                                "מילאתי אבל לא ניסיתי להניע",
-                                "אין לי שמן"
+                                {
+                                    "id": "filled_light_off",
+                                    "label": "✅ מילאתי עד MAX, הנעתי והנורה כבתה!"
+                                },
+                                {
+                                    "id": "filled_light_on",
+                                    "label": "מילאתי אבל הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "filled_didnt_start",
+                                    "label": "מילאתי אבל לא ניסיתי להניע"
+                                },
+                                {
+                                    "id": "no_oil",
+                                    "label": "אין לי שמן"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ מילאתי עד MAX, הנעתי והנורה כבתה!": {
+                                "filled_light_off": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: מפלס שמן היה נמוך",
-                                    "recommendation": "נסע בזהירות למוסך לבדיקה. בדוק למה השמן נעלם (נזילה או צריכה מוגברת). בדוק מפלס שמן כל שבוע.",
+                                    "recommendation": "נסע בזהירות למוסך. בדוק מפלס שמן כל שבוע.",
                                     "drive_ok": true
                                 },
-                                "מילאתי אבל הנורה עדיין דולקת": {
+                                "filled_light_on": {
                                     "status": "needs_tow",
-                                    "diagnosis": "הנורה לא נכבית למרות מילוי - ייתכן משאבת שמן או חיישן תקולים",
-                                    "recommendation": "כבה את המנוע מיד והזמן גרר! אל תנסה לנסוע."
+                                    "diagnosis": "הנורה לא נכבית - משאבת שמן או חיישן תקולים",
+                                    "recommendation": "כבה את המנוע מיד והזמן גרר!"
                                 },
-                                "מילאתי אבל לא ניסיתי להניע": {
+                                "filled_didnt_start": {
                                     "status": "pending",
-                                    "message": "הנע את הרכב לשנייה אחת בלבד ובדוק אם הנורה כבתה. אם לא כבתה - כבה מיד והזמן גרר."
+                                    "message": "הנע לשנייה בלבד ובדוק אם הנורה כבתה."
                                 },
-                                "אין לי שמן": {
+                                "no_oil": {
                                     "status": "needs_tow",
-                                    "recommendation": "הזמן גרר או בקש ממישהו להביא שמן מתחנת דלק קרובה. אל תניע את הרכב ללא שמן!"
+                                    "recommendation": "הזמן גרר או בקש שמן מתחנת דלק."
                                 }
                             }
                         }
@@ -1185,30 +1343,42 @@
                         "followup_question": {
                             "text": "איפה השמן נמצא על המדיד?",
                             "options": [
-                                "באזור MAX (מלא)",
-                                "באזור MIN או מתחתיו (חסר)",
-                                "המדיד יבש לגמרי",
-                                "לא הצלחתי לבדוק"
+                                {
+                                    "id": "at_max",
+                                    "label": "באזור MAX (מלא)"
+                                },
+                                {
+                                    "id": "at_min",
+                                    "label": "באזור MIN או מתחתיו (חסר)"
+                                },
+                                {
+                                    "id": "dry",
+                                    "label": "המדיד יבש לגמרי"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
                             ],
                             "resolution_paths": {
-                                "באזור MAX (מלא)": {
+                                "at_max": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "מפלס שמן תקין אך הנורה דולקת - ייתכן חיישן תקול או פילטר שמן סתום",
-                                    "recommendation": "פנה למוסך לבדיקה. אל תניע עד שתתייעץ עם מכונאי."
+                                    "diagnosis": "מפלס תקין אך הנורה דולקת - חיישן או פילטר סתום",
+                                    "recommendation": "פנה למוסך. אל תניע עד התייעצות."
                                 },
-                                "באזור MIN או מתחתיו (חסר)": {
+                                "at_min": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_oil",
-                                    "message": "יש למלא שמן. המשך לשלב הבא."
+                                    "message": "יש למלא שמן."
                                 },
-                                "המדיד יבש לגמרי": {
+                                "dry": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_oil",
-                                    "message": "⚠️ המנוע ללא שמן! יש למלא מיד לפני כל ניסיון התנעה."
+                                    "message": "⚠️ המנוע ללא שמן! יש למלא מיד."
                                 },
-                                "לא הצלחתי לבדוק": {
+                                "cant_check": {
                                     "status": "needs_mechanic",
-                                    "recommendation": "פנה למוסך או בקש עזרה ממישהו שמכיר רכבים."
+                                    "recommendation": "פנה למוסך או בקש עזרה."
                                 }
                             }
                         }
@@ -1229,31 +1399,32 @@
                         "followup_question": {
                             "text": "האם מילאת שמן?",
                             "options": [
-                                "כן, מילאתי עד MAX",
-                                "אין לי שמן",
-                                "לא יודע איזה שמן להשתמש"
+                                {
+                                    "id": "filled",
+                                    "label": "כן, מילאתי עד MAX"
+                                },
+                                {
+                                    "id": "no_oil",
+                                    "label": "אין לי שמן"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה שמן להשתמש"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, מילאתי עד MAX": {
+                                "filled": {
                                     "status": "needs_verification",
                                     "next_action": "verify_light_off",
                                     "message": "מצוין! עכשיו נבדוק אם הנורה נכבית."
                                 },
-                                "אין לי שמן": {
-                                    "status": "needs_more_info",
-                                    "next_steps": [
-                                        "אל תניע את הרכב בשום אופן!",
-                                        "בקש ממישהו להביא שמן מתחנת דלק קרובה",
-                                        "או הזמן שירותי דרך/גרר"
-                                    ]
+                                "no_oil": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אל תניע. בקש שמן מתחנת דלק או הזמן גרר."
                                 },
-                                "לא יודע איזה שמן להשתמש": {
+                                "dont_know_type": {
                                     "status": "needs_more_info",
-                                    "next_steps": [
-                                        "בדוק במדבקה על המנוע או בספר הרכב",
-                                        "לרוב כתוב משהו כמו 5W-30 או 5W-40",
-                                        "אם לא מוצא - התקשר למוסך או בקש עזרה מעובד בתחנת דלק"
-                                    ]
+                                    "message": "בדוק במדבקה על המנוע או בספר הרכב."
                                 }
                             }
                         }
@@ -1272,24 +1443,33 @@
                         "followup_question": {
                             "text": "האם הנורה כבתה אחרי המילוי וההתנעה?",
                             "options": [
-                                "✅ כן, הנורה כבתה!",
-                                "לא, עדיין דולקת",
-                                "לא ניסיתי"
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ כן, הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "לא, עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_try",
+                                    "label": "לא ניסיתי"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ כן, הנורה כבתה!": {
+                                "light_off": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: מפלס שמן היה נמוך",
-                                    "recommendation": "פנה למוסך בקרוב לבדוק למה השמן נעלם (נזילה או צריכה מוגברת). בדוק מפלס שמן כל שבוע."
+                                    "recommendation": "פנה למוסך לבדוקה. בדוק מפלס שמן כל שבוע."
                                 },
-                                "לא, עדיין דולקת": {
+                                "still_on": {
                                     "status": "needs_tow",
-                                    "diagnosis": "הנורה לא נכבית למרות מילוי - ייתכן חיישן, משאבה או פילטר תקולים",
-                                    "recommendation": "כבה את המנוע מיד והזמן גרר למוסך. אל תנסה לנסוע!"
+                                    "diagnosis": "הנורה לא נכבית - חיישן/משאבה/פילטר תקולים",
+                                    "recommendation": "כבה מיד והזמן גרר!"
                                 },
-                                "לא ניסיתי": {
+                                "didnt_try": {
                                     "status": "pending",
-                                    "message": "הנע את הרכב רק לאחר שווידאת שהמפלס באזור MAX. אם הנורה לא נכבית תוך 3 שניות - כבה מיד."
+                                    "message": "הנע אחרי שווידאת שהמפלס ב-MAX."
                                 }
                             }
                         }
@@ -1431,19 +1611,32 @@
                         "followup_question": {
                             "text": "האם עצרת וכיבית את המנוע?",
                             "options": [
-                                "כן, עצרתי וכיביתי",
-                                "לא, עדיין נוסע",
-                                "כמעט עצרתי"
+                                {
+                                    "id": "stopped",
+                                    "label": "כן, עצרתי וכיביתי"
+                                },
+                                {
+                                    "id": "still_driving",
+                                    "label": "לא, עדיין נוסע"
+                                },
+                                {
+                                    "id": "almost_stopped",
+                                    "label": "כמעט עצרתי"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, עצרתי וכיביתי": {
+                                "stopped": {
                                     "status": "wait_and_verify",
                                     "next_action": "post_cooldown_check",
-                                    "message": "מצוין! המתן 30 דקות עד שהמנוע יתקרר לפני לפתוח את מכסה המנוע."
+                                    "message": "מצוין! המתן 30 דקות עד שהמנוע יתקרר."
                                 },
-                                "לא, עדיין נוסע": {
+                                "still_driving": {
                                     "status": "critical",
-                                    "message": "⛔ עצור מיד! כל דקה נוספת עלולה להרוס את המנוע!"
+                                    "message": "⛔ עצור מיד! כל דקה עלולה להרוס את המנוע!"
+                                },
+                                "almost_stopped": {
+                                    "status": "critical",
+                                    "message": "המשך לעצור לגמרי וכבה את המנוע."
                                 }
                             }
                         },
@@ -1464,30 +1657,42 @@
                         "followup_question": {
                             "text": "מה מצב נוזל הקירור במיכל העיבוי?",
                             "options": [
-                                "תקין (בין MIN ל-MAX)",
-                                "נמוך (מתחת ל-MIN או ריק)",
-                                "יש נזילה/שלולית מתחת לרכב",
-                                "לא מצאתי את המיכל"
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "low",
+                                    "label": "נמוך (מתחת ל-MIN או ריק)"
+                                },
+                                {
+                                    "id": "leak",
+                                    "label": "יש נזילה/שלולית מתחת לרכב"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המיכל"
+                                }
                             ],
                             "resolution_paths": {
-                                "תקין (בין MIN ל-MAX)": {
+                                "normal": {
                                     "status": "needs_verification",
                                     "next_action": "test_after_cooldown",
-                                    "message": "מפלס תקין. נבדוק אם הנורה חוזרת אחרי התנעה."
+                                    "message": "מפלס תקין. נבדוק אם הנורה חוזרת."
                                 },
-                                "נמוך (מתחת ל-MIN או ריק)": {
+                                "low": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_coolant_emergency",
-                                    "message": "יש למלא נוזל קירור. המשך לשלב הבא."
+                                    "message": "יש למלא נוזל קירור."
                                 },
-                                "יש נזילה/שלולית מתחת לרכב": {
+                                "leak": {
                                     "status": "needs_tow",
                                     "diagnosis": "נזילת נוזל קירור פעילה",
-                                    "recommendation": "הזמן גרר מיד. נסיעה עם נזילה תגרום להתחממות חוזרת."
+                                    "recommendation": "הזמן גרר מיד."
                                 },
-                                "לא מצאתי את המיכל": {
+                                "not_found": {
                                     "status": "needs_tow",
-                                    "recommendation": "אם לא ניתן לבדוק - הזמן גרר למוסך לבדיקה מקצועית."
+                                    "recommendation": "הזמן גרר לבדיקה."
                                 }
                             }
                         }
@@ -1509,33 +1714,41 @@
                         "followup_question": {
                             "text": "האם מילאת נוזל קירור?",
                             "options": [
-                                "כן, מילאתי עד MAX",
-                                "כן, מילאתי מים (אין לי נוזל קירור)",
-                                "אין לי נוזל ואין מים",
-                                "לא יודע איזה נוזל"
+                                {
+                                    "id": "filled_coolant",
+                                    "label": "כן, מילאתי עד MAX"
+                                },
+                                {
+                                    "id": "filled_water",
+                                    "label": "כן, מילאתי מים (אין לי נוזל קירור)"
+                                },
+                                {
+                                    "id": "nothing_available",
+                                    "label": "אין לי נוזל ואין מים"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה נוזל"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, מילאתי עד MAX": {
+                                "filled_coolant": {
                                     "status": "needs_verification",
                                     "next_action": "test_after_cooldown",
-                                    "message": "מצוין! עכשיו נבדוק אם הנורה נכבית אחרי התנעה."
+                                    "message": "מצוין! נבדוק אם הנורה נכבית."
                                 },
-                                "כן, מילאתי מים (אין לי נוזל קירור)": {
+                                "filled_water": {
                                     "status": "needs_verification",
                                     "next_action": "test_after_cooldown",
-                                    "message": "מים זה פתרון זמני. נבדוק אם הנורה נכבית, ואז נסע למוסך להחלפה לנוזל קירור אמיתי."
+                                    "message": "מים זה פתרון זמני. נבדוק ואז פנה למוסך להחלפה."
                                 },
-                                "אין לי נוזל ואין מים": {
+                                "nothing_available": {
                                     "status": "needs_tow",
-                                    "recommendation": "אל תניע את הרכב! הזמן גרר או בקש ממישהו להביא מים/נוזל קירור."
+                                    "recommendation": "אל תניע! הזמן גרר או בקש נוזל."
                                 },
-                                "לא יודע איזה נוזל": {
+                                "dont_know_type": {
                                     "status": "needs_more_info",
-                                    "next_steps": [
-                                        "בדוק את צבע הנוזל שנשאר במיכל",
-                                        "או בדוק במדבקה על המיכל/בספר הרכב",
-                                        "בלית ברירה - מים רגילים יעבדו זמנית"
-                                    ]
+                                    "message": "מים רגילים יעבדו זמנית."
                                 }
                             }
                         }
@@ -1555,33 +1768,45 @@
                         "followup_question": {
                             "text": "מה קרה אחרי ההתנעה?",
                             "options": [
-                                "✅ הנורה כבתה ומד החום תקין",
-                                "הנורה עדיין דולקת",
-                                "מד החום עולה מהר מדי",
-                                "הנורה חזרה שוב בזמן נסיעה"
+                                {
+                                    "id": "light_off_ok",
+                                    "label": "✅ הנורה כבתה ומד החום תקין"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "temp_rising_fast",
+                                    "label": "מד החום עולה מהר מדי"
+                                },
+                                {
+                                    "id": "light_returned",
+                                    "label": "הנורה חזרה שוב בזמן נסיעה"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הנורה כבתה ומד החום תקין": {
+                                "light_off_ok": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: מפלס נוזל קירור היה נמוך",
-                                    "recommendation": "פנה למוסך לבדוק למה הנוזל נעלם (נזילה?). בדוק מפלס כל שבוע. אם מילאת מים - החלף לנוזל קירור בהקדם.",
+                                    "recommendation": "פנה למוסך לבדיקה. בדוק מפלס כל שבוע.",
                                     "drive_ok": true
                                 },
-                                "הנורה עדיין דולקת": {
+                                "still_on": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "ייתכן חיישן טמפרטורה תקול",
-                                    "recommendation": "פנה למוסך לבדיקה. אם מד החום תקין - ניתן לנסוע בזהירות.",
+                                    "recommendation": "פנה למוסך. אם מד החום תקין - אפשר לנסוע בזהירות.",
                                     "drive_ok": true
                                 },
-                                "מד החום עולה מהר מדי": {
+                                "temp_rising_fast": {
                                     "status": "needs_tow",
-                                    "diagnosis": "בעיית קירור חמורה - ייתכן נזילה או תרמוסטט תקול",
-                                    "recommendation": "כבה את המנוע מיד והזמן גרר!"
+                                    "diagnosis": "בעית קירור חמורה",
+                                    "recommendation": "כבה מיד והזמן גרר!"
                                 },
-                                "הנורה חזרה שוב בזמן נסיעה": {
+                                "light_returned": {
                                     "status": "needs_tow",
-                                    "diagnosis": "בעיית קירור מתמשכת",
-                                    "recommendation": "הזמן גרר. אל תנסה להמשיך לנסוע!"
+                                    "diagnosis": "בעית קירור מתמשכת",
+                                    "recommendation": "הזמן גרר. אל תנסה להמשיך!"
                                 }
                             }
                         }
@@ -1646,23 +1871,32 @@
                         "followup_question": {
                             "text": "האם המתנת לפחות 20 דקות?",
                             "options": [
-                                "כן, המתנתי",
-                                "לא, עוד לא",
-                                "אני ממתין עכשיו"
+                                {
+                                    "id": "waited",
+                                    "label": "כן, המתנתי"
+                                },
+                                {
+                                    "id": "not_yet",
+                                    "label": "לא, עוד לא"
+                                },
+                                {
+                                    "id": "waiting_now",
+                                    "label": "אני ממתין עכשיו"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, המתנתי": {
+                                "waited": {
                                     "status": "needs_verification",
                                     "next_action": "visual_check_coolant",
                                     "message": "עכשיו ניתן לבדוק את מיכל נוזל הקירור."
                                 },
-                                "לא, עוד לא": {
+                                "not_yet": {
                                     "status": "pending",
-                                    "message": "חשוב להמתין! פתיחת מכסה כשהמנוע חם עלולה לגרום לכוויות חמורות."
+                                    "message": "חשוב להמתין! פתיחת מכסה כשהמנוע חם מסוכנת."
                                 },
-                                "אני ממתין עכשיו": {
+                                "waiting_now": {
                                     "status": "pending",
-                                    "message": "מצוין. המשך להמתין עד שהמנוע יתקרר לגמרי (כ-20-30 דקות)."
+                                    "message": "מצוין. המשך להמתין 20-30 דקות."
                                 }
                             }
                         },
@@ -1682,28 +1916,33 @@
                         "followup_question": {
                             "text": "מה מצב הנוזל במיכל?",
                             "options": [
-                                "ריק/נמוך מאוד",
-                                "יש נוזל לפי הסימון (בין MIN ל-MAX)",
-                                "לא מצאתי את המיכל"
+                                {
+                                    "id": "empty_low",
+                                    "label": "ריק/נמוך מאוד"
+                                },
+                                {
+                                    "id": "normal",
+                                    "label": "יש נוזל לפי הסימון (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המיכל"
+                                }
                             ],
                             "resolution_paths": {
-                                "ריק/נמוך מאוד": {
+                                "empty_low": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_coolant",
-                                    "message": "יש למלא נוזל קירור. המשך לשלב הבא."
+                                    "message": "יש למלא נוזל קירור."
                                 },
-                                "יש נוזל לפי הסימון (בין MIN ל-MAX)": {
+                                "normal": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "נוזל קירור תקין אך הנורה דולקת - ייתכן חיישן טמפרטורה תקול",
-                                    "recommendation": "פנה למוסך לבדיקת החיישן. ניתן לנסוע בזהירות תוך מעקב אחרי מד החום."
+                                    "diagnosis": "נוזל קירור תקין אך הנורה דולקת - ייתכן חיישן תקול",
+                                    "recommendation": "פנה למוסך. אפשר לנסוע בזהירות עם מעקב אחרי מד החום."
                                 },
-                                "לא מצאתי את המיכל": {
+                                "not_found": {
                                     "status": "needs_more_info",
-                                    "next_steps": [
-                                        "חפש מיכל פלסטיק שקוף/חצי שקוף בצד המנוע",
-                                        "לרוב יש עליו סמל של גלים או מילה COOLANT",
-                                        "אם לא מוצא - פנה למוסך או בקש עזרה"
-                                    ]
+                                    "message": "חפש מיכל פלסטיק שקוף בצד המנוע. אם לא מוצא - פנה למוסך."
                                 }
                             }
                         }
@@ -1724,33 +1963,41 @@
                         "followup_question": {
                             "text": "האם מילאת נוזל קירור?",
                             "options": [
-                                "כן, מילאתי נוזל קירור",
-                                "כן, מילאתי מים (אין לי נוזל קירור)",
-                                "אין לי נוזל ואין מים",
-                                "לא יודע איזה נוזל"
+                                {
+                                    "id": "filled_coolant",
+                                    "label": "כן, מילאתי נוזל קירור"
+                                },
+                                {
+                                    "id": "filled_water",
+                                    "label": "כן, מילאתי מים (אין לי נוזל קירור)"
+                                },
+                                {
+                                    "id": "nothing_available",
+                                    "label": "אין לי נוזל ואין מים"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה נוזל"
+                                }
                             ],
                             "resolution_paths": {
-                                "כן, מילאתי נוזל קירור": {
+                                "filled_coolant": {
                                     "status": "needs_verification",
                                     "next_action": "verify_after_fill",
-                                    "message": "מצוין! הנע את הרכב ובדוק אם הנורה נכבית."
+                                    "message": "מצוין! הנע ובדוק אם הנורה נכבית."
                                 },
-                                "כן, מילאתי מים (אין לי נוזל קירור)": {
+                                "filled_water": {
                                     "status": "needs_verification",
                                     "next_action": "verify_after_fill",
-                                    "message": "מים זה פתרון זמני. הנע את הרכב, ואם הנורה כבתה - נסע למוסך להחלפה לנוזל קירור אמיתי."
+                                    "message": "מים זה זמני. הנע ובדוק."
                                 },
-                                "אין לי נוזל ואין מים": {
+                                "nothing_available": {
                                     "status": "needs_tow",
-                                    "recommendation": "אל תניע את הרכב! הזמן גרר או בקש ממישהו להביא מים/נוזל קירור."
+                                    "recommendation": "אל תניע! הזמן גרר או בקש נוזל."
                                 },
-                                "לא יודע איזה נוזל": {
+                                "dont_know_type": {
                                     "status": "needs_more_info",
-                                    "next_steps": [
-                                        "בדוק את צבע הנוזל שנשאר במיכל",
-                                        "או בדוק במדבקה על המיכל/בספר הרכב",
-                                        "בלית ברירה - מים רגילים יעבדו זמנית"
-                                    ]
+                                    "message": "מים רגילים יעבדו זמנית."
                                 }
                             }
                         }
@@ -1769,25 +2016,34 @@
                         "followup_question": {
                             "text": "מה קרה אחרי ההתנעה?",
                             "options": [
-                                "✅ הנורה כבתה ומד החום תקין",
-                                "הנורה עדיין דולקת",
-                                "מד החום עולה מהר מדי"
+                                {
+                                    "id": "light_off_ok",
+                                    "label": "✅ הנורה כבתה ומד החום תקין"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "temp_rising_fast",
+                                    "label": "מד החום עולה מהר מדי"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הנורה כבתה ומד החום תקין": {
+                                "light_off_ok": {
                                     "status": "resolved",
                                     "diagnosis": "✅ נפתר: מפלס נוזל קירור היה נמוך",
-                                    "recommendation": "פנה למוסך לבדוק למה הנוזל נעלם (נזילה?). בדוק מפלס כל שבוע. אם מילאת מים - החלף לנוזל קירור בהקדם."
+                                    "recommendation": "פנה למוסך לבדיקה. בדוק מפלס כל שבוע."
                                 },
-                                "הנורה עדיין דולקת": {
+                                "still_on": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "ייתכן חיישן טמפרטורה תקול",
-                                    "recommendation": "פנה למוסך לבדיקה. אם מד החום תקין - ניתן לנסוע בזהירות."
+                                    "recommendation": "פנה למוסך. אם מד החום תקין - אפשר לנסוע בזהירות."
                                 },
-                                "מד החום עולה מהר מדי": {
+                                "temp_rising_fast": {
                                     "status": "needs_tow",
-                                    "diagnosis": "בעיית קירור חמורה - ייתכן נזילה או תרמוסטט תקול",
-                                    "recommendation": "כבה את המנוע מיד והזמן גרר!"
+                                    "diagnosis": "בעית קירור חמורה",
+                                    "recommendation": "כבה מיד והזמן גרר!"
                                 }
                             }
                         }
@@ -1926,16 +2182,26 @@
                             "הרכב נוסע חלק"
                         ],
                         "key_question": {
+                            "id": "feels_normal",
                             "text": "האם הרכב מרגיש תקין לחלוטין למרות הנורה?",
                             "options": [
-                                "כן, הכל רגיל",
-                                "יש משהו קצת שונה",
-                                "לא בטוח"
+                                {
+                                    "id": "yes_normal",
+                                    "label": "כן, הכל רגיל"
+                                },
+                                {
+                                    "id": "something_different",
+                                    "label": "יש משהו קצת שונה"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
                             ],
                             "score_mapping": {
-                                "כן, הכל רגיל": "confirms",
-                                "יש משהו קצת שונה": "rules_out",
-                                "לא בטוח": "uncertain_probable"
+                                "yes_normal": "confirms",
+                                "something_different": "rules_out",
+                                "unsure": "uncertain_probable"
                             }
                         }
                     },
@@ -2034,32 +2300,44 @@
                         "followup_question": {
                             "text": "מה קורה כשאתה מפחית מהירות ונוסע בעדינות?",
                             "options": [
-                                "הרעידות ממשיכות כרגיל",
-                                "הרעידות מחמירות",
-                                "הרעידות פחתו",
-                                "יש ריח שרוף או דלק"
+                                {
+                                    "id": "shaking_same",
+                                    "label": "הרעידות ממשיכות כרגיל"
+                                },
+                                {
+                                    "id": "shaking_worse",
+                                    "label": "הרעידות מחמירות"
+                                },
+                                {
+                                    "id": "shaking_better",
+                                    "label": "הרעידות פחתו"
+                                },
+                                {
+                                    "id": "smell",
+                                    "label": "יש ריח שרוף או דלק"
+                                }
                             ],
                             "resolution_paths": {
-                                "הרעידות ממשיכות כרגיל": {
+                                "shaking_same": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "תקלת הצתה (Misfire) יציבה",
-                                    "recommendation": "נסע בזהירות למוסך הקרוב. אל תלחץ גז חזק.",
+                                    "recommendation": "נסע בזהירות למוסך.",
                                     "drive_ok": true
                                 },
-                                "הרעידות מחמירות": {
+                                "shaking_worse": {
                                     "status": "needs_tow",
-                                    "diagnosis": "התקלה מחמירה - סכנה לממיר הקטליטי",
+                                    "diagnosis": "התקלה מחמירה - סכנה לממיר",
                                     "recommendation": "עצור במקום בטוח והזמן גרר!"
                                 },
-                                "הרעידות פחתו": {
+                                "shaking_better": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "ייתכן תקלה בעומס גבוה בלבד",
-                                    "recommendation": "המשך בזהירות למוסך. אל תאיץ חזק.",
+                                    "recommendation": "המשך בזהירות למוסך.",
                                     "drive_ok": true
                                 },
-                                "יש ריח שרוף או דלק": {
+                                "smell": {
                                     "status": "needs_tow",
-                                    "diagnosis": "⛔ ריח שרוף/דלק = סכנה! דלק לא שרוף מגיע לממיר ועלול להבעיר אותו",
+                                    "diagnosis": "⛔ ריח שרוף/דלק = סכנה!",
                                     "recommendation": "עצור מיד והזמן גרר!"
                                 }
                             }
@@ -2139,26 +2417,35 @@
                         "followup_question": {
                             "text": "מה היה מצב הרכב לפני שעצרת?",
                             "options": [
-                                "רעד חזק או היה ריח שרוף/דלק",
-                                "לא הצלחתי להאיץ מעל 40 קמ\"ש (Limp Mode)",
-                                "נסע כמעט רגיל, רק הנורה הבהבה"
+                                {
+                                    "id": "shaking_smell",
+                                    "label": "רעד חזק או היה ריח שרוף/דלק"
+                                },
+                                {
+                                    "id": "limp_mode",
+                                    "label": "לא הצלחתי להאיץ מעל 40 קמ\"ש (Limp Mode)"
+                                },
+                                {
+                                    "id": "mostly_normal",
+                                    "label": "נסע כמעט רגיל, רק הנורה הבהבה"
+                                }
                             ],
                             "resolution_paths": {
-                                "רעד חזק או היה ריח שרוף/דלק": {
+                                "shaking_smell": {
                                     "status": "needs_tow",
-                                    "diagnosis": "תקלת הצתה חמורה (Misfire) - נזק פעיל לממיר!",
-                                    "recommendation": "הזמן גרר מיד! כל דקה נוספת של נסיעה עלולה לגרום לנזק של מאות שקלים."
+                                    "diagnosis": "תקלת הצתה חמורה - נזק פעיל לממיר!",
+                                    "recommendation": "הזמן גרר מיד!"
                                 },
-                                "לא הצלחתי להאיץ מעל 40 קמ\"ש (Limp Mode)": {
+                                "limp_mode": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "הרכב היה במצב הגנה (Limp Mode)",
-                                    "recommendation": "ניתן לנסוע בזהירות למוסך קרוב. אם הדרך ארוכה - הזמן גרר.",
+                                    "recommendation": "ניתן לנסוע בזהירות למוסך קרוב.",
                                     "drive_ok": true
                                 },
-                                "נסע כמעט רגיל, רק הנורה הבהבה": {
+                                "mostly_normal": {
                                     "status": "needs_more_info",
                                     "next_action": "check_gas_cap_ce",
-                                    "message": "נבדוק את מכסה הדלק - לפעמים זה הפתרון."
+                                    "message": "נבדוק את מכסה הדלק."
                                 }
                             }
                         }
@@ -2176,29 +2463,41 @@
                         "followup_question": {
                             "text": "מה קרה אחרי סגירת מכסה הדלק היטב?",
                             "options": [
-                                "✅ הנורה כבתה!",
-                                "הנורה עדיין מהבהבת",
-                                "הנורה עדיין דולקת קבוע",
-                                "כבר היה סגור"
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_flashing",
+                                    "label": "הנורה עדיין מהבהבת"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת קבוע"
+                                },
+                                {
+                                    "id": "already_closed",
+                                    "label": "כבר היה סגור"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הנורה כבתה!": {
+                                "light_off": {
                                     "status": "resolved",
-                                    "diagnosis": "✅ נפתר: מכסה דלק לא היה סגור כראוי",
-                                    "recommendation": "ניתן להמשיך בנסיעה כרגיל."
+                                    "diagnosis": "✅ נפתר: מכסה דלק לא היה סגור",
+                                    "recommendation": "ניתן להמשיך בנסיעה."
                                 },
-                                "הנורה עדיין מהבהבת": {
+                                "still_flashing": {
                                     "status": "needs_tow",
                                     "diagnosis": "נורה מהבהבת = תקלת הצתה (Misfire)",
-                                    "recommendation": "הזמן גרר! המשך נסיעה יגרום נזק לממיר הקטליטי."
+                                    "recommendation": "הזמן גרר!"
                                 },
-                                "הנורה עדיין דולקת קבוע": {
+                                "still_on": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "הבעיה לא במכסה הדלק",
-                                    "recommendation": "פנה למוסך לקריאת קודי תקלה. אם הרכב נוסע רגיל - ניתן להמשיך בזהירות.",
+                                    "recommendation": "פנה למוסך לקריאת קודים.",
                                     "drive_ok": true
                                 },
-                                "כבר היה סגור": {
+                                "already_closed": {
                                     "status": "needs_more_info",
                                     "next_action": "electrical_reset",
                                     "message": "נסה איפוס חשמלי."
@@ -2221,31 +2520,43 @@
                         "followup_question": {
                             "text": "מה קרה אחרי האיפוס?",
                             "options": [
-                                "✅ הרכב מגיב רגיל והנורה כבתה",
-                                "הרכב מגיב רגיל אבל הנורה דולקת",
-                                "עדיין Limp Mode / רועד",
-                                "המצב החמיר"
+                                {
+                                    "id": "normal_light_off",
+                                    "label": "✅ הרכב מגיב רגיל והנורה כבתה"
+                                },
+                                {
+                                    "id": "normal_light_on",
+                                    "label": "הרכב מגיב רגיל אבל הנורה דולקת"
+                                },
+                                {
+                                    "id": "still_limp",
+                                    "label": "עדיין Limp Mode / רועד"
+                                },
+                                {
+                                    "id": "worse",
+                                    "label": "המצב החמיר"
+                                }
                             ],
                             "resolution_paths": {
-                                "✅ הרכב מגיב רגיל והנורה כבתה": {
+                                "normal_light_off": {
                                     "status": "resolved_temp",
                                     "diagnosis": "✅ נפתר זמנית - ייתכן תקלה חד פעמית",
-                                    "recommendation": "פנה למוסך לקריאת קודי תקלה שנשמרו בזיכרון. אם הבעיה חוזרת - יש תקלה קבועה."
+                                    "recommendation": "פנה למוסך לקריאת קודים."
                                 },
-                                "הרכב מגיב רגיל אבל הנורה דולקת": {
+                                "normal_light_on": {
                                     "status": "needs_mechanic",
-                                    "diagnosis": "יש תקלה שמורה במחשב הרכב",
-                                    "recommendation": "פנה למוסך לקריאת קודי תקלה. ניתן להמשיך לנסוע אם הרכב מתנהג רגיל.",
+                                    "diagnosis": "יש תקלה שמורה במחשב",
+                                    "recommendation": "פנה למוסך. ניתן לנסוע אם הרכב רגיל.",
                                     "drive_ok": true
                                 },
-                                "עדיין Limp Mode / רועד": {
+                                "still_limp": {
                                     "status": "needs_mechanic",
                                     "diagnosis": "התקלה לא התאפסה - בעיה קבועה",
-                                    "recommendation": "נסע בזהירות למוסך הקרוב. אם המרחק גדול - הזמן גרר."
+                                    "recommendation": "נסע בזהירות למוסך קרוב."
                                 },
-                                "המצב החמיר": {
+                                "worse": {
                                     "status": "needs_tow",
-                                    "recommendation": "עצור והזמן גרר! אל תמשיך לנסוע."
+                                    "recommendation": "עצור והזמן גרר!"
                                 }
                             }
                         }
@@ -2599,36 +2910,43 @@
                         "followup_question": {
                             "text": "מה מצאת בבדיקה?",
                             "options": [
-                                "יש צמיג שטוח לגמרי",
-                                "יש צמיג רך אבל לא שטוח",
-                                "כל הצמיגים נראים תקינים",
-                                "מצאתי בורג/מסמר בצמיג"
+                                {
+                                    "id": "flat_tire",
+                                    "label": "יש צמיג שטוח לגמרי"
+                                },
+                                {
+                                    "id": "soft_tire",
+                                    "label": "יש צמיג רך אבל לא שטוח"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "כל הצמיגים נראים תקינים"
+                                },
+                                {
+                                    "id": "found_nail",
+                                    "label": "מצאתי בורג/מסמר בצמיג"
+                                }
                             ],
                             "resolution_paths": {
-                                "יש צמיג שטוח לגמרי": {
+                                "flat_tire": {
                                     "status": "needs_attention",
                                     "diagnosis": "פנצ'ר או אובדן אוויר מלא",
-                                    "recommendation": "החלף לגלגל רזרבי או הזמן שירותי דרך. אסור לנסוע על צמיג שטוח!",
-                                    "next_steps": [
-                                        "אם יש לך גלגל רזרבי - החלף",
-                                        "אם לא - הזמן שירותי דרך",
-                                        "אל תנסה לנסוע על צמיג שטוח - זה יהרוס את הצמיג והג'אנט"
-                                    ]
+                                    "recommendation": "החלף לגלגל רזרבי או הזמן שירותי דרך."
                                 },
-                                "יש צמיג רך אבל לא שטוח": {
+                                "soft_tire": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_air",
-                                    "message": "ניתן לנסוע בזהירות לתחנת דלק קרובה למילוי אוויר."
+                                    "message": "ניתן לנסוע בזהירות לתחנת דלק למילוי."
                                 },
-                                "כל הצמיגים נראים תקינים": {
+                                "all_ok": {
                                     "status": "needs_more_info",
                                     "next_action": "fill_air",
-                                    "message": "ייתכן הבדל קטן בלחץ. גש לתחנת דלק לבדיקה ומילוי."
+                                    "message": "גש לתחנת דלק לבדיקה ומילוי."
                                 },
-                                "מצאתי בורג/מסמר בצמיג": {
+                                "found_nail": {
                                     "status": "needs_attention",
-                                    "diagnosis": "פנצ'ר איטי - הבורג/מסמר אוטם את החור",
-                                    "recommendation": "אל תוציא את הבורג! מלא אוויר ונסע לפנצ'ריה/מוסך לתיקון.",
+                                    "diagnosis": "פנצ'ר איטי - הבורג אוטם את החור",
+                                    "recommendation": "אל תוציא את הבורג! מלא אוויר ונסע לפנצ'ריה.",
                                     "drive_ok": true
                                 }
                             }
@@ -2866,7 +3184,23 @@
                                     "id": "cant_refuel",
                                     "label": "לא הצלחתי לתדלק עכשיו"
                                 }
-                            ]
+                            ],
+                            "resolution_paths": {
+                                "resolved": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: דלק נמוך",
+                                    "recommendation": "המשך לנסוע כרגיל."
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן חיישן/מצוף דלק תקול",
+                                    "recommendation": "תדלק שוב ובדוק. אם עדיין דולקת - פנה למוסך."
+                                },
+                                "cant_refuel": {
+                                    "status": "pending",
+                                    "message": "תדלק בהקדם - הימנע מנסיעה ממושכת."
+                                }
+                            }
                         }
                     }
                 ],

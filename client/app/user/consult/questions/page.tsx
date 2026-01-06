@@ -29,6 +29,14 @@ interface Vehicle {
 
 const DRAFT_IMAGES_KEY = "draft_images";
 
+// Normalize message types for backwards compatibility
+function normalizeMsgType(type?: string) {
+  if (!type) return type;
+  if (type === "final_diagnosis") return "diagnosis_report";
+  if (type === "mechanic_report") return "diagnosis_report";
+  return type;
+}
+
 export default function QuestionsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -84,7 +92,6 @@ export default function QuestionsPage() {
 
     // 🔴 סימון מיידי שהאתחול בוצע
     hasInitialized.current = true;
-    console.log("[QuestionsPage] Initializing flow with:", description);
 
     // טעינת תמונות
     const storedImages = window.sessionStorage.getItem(DRAFT_IMAGES_KEY);
@@ -114,14 +121,15 @@ export default function QuestionsPage() {
     setIsFinalizing(true);
 
     try {
-      const reportMsg = state.messages.find(m => m.type === "mechanic_report");
+      const reportMsg = state.messages.find(m => normalizeMsgType(m.type) === "diagnosis_report");
       const reportData = reportMsg?.meta?.diagnosis || {};
       const draftId = window.sessionStorage.getItem("draft_id");
 
-      // DEBUG: Log what's in reportData
-      console.log("[handleSaveRequest] reportMsg:", reportMsg);
-      console.log("[handleSaveRequest] reportData:", reportData);
-      console.log("[handleSaveRequest] conversationSummaries:", reportData.conversationSummaries);
+      // Extract category from context or report data
+      const category = state.context?.detectedLightType ||
+        reportData.detectedLightType ||
+        reportMsg?.meta?.detectedLightType ||
+        null;
 
       const res = await fetch("/api/requests/from-draft", {
         method: "POST",
@@ -130,8 +138,10 @@ export default function QuestionsPage() {
           draft_id: draftId,
           user_id: user.id,
           car_id: vehicle.id,
+          description: description || null, // Initial problem description
+          category, // Issue category (light type or symptom)
           ai_diagnosis: reportMsg?.text || "אבחון הושלם",
-          ai_confidence: 1.0,
+          ai_confidence: reportData.confidence || 1.0,
           // Derive Q&A from actual message history
           ai_questions: state.messages
             .filter(m => m.sender === "ai" && m.type !== "mechanic_report")
@@ -218,9 +228,10 @@ export default function QuestionsPage() {
 
           <AnimatePresence mode="popLayout">
             {state.messages.map((msg) => {
+              const t = normalizeMsgType(msg.type);
 
-              // 🔴 FIX APPLIED: Data Transformation for Mechanic Report
-              if (msg.type === "mechanic_report") {
+              // 🔴 FIX APPLIED: Data Transformation for Diagnosis Report
+              if (t === "diagnosis_report") {
                 const diagnosisData = msg.meta?.diagnosis || {};
                 const rawDiagnosis = diagnosisData.results || msg.meta?.diagnosis?.diagnosis || [];
                 const safetyNotice = diagnosisData.disclaimer || msg.meta?.diagnosis?.safety_notice;
@@ -266,8 +277,7 @@ export default function QuestionsPage() {
               }
 
               // 📋 Instruction Messages - use InstructionBubble with steps
-              // 🔧 FIX: Only use InstructionBubble if we have steps, otherwise ChatBubble handles it
-              if ((msg.type === "instruction" || msg.isInstruction) && msg.meta?.steps?.length > 0) {
+              if ((t === "instruction" || msg.isInstruction) && msg.meta?.steps?.length > 0) {
                 const instructionMeta = msg.meta || {};
                 return (
                   <InstructionBubble
@@ -282,7 +292,7 @@ export default function QuestionsPage() {
               }
 
               // 🚨 Safety Instruction without steps - use ChatBubble with special styling
-              if (msg.type === "safety_instruction" || (msg.isInstruction && !msg.meta?.steps?.length)) {
+              if (t === "safety_instruction" || (msg.isInstruction && !msg.meta?.steps?.length)) {
                 return (
                   <ChatBubble
                     key={msg.id}
@@ -300,7 +310,7 @@ export default function QuestionsPage() {
                   message={msg.text}
                   images={msg.images}
                   isUser={msg.sender === "user"}
-                  type={msg.type}
+                  type={t}
                   meta={msg.meta}
                 />
               );

@@ -1,15 +1,4 @@
 // lib/ai/flow-handlers.ts
-/**
- * =============================================================================
- * FLOW HANDLERS - Business Logic for route.ts
- * =============================================================================
- * Anti-Gravity: route.ts routes; this file performs the work.
- * 
- * Hybrid Mode Support:
- * - If user types free-text instead of clicking a button, we try to map it
- *   to one of the expected options via AI (option_map mode).
- */
-
 import { NextResponse } from 'next/server';
 import { createOpenAIClient } from '@/lib/ai/client';
 import { fetchImageAsInlineData } from '@/lib/ai/image-utils';
@@ -29,8 +18,11 @@ import {
     checkImmediateAction,
     generateDiagnosis,
     updateSuspectsAndReport,
-    generateScenarioReport
+    generateScenarioReport,
+    matchOption
 } from '@/lib/ai/diagnostic-utils';
+import { generateAIDiagnosis, HYBRID_LIGHTS } from '@/lib/ai/hybrid-diagnosis';
+import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis';
 import type { KBNextStep, KBInstruction } from '@/lib/ai/diagnostic-utils';
 
 export interface FlowResult {
@@ -46,68 +38,65 @@ export interface RequestContext {
     hasImage: boolean;
 }
 
-const mergeContext = (base: any, patch: any) => ({ ...(base ?? {}), ...(patch ?? {}) });
+// Safe merge: don't overwrite with null/undefined, union arrays
+const mergeContext = (base: any, patch: any) => {
+    const out: any = { ...(base ?? {}) };
+    if (!patch) return out;
+    for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined || v === null) continue;
+        if (Array.isArray(v) && Array.isArray(out[k])) out[k] = Array.from(new Set([...out[k], ...v]));
+        else out[k] = v;
+    }
+    return out;
+};
 
-// =============================================================================
-// BRIDGE MODE HELPERS
-// =============================================================================
+// Deterministic option selection: number input or exact match only
+function normalizeSelection(userText: string, options: string[]): { selected: string | null } {
+    const t = (userText ?? '').trim();
+    if (!t) return { selected: null };
+    const n = Number(t);
+    if (Number.isInteger(n) && n >= 1 && n <= options.length) return { selected: options[n - 1] };
+    if (options.includes(t)) return { selected: t };
+    return { selected: null };
+}
 
-/**
- * Build a picker list of warning lights sorted by severity.
- * Used when bridge questions fail to identify the light.
- */
+// Build light picker for bridge mode
 function buildLightPickerOptions(): string[] {
     const entries = Object.entries(warningLightsKB as any);
-    const weight = (sev: string) =>
-        sev === 'critical' ? 0 : sev === 'high' ? 1 : sev === 'moderate' ? 2 : 3;
-
+    const weight = (sev: string) => sev === 'critical' ? 0 : sev === 'high' ? 1 : sev === 'moderate' ? 2 : 3;
     return entries
         .sort((a, b) => weight(String((a[1] as any)?.severity)) - weight(String((b[1] as any)?.severity)))
         .slice(0, 10)
-        .map(([id, data]) => {
-            const he = (data as any)?.names?.he?.[0] ?? id;
-            return `${he} (${id})`;
-        })
+        .map(([id, data]) => `${(data as any)?.names?.he?.[0] ?? id} (${id})`)
         .concat(['נורה אחרת / לא בטוח - אתאר במילים']);
 }
 
-/**
- * Extract lightId from a picker option string like "נורת שמן (oil_pressure_light)"
- */
 function extractLightIdFromPicker(text: string): string | null {
     const m = String(text || '').match(/\(([\w_]+)\)/);
     return m?.[1] ?? null;
 }
 
-// =============================================================================
-// RESOLVED/SUCCESS OPTION DETECTION
-// =============================================================================
-
-/**
- * Detects if user selected an option indicating the problem is resolved.
- * Checks for Hebrew patterns like "הנורה כבתה", "נפתר", "הכל תקין", or ✅ emoji.
- */
+// Detects if user selected a "resolved" option or wrote success phrase
 function isResolvedOption(optionText: string): boolean {
     if (!optionText) return false;
     const lower = optionText.toLowerCase();
-    const resolvedPatterns = [
-        '✅',
-        'הנורה כבתה',
-        'נפתר',
-        'הכל תקין',
-        'נסתדר',
-        'resolved',
-        'success',
-        'fixed'
-    ];
-    return resolvedPatterns.some(p => lower.includes(p) || optionText.includes(p));
+    const patterns = ['✅', 'הנורה כבתה', 'נפתר', 'הכל תקין', 'נסתדר', 'resolved', 'success', 'fixed'];
+    return patterns.some(p => lower.includes(p) || optionText.includes(p));
 }
 
-/**
- * Extracts a description of what was resolved based on context.
- */
+// Detects free-text success/completion phrases
+function isSuccessPhrase(text: string): boolean {
+    if (!text) return false;
+    const successPhrases = [
+        'הצלחתי', 'ביצעתי', 'עשיתי', 'סיימתי', 'בוצע',
+        'תיקנתי', 'מילאתי', 'כבתה', 'נכבתה', 'תקין עכשיו',
+        'הכל בסדר', 'עובד', 'נפתר', 'סידרתי', 'המשכתי'
+    ];
+    return successPhrases.some(phrase => text.includes(phrase));
+}
+
 function getResolvedIssueDescription(lightType: string, context: any): string {
-    const lightNames: Record<string, string> = {
+    const names: Record<string, string> = {
         'tpms_light': 'לחץ אוויר נמוך בצמיגים',
         'battery_light': 'מצבר חלש/מפורק',
         'brake_light': 'בלם יד היה משוך',
@@ -115,72 +104,26 @@ function getResolvedIssueDescription(lightType: string, context: any): string {
         'check_engine_light': 'מכסה דלק לא היה סגור',
         'oil_pressure_light': 'מפלס שמן נמוך'
     };
-    return lightNames[lightType] || 'הבעיה נפתרה';
+    return names[lightType] || 'הבעיה נפתרה';
 }
 
-// =============================================================================
-// SCENARIO-BASED INITIAL SCORE BOOST
-// =============================================================================
-
-/**
- * Apply initial score boost when a scenario is first determined.
- * Some scenarios already indicate a strong symptom before any key_question is asked.
- * 
- * For example:
- * - tpms_light + steady_pulling = "הרכב מושך לצד" → strong signal of puncture
- * - This gives immediate positive score to 'low_tire_puncture'
- */
-function applyScenarioBoost(
-    lightType: string,
-    scenarioId: string,
-    scores: Record<string, number>
-): Record<string, number> {
+// Apply initial score boost for specific scenarios
+function applyScenarioBoost(lightType: string, scenarioId: string, scores: Record<string, number>): Record<string, number> {
     const newScores = { ...scores };
-
-    // Define scenario-based boosts
-    // Format: { lightType: { scenarioId: { causeId: boostAmount } } }
-    const scenarioBoosts: Record<string, Record<string, Record<string, number>>> = {
-        'tpms_light': {
-            'steady_pulling': {
-                // "הרכב מושך לצד" is a clear symptom of puncture
-                'low_tire_puncture': 1.5  // Probability 0.8, give significant boost
-            },
-            'steady': {
-                // Most common cause: simple low air pressure due to temperature/time
-                // Give initial boost since this is the default assumption
-                'temperature_change': 1.0  // Probability 0.6, give moderate boost
-            }
-        },
-        'brake_light': {
-            'from_parking': {
-                // Most likely cause when brake light is on from parking
-                'handbrake_engaged': 1.0
-            }
-        }
+    const boosts: Record<string, Record<string, Record<string, number>>> = {
+        'tpms_light': { 'steady_pulling': { 'low_tire_puncture': 1.5 }, 'steady': { 'temperature_change': 1.0 } },
+        'brake_light': { 'from_parking': { 'handbrake_engaged': 1.0 } }
     };
-
-    const lightBoosts = scenarioBoosts[lightType];
+    const lightBoosts = boosts[lightType]?.[scenarioId];
     if (!lightBoosts) return newScores;
-
-    const boostsForScenario = lightBoosts[scenarioId];
-    if (!boostsForScenario) return newScores;
-
-    for (const [causeId, boost] of Object.entries(boostsForScenario)) {
-        const oldScore = newScores[causeId] || 0;
-        newScores[causeId] = oldScore + boost;
-        console.log(`[Scores] ⚡ Scenario boost for "${causeId}": ${oldScore.toFixed(2)} -> ${newScores[causeId].toFixed(2)} (boost: +${boost.toFixed(2)}, scenario="${scenarioId}")`);
+    for (const [causeId, boost] of Object.entries(lightBoosts)) {
+        newScores[causeId] = (newScores[causeId] || 0) + boost;
     }
-
     return newScores;
 }
 
-
-// =============================================================================
-// KB RESOLUTION_PATHS LOOKUP
-// =============================================================================
-
 interface ResolutionPath {
-    status: 'resolved' | 'resolved_temp' | 'needs_more_info' | 'needs_mechanic' | 'needs_tow' | 'pending' | 'wait_and_verify' | 'needs_attention' | 'needs_verification' | 'needs_mechanic_urgent' | 'needs_inspection' | 'critical';
+    status: 'resolved' | 'resolved_temp' | 'needs_more_info' | 'needs_mechanic' | 'needs_tow' | 'pending' | 'wait_and_verify' | 'needs_attention' | 'needs_verification' | 'needs_mechanic_urgent' | 'needs_inspection' | 'critical' | 'continue_diagnosis';
     diagnosis?: string;
     recommendation?: string;
     message?: string;
@@ -191,54 +134,32 @@ interface ResolutionPath {
     if_returns?: string;
 }
 
-/**
- * Look up resolution_paths from KB for the current self_fix_action followup.
- * Returns the resolution if found, or null.
- */
-function lookupResolutionPath(
-    lightType: string,
-    scenarioId: string,
-    actionId: string | undefined,
-    selectedOptionIdOrLabel: string
-): ResolutionPath | null {
+// Look up resolution_paths from KB by optionId only (no label fallback)
+function lookupResolutionPath(lightType: string, scenarioId: string, actionId: string | undefined, selectedOptionIdOrLabel: string): ResolutionPath | null {
     try {
         const lightData = (warningLightsKB as any)[lightType];
         if (!lightData?.scenarios?.[scenarioId]) return null;
-
         const scenario = lightData.scenarios[scenarioId];
         const selfFixActions = scenario.self_fix_actions || [];
 
-        // Find the current action (by actionId or just iterate all)
         for (const action of selfFixActions) {
             const followup = action.followup_question;
             if (!followup?.resolution_paths) continue;
-
             const resolutionPaths = followup.resolution_paths;
 
-            // Try to find by option ID first
+            // Try by option ID directly
             if (resolutionPaths[selectedOptionIdOrLabel]) {
-                console.log(`[KBFlow] 🔍 Found resolution_path for ID: ${selectedOptionIdOrLabel}`);
                 return resolutionPaths[selectedOptionIdOrLabel];
             }
 
             // Try to find by matching option label to ID
             const options = followup.options || [];
             for (const opt of options) {
-                if (typeof opt === 'object' && opt.label === selectedOptionIdOrLabel) {
-                    if (resolutionPaths[opt.id]) {
-                        console.log(`[KBFlow] 🔍 Found resolution_path for ID (via label match): ${opt.id}`);
-                        return resolutionPaths[opt.id];
-                    }
+                if (typeof opt === 'object' && opt.label === selectedOptionIdOrLabel && resolutionPaths[opt.id]) {
+                    return resolutionPaths[opt.id];
                 }
             }
-
-            // Fallback: try label as key (for legacy string-keyed resolution_paths)
-            if (resolutionPaths[selectedOptionIdOrLabel]) {
-                console.log(`[KBFlow] 🔍 Found resolution_path for label: ${selectedOptionIdOrLabel}`);
-                return resolutionPaths[selectedOptionIdOrLabel];
-            }
         }
-
         return null;
     } catch (err) {
         console.error('[KBFlow] Error looking up resolution_path:', err);
@@ -246,16 +167,8 @@ function lookupResolutionPath(
     }
 }
 
-/**
- * Process a resolution_path and return appropriate response.
- */
-function handleResolutionPath(
-    resolution: ResolutionPath,
-    lightType: string,
-    scenarioId: string,
-    context: any,
-    updatedScores: any
-): FlowResult | null {
+// Process a resolution_path and return appropriate response
+function handleResolutionPath(resolution: ResolutionPath, lightType: string, scenarioId: string, context: any, updatedScores: any): FlowResult | null {
     const mergedContext = mergeContext(context, {
         currentLightScenario: scenarioId,
         causeScores: updatedScores,
@@ -263,9 +176,14 @@ function handleResolutionPath(
         awaitingInstructionResult: false
     });
 
-    // RESOLVED statuses -> diagnosis_report
+    // CONTINUE_DIAGNOSIS - proceed to next KB question (used for check_engine after immediate action)
+    if (resolution.status === 'continue_diagnosis') {
+        // Return null to let KB flow continue to next question
+        return null;
+    }
+
+    // RESOLVED
     if (resolution.status === 'resolved' || resolution.status === 'resolved_temp') {
-        console.log(`[KBFlow] ✅ Resolution status: ${resolution.status}`);
         return {
             handled: true,
             response: NextResponse.json({
@@ -273,52 +191,23 @@ function handleResolutionPath(
                 title: resolution.diagnosis || 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [
-                    {
-                        issue: resolution.diagnosis || getResolvedIssueDescription(lightType, context),
-                        probability: 0.8,
-                        explanation: resolution.recommendation || 'הבעיה נפתרה בהצלחה'
-                    }
-                ],
-                status: {
-                    color: 'green',
-                    text: resolution.status === 'resolved_temp' ? 'נפתר זמנית' : 'הבעיה נפתרה',
-                    instruction: resolution.recommendation || 'ניתן להמשיך כרגיל'
-                },
-                recommendations: [
-                    resolution.recommendation,
-                    resolution.if_returns
-                ].filter(Boolean),
+                results: [{ issue: resolution.diagnosis || getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: resolution.recommendation || 'הבעיה נפתרה' }],
+                status: { color: 'green', text: resolution.status === 'resolved_temp' ? 'נפתר זמנית' : 'הבעיה נפתרה', instruction: resolution.recommendation || 'ניתן להמשיך כרגיל' },
+                recommendations: [resolution.recommendation, resolution.if_returns].filter(Boolean),
                 endConversation: true,
                 context: mergedContext
             })
         };
     }
 
-    // NEEDS_MORE_INFO -> return instruction with next_steps OR trigger next_action
+    // NEEDS_MORE_INFO
     if (resolution.status === 'needs_more_info') {
-        console.log(`[KBFlow] ℹ️ Resolution: needs_more_info`);
-
-        // If there's a next_action, fetch that instruction from KB and return it
         if (resolution.next_action) {
-            console.log(`[KBFlow]   next_action: ${resolution.next_action}`);
-
-            // Fetch the actual action from KB
             const lightData = (warningLightsKB as any)[lightType];
             const scenario = lightData?.scenarios?.[scenarioId];
-            const selfFixActions = scenario?.self_fix_actions || [];
-            const nextAction = selfFixActions.find((a: any) => a.id === resolution.next_action);
-
+            const nextAction = (scenario?.self_fix_actions || []).find((a: any) => a.id === resolution.next_action);
             if (nextAction) {
-                // Return the full instruction with actual steps
-                const followupOptions = nextAction.followup_question?.options || [];
-                const followupLabels = followupOptions.map((opt: any) =>
-                    typeof opt === 'string' ? opt : opt?.label || ''
-                ).filter(Boolean);
-
-                console.log(`[KBFlow] 📋 Found next_action instruction: ${nextAction.id}`);
-                console.log(`[KBFlow]   Steps: ${nextAction.steps?.length || 0}`);
-
+                const followupLabels = (nextAction.followup_question?.options || []).map((opt: any) => typeof opt === 'string' ? opt : opt?.label || '').filter(Boolean);
                 return {
                     handled: true,
                     response: NextResponse.json({
@@ -327,77 +216,33 @@ function handleResolutionPath(
                         actionType: nextAction.actionType || 'inspect',
                         steps: nextAction.steps || [],
                         warning: nextAction.warning,
-                        condition: nextAction.condition,
                         question: nextAction.followup_question?.text,
                         options: followupLabels.length > 0 ? followupLabels : undefined,
                         detectedLightType: lightType,
                         kbSource: true,
                         context: mergeContext(mergedContext, {
-                            shownInstructionIds: [...(context.shownInstructionIds || []), nextAction.id],
+                            shownInstructionIds: [nextAction.id],
                             lastInstructionId: nextAction.id,
                             awaitingInstructionResult: true,
                             currentQuestionId: nextAction.id,
                             currentQuestionText: nextAction.followup_question?.text,
                             currentQuestionOptions: followupLabels,
-                            pendingResolutionPaths: nextAction.followup_question?.resolution_paths,
-                            optionMapAttempts: 0
+                            pendingResolutionPaths: nextAction.followup_question?.resolution_paths
                         })
-                    })
-                };
-            } else {
-                // Fallback: just return the message if action not found
-                console.log(`[KBFlow] ⚠️ next_action "${resolution.next_action}" not found in KB`);
-                return {
-                    handled: true,
-                    response: NextResponse.json({
-                        type: 'instruction',
-                        title: resolution.message || 'צעד הבא',
-                        steps: [resolution.message].filter(Boolean),
-                        text: resolution.message,
-                        detectedLightType: lightType,
-                        kbSource: true,
-                        context: mergedContext
                     })
                 };
             }
         }
-
-        // Otherwise return next_steps as instruction
         if (resolution.next_steps?.length) {
-            console.log(`[KBFlow]   next_steps: ${resolution.next_steps.length} steps`);
-            return {
-                handled: true,
-                response: NextResponse.json({
-                    type: 'instruction',
-                    title: 'צעדים נוספים',
-                    steps: resolution.next_steps,
-                    text: resolution.next_steps.join('\n'),
-                    detectedLightType: lightType,
-                    kbSource: true,
-                    context: mergedContext
-                })
-            };
+            return { handled: true, response: NextResponse.json({ type: 'instruction', title: 'צעדים נוספים', steps: resolution.next_steps, text: resolution.next_steps.join('\n'), detectedLightType: lightType, kbSource: true, context: mergedContext }) };
         }
-
-        // Fallback: just show message
         if (resolution.message) {
-            return {
-                handled: true,
-                response: NextResponse.json({
-                    type: 'question',
-                    text: resolution.message,
-                    options: ['הבנתי, אמשיך', 'לא יכול לבצע'],
-                    detectedLightType: lightType,
-                    kbSource: true,
-                    context: mergedContext
-                })
-            };
+            return { handled: true, response: NextResponse.json({ type: 'question', text: resolution.message, options: ['הבנתי, אמשיך', 'לא יכול לבצע'], detectedLightType: lightType, kbSource: true, context: mergedContext }) };
         }
     }
 
-    // NEEDS_MECHANIC / NEEDS_TOW -> diagnosis with mechanic recommendation
+    // NEEDS_MECHANIC / NEEDS_TOW
     if (resolution.status === 'needs_mechanic' || resolution.status === 'needs_mechanic_urgent' || resolution.status === 'needs_tow') {
-        console.log(`[KBFlow] 🔧 Resolution: ${resolution.status}`);
         const severity = resolution.status === 'needs_tow' ? 'critical' : 'high';
         return {
             handled: true,
@@ -406,18 +251,8 @@ function handleResolutionPath(
                 title: resolution.diagnosis || 'נדרש טיפול מקצועי',
                 severity,
                 confidence: 0.7,
-                results: [
-                    {
-                        issue: resolution.diagnosis || 'נדרשת בדיקה במוסך',
-                        probability: 0.7,
-                        explanation: resolution.recommendation || ''
-                    }
-                ],
-                status: {
-                    color: resolution.status === 'needs_tow' ? 'red' : 'orange',
-                    text: resolution.status === 'needs_tow' ? 'הזמן גרר' : 'פנה למוסך',
-                    instruction: resolution.recommendation || 'יש לפנות למוסך בהקדם'
-                },
+                results: [{ issue: resolution.diagnosis || 'נדרשת בדיקה במוסך', probability: 0.7, explanation: resolution.recommendation || '' }],
+                status: { color: resolution.status === 'needs_tow' ? 'red' : 'orange', text: resolution.status === 'needs_tow' ? 'הזמן גרר' : 'פנה למוסך', instruction: resolution.recommendation || 'יש לפנות למוסך בהקדם' },
                 recommendations: [resolution.recommendation].filter(Boolean),
                 endConversation: true,
                 context: mergedContext
@@ -425,239 +260,104 @@ function handleResolutionPath(
         };
     }
 
-    // PENDING / WAIT_AND_VERIFY -> return message and/or trigger next_action
+    // PENDING / WAIT_AND_VERIFY
     if (resolution.status === 'pending' || resolution.status === 'wait_and_verify') {
-        console.log(`[KBFlow] ⏳ Resolution: ${resolution.status}`);
-
-        // If there's a next_action, fetch that instruction from KB and return it
         if (resolution.next_action) {
-            console.log(`[KBFlow]   next_action: ${resolution.next_action}`);
-
-            // Fetch the actual action from KB
             const lightData = (warningLightsKB as any)[lightType];
             const scenario = lightData?.scenarios?.[scenarioId];
-            const selfFixActions = scenario?.self_fix_actions || [];
-            const nextAction = selfFixActions.find((a: any) => a.id === resolution.next_action);
-
+            const nextAction = (scenario?.self_fix_actions || []).find((a: any) => a.id === resolution.next_action);
             if (nextAction) {
-                // Return the full instruction with actual steps
-                const followupOptions = nextAction.followup_question?.options || [];
-                const followupLabels = followupOptions.map((opt: any) =>
-                    typeof opt === 'string' ? opt : opt?.label || ''
-                ).filter(Boolean);
-
-                console.log(`[KBFlow] 📋 Found next_action instruction: ${nextAction.id}`);
-                console.log(`[KBFlow]   Steps: ${nextAction.steps?.length || 0}`);
-
+                const followupLabels = (nextAction.followup_question?.options || []).map((opt: any) => typeof opt === 'string' ? opt : opt?.label || '').filter(Boolean);
                 return {
                     handled: true,
                     response: NextResponse.json({
                         type: 'instruction',
-                        title: nextAction.name || resolution.message || 'המתן ובדוק',
+                        title: nextAction.name || 'המתן ובדוק',
                         actionType: nextAction.actionType || 'inspect',
                         steps: nextAction.steps || [],
                         warning: nextAction.warning,
-                        condition: nextAction.condition,
                         question: nextAction.followup_question?.text,
                         options: followupLabels.length > 0 ? followupLabels : undefined,
                         detectedLightType: lightType,
                         kbSource: true,
                         context: mergeContext(mergedContext, {
-                            shownInstructionIds: [...(context.shownInstructionIds || []), nextAction.id],
+                            shownInstructionIds: [nextAction.id],
                             lastInstructionId: nextAction.id,
                             awaitingInstructionResult: true,
                             currentQuestionId: nextAction.id,
                             currentQuestionText: nextAction.followup_question?.text,
                             currentQuestionOptions: followupLabels,
-                            pendingResolutionPaths: nextAction.followup_question?.resolution_paths,
-                            optionMapAttempts: 0
+                            pendingResolutionPaths: nextAction.followup_question?.resolution_paths
                         })
                     })
                 };
             }
         }
-
-        // Fallback: just return message
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'instruction',
-                title: resolution.status === 'wait_and_verify' ? 'המתן ובדוק' : 'המשך',
-                text: resolution.message || 'המשך לפי ההוראות',
-                steps: resolution.next_steps || [resolution.message].filter(Boolean),
-                detectedLightType: lightType,
-                kbSource: true,
-                context: mergedContext
-            })
-        };
+        return { handled: true, response: NextResponse.json({ type: 'instruction', title: resolution.status === 'wait_and_verify' ? 'המתן ובדוק' : 'המשך', text: resolution.message || 'המשך לפי ההוראות', steps: resolution.next_steps || [resolution.message].filter(Boolean), detectedLightType: lightType, kbSource: true, context: mergedContext }) };
     }
 
-    // NEEDS_VERIFICATION with next_action -> fetch that instruction from KB
-    if (resolution.status === 'needs_verification' && resolution.next_action) {
-        console.log(`[KBFlow] 🔄 Resolution: needs_verification with next_action: ${resolution.next_action} `);
-
-        // Fetch the actual action from KB
-        const lightData = (warningLightsKB as any)[lightType];
-        const scenario = lightData?.scenarios?.[scenarioId];
-        const selfFixActions = scenario?.self_fix_actions || [];
-        const nextAction = selfFixActions.find((a: any) => a.id === resolution.next_action);
-
-        if (nextAction) {
-            // Return the full instruction with actual steps
-            const followupOptions = nextAction.followup_question?.options || [];
-            const followupLabels = followupOptions.map((opt: any) =>
-                typeof opt === 'string' ? opt : opt?.label || ''
-            ).filter(Boolean);
-
-            console.log(`[KBFlow] 📋 Found next_action instruction: ${nextAction.id} `);
-            console.log(`[KBFlow]   Steps: ${nextAction.steps?.length || 0} `);
-
+    // NEEDS_VERIFICATION
+    if (resolution.status === 'needs_verification') {
+        if (resolution.next_action) {
+            const lightData = (warningLightsKB as any)[lightType];
+            const scenario = lightData?.scenarios?.[scenarioId];
+            const nextAction = (scenario?.self_fix_actions || []).find((a: any) => a.id === resolution.next_action);
+            if (nextAction) {
+                const followupLabels = (nextAction.followup_question?.options || []).map((opt: any) => typeof opt === 'string' ? opt : opt?.label || '').filter(Boolean);
+                return {
+                    handled: true,
+                    response: NextResponse.json({
+                        type: 'instruction',
+                        title: nextAction.name || 'בדיקה',
+                        actionType: nextAction.actionType || 'inspect',
+                        steps: nextAction.steps || [],
+                        question: nextAction.followup_question?.text,
+                        options: followupLabels.length > 0 ? followupLabels : undefined,
+                        detectedLightType: lightType,
+                        kbSource: true,
+                        context: mergeContext(mergedContext, {
+                            shownInstructionIds: [nextAction.id],
+                            lastInstructionId: nextAction.id,
+                            awaitingInstructionResult: true,
+                            currentQuestionId: nextAction.id,
+                            currentQuestionText: nextAction.followup_question?.text,
+                            currentQuestionOptions: followupLabels,
+                            pendingResolutionPaths: nextAction.followup_question?.resolution_paths
+                        })
+                    })
+                };
+            }
+        }
+        if (resolution.next_question) {
+            const nextQ = resolution.next_question;
+            const optionLabels = (nextQ.options || []).map((o: any) => typeof o === 'object' ? o.label : o);
             return {
                 handled: true,
                 response: NextResponse.json({
-                    type: 'instruction',
-                    title: nextAction.name || resolution.message || 'בדיקה',
-                    actionType: nextAction.actionType || 'inspect',
-                    steps: nextAction.steps || [],
-                    warning: nextAction.warning,
-                    condition: nextAction.condition,
-                    question: nextAction.followup_question?.text,
-                    options: followupLabels.length > 0 ? followupLabels : undefined,
+                    type: 'question',
+                    text: nextQ.text,
+                    options: optionLabels,
                     detectedLightType: lightType,
+                    lightSeverity: context.lightSeverity || 'caution',
                     kbSource: true,
                     context: mergeContext(mergedContext, {
-                        shownInstructionIds: [...(context.shownInstructionIds || []), nextAction.id],
-                        lastInstructionId: nextAction.id,
-                        awaitingInstructionResult: true,
-                        currentQuestionId: nextAction.id,
-                        currentQuestionText: nextAction.followup_question?.text,
-                        currentQuestionOptions: followupLabels,
-                        pendingResolutionPaths: nextAction.followup_question?.resolution_paths,
-                        optionMapAttempts: 0
+                        currentQuestionText: nextQ.text,
+                        currentQuestionOptions: optionLabels,
+                        pendingResolutionPaths: nextQ.resolution_paths
                     })
                 })
             };
-        } else {
-            console.log(`[KBFlow] ⚠️ next_action "${resolution.next_action}" not found in KB for verification`);
         }
     }
 
-    // NEEDS_VERIFICATION with next_question -> ask the follow-up
-    if (resolution.status === 'needs_verification' && resolution.next_question) {
-        console.log('[KBFlow] 🔄 Resolution: needs_verification, asking follow-up question');
-        const nextQ = resolution.next_question;
-        const optionLabels = (nextQ.options || []).map((o: any) =>
-            typeof o === 'object' ? o.label : o
-        );
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'question',
-                text: nextQ.text,
-                options: optionLabels,
-                detectedLightType: lightType,
-                lightSeverity: context.lightSeverity || 'caution',
-                kbSource: true,
-                context: mergeContext(mergedContext, {
-                    currentQuestionText: nextQ.text,
-                    currentQuestionOptions: optionLabels,
-                    optionMapAttempts: 0,
-                    // Store the nested resolution_paths for next iteration
-                    pendingResolutionPaths: nextQ.resolution_paths
-                })
-            })
-        };
-    }
-
-    return null; // Not handled by resolution_paths
+    return null;
 }
 
-// =============================================================================
-// OPTION MAPPER AI HELPER
-// =============================================================================
-
-interface OptionMapResult {
-    selectedOptionLabel: string | null;
-    needClarification: string | null;
-}
-
-/**
- * Call AI to map a free-text user answer to one of the expected options.
- */
-async function callOptionMapperAI(params: {
-    userText: string;
-    detectedLightType?: string;
-    answers: UserAnswer[];
-    questionText: string;
-    options: string[];
-    context?: any;
-}): Promise<OptionMapResult> {
-    const { userText, detectedLightType, answers, questionText, options } = params;
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        console.warn('[OptionMapper] No API key, skipping mapping');
-        return { selectedOptionLabel: null, needClarification: null };
-    }
-
-    try {
-        const client: any = createOpenAIClient(apiKey, 'gpt-4o', { responseFormat: { type: 'json_object' } });
-
-        const ctx = {
-            mode: 'option_map' as const,
-            currentQuestionText: questionText,
-            currentQuestionOptions: options
-        };
-
-        const prompt = buildChatPrompt(
-            userText,
-            answers,
-            false,
-            answers.length,
-            detectedLightType ?? null,
-            ctx
-        );
-
-        console.log(`[OptionMapper] 🎯 Mapping "${userText}" to options: [${options.join(', ')}]`);
-
-        const raw = await client.generateContent(prompt, {
-            responseFormat: { type: 'json_object' }
-        });
-
-        const parsed = extractJSON(raw);
-        if (!parsed) {
-            console.warn('[OptionMapper] Failed to parse JSON response');
-            return { selectedOptionLabel: null, needClarification: null };
-        }
-
-        const selectedLabel = parsed.selectedOptionLabel ?? null;
-        const clarification = parsed.needClarification ?? null;
-
-        // Validate that selectedLabel is actually one of the options
-        if (selectedLabel && options.includes(selectedLabel)) {
-            console.log(`[OptionMapper] ✅ Mapped to: "${selectedLabel}"`);
-            return { selectedOptionLabel: selectedLabel, needClarification: null };
-        }
-
-        if (clarification) {
-            console.log(`[OptionMapper] ❓ Needs clarification: "${clarification}"`);
-            return { selectedOptionLabel: null, needClarification: clarification };
-        }
-
-        console.log('[OptionMapper] ⚠️ No valid mapping found');
-        return { selectedOptionLabel: null, needClarification: null };
-    } catch (err) {
-        console.error('[OptionMapper] Error:', err);
-        return { selectedOptionLabel: null, needClarification: null };
-    }
-}
-
-// =============================================================================
 // KB FLOW (Warning lights)
-// =============================================================================
+// HYBRID_LIGHTS use KB for questions but AI for diagnosis (imported from hybrid-diagnosis.ts)
+
 export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const { userText, answers, context } = req;
-
     if (!context?.detectedLightType || context.detectedLightType === 'unidentified_light') {
         return { response: null, handled: false };
     }
@@ -665,100 +365,134 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const lightType = context.detectedLightType;
     const uiSeverity = context.lightSeverity || 'caution';
 
-    // 📋 CONVERSATION LOG: Log current state
-    console.log(`\n${'='.repeat(60)} `);
-    console.log(`[KBFlow] 📋 CONVERSATION STATE: `);
-    console.log(`  Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting...'} | Severity: ${uiSeverity} `);
-    console.log(`  Last Question: "${(context as any).currentQuestionText || 'N/A'}"`);
-    console.log(`  User Answer: "${userText}"`);
-    console.log(`  Total Answers: ${answers?.length || 0} `);
-    if (context.causeScores && Object.keys(context.causeScores).length > 0) {
-        console.log(`  Current Scores: ${JSON.stringify(context.causeScores)} `);
-    }
-    console.log(`${'='.repeat(60)} \n`);
+    console.log(`[KBFlow] Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting'} | Answer: "${userText}"`);
 
-    // ---------------------------------------------------------------------------
-    // Option Mapping: If user typed free-text and we have expected options
-    // ---------------------------------------------------------------------------
+    // Deterministic option mapping (no AI)
     let effectiveText = userText;
     const currentOptions = (context as any).currentQuestionOptions as string[] | undefined;
-    const optionMapAttempts = ((context as any).optionMapAttempts ?? 0) as number;
 
-    if (
-        currentOptions &&
-        Array.isArray(currentOptions) &&
-        currentOptions.length > 0 &&
-        userText &&
-        !currentOptions.includes(userText.trim()) &&
-        optionMapAttempts < 1
-    ) {
-        const mapResult = await callOptionMapperAI({
-            userText,
-            detectedLightType: lightType,
-            answers,
-            questionText: (context as any).currentQuestionText ?? 'בחר/י אפשרות',
-            options: currentOptions,
-            context
-        });
-
-        if (mapResult.selectedOptionLabel) {
-            effectiveText = mapResult.selectedOptionLabel;
-            console.log(`[KBFlow] 🔄 Mapped user input to: "${effectiveText}"`);
-        } else if (mapResult.needClarification) {
-            // Ask for clarification without advancing
+    if (currentOptions?.length && userText && !currentOptions.includes(userText.trim())) {
+        const { selected } = normalizeSelection(userText, currentOptions);
+        if (selected) {
+            effectiveText = selected;
+        } else if (isSuccessPhrase(userText) || isResolvedOption(userText)) {
+            // User wrote success phrase like "הצלחתי לבצע" - treat as resolved/completed
+            console.log(`[KBFlow] Success phrase detected: "${userText}" - treating as completion`);
+            // Find a positive/success option if available, otherwise proceed to diagnosis
+            const positiveOption = currentOptions.find(opt =>
+                opt.includes('הצלחתי') || opt.includes('כבתה') || opt.includes('תקין') ||
+                opt.includes('בוצע') || opt.includes('סיימתי') || isResolvedOption(opt)
+            );
+            if (positiveOption) {
+                effectiveText = positiveOption;
+            } else {
+                // No matching option - generate resolved diagnosis
+                return {
+                    handled: true,
+                    response: NextResponse.json({
+                        type: 'diagnosis_report',
+                        title: `נורת ${(warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType}`,
+                        confidence: 0.8,
+                        confidenceLevel: 'high',
+                        results: [{ issue: 'ביצעת את ההוראות בהצלחה', probability: 0.9, explanation: 'הבעיה ככל הנראה נפתרה' }],
+                        status: { color: 'green', text: 'נפתר!', instruction: 'אם הנורה נשארת דולקת אחרי נסיעה קצרה, פנה למוסך.' },
+                        selfFix: [],
+                        nextSteps: 'עקוב אחר הנורה בנסיעות הבאות',
+                        recommendations: ['בדוק שהנורה אכן כבתה', 'אם הנורה חוזרת - פנה למוסך'],
+                        endConversation: true,
+                        context: mergeContext(context, { resolved: true })
+                    })
+                };
+            }
+        } else {
             return {
                 handled: true,
                 response: NextResponse.json({
                     type: 'question',
-                    text: mapResult.needClarification,
+                    text: 'כדי שאוכל להמשיך, בבקשה בחר אחת מהאפשרויות.',
                     options: currentOptions,
                     detectedLightType: lightType,
                     lightSeverity: uiSeverity,
                     kbSource: true,
-                    context: mergeContext(context, {
-                        optionMapAttempts: optionMapAttempts + 1
-                    })
+                    context: mergeContext(context, { currentQuestionOptions: currentOptions })
                 })
             };
         }
-        // else: fallback, continue with original userText
     }
 
-    // Determine scenario (based on first question answer)
+    // Determine scenario - include current answer for first_question scenario detection
     let scenarioId: string | undefined = context.currentLightScenario || undefined;
     const isNewScenario = !scenarioId;
     if (!scenarioId) {
-        scenarioId = determineScenario(lightType, answers) || undefined;
-        console.log(`[KBFlow] 🎯 Scenario: ${scenarioId ?? 'none'} `);
-    }
-    if (!scenarioId) return { response: null, handled: false };
+        // Include current answer for scenario detection (answers from context may not include it yet)
+        const currentAnswer: UserAnswer = { question: context.currentQuestionText || 'first_question', answer: effectiveText };
+        const answersWithCurrent = [...(answers || []), currentAnswer];
+        scenarioId = determineScenario(lightType, answersWithCurrent) || undefined;
 
-    // Critical immediate action (e.g., oil pressure / coolant temp while driving)
+        if (scenarioId) {
+            console.log(`[KBFlow] Scenario determined: ${scenarioId} from answer: "${effectiveText}"`);
+        }
+    }
+
+    // If no scenario found, check for followup questions from first_question
+    if (!scenarioId) {
+        const lightData = (warningLightsKB as any)[lightType];
+        const firstQ = lightData?.first_question;
+        const followups = firstQ?.followups;
+
+        if (followups && typeof followups === 'object') {
+            // Match current answer to first_question option to get followup
+            const matched = matchOption(firstQ?.options, effectiveText);
+            const optionId = matched?.id;
+            const followupQ = optionId ? followups[optionId] : null;
+
+            if (followupQ?.text && followupQ?.options) {
+                const followupOptions = followupQ.options.map((o: any) => typeof o === 'string' ? o : o?.label || '').filter(Boolean);
+                console.log(`[KBFlow] No scenario yet, showing followup for "${optionId}"`);
+
+                return {
+                    handled: true,
+                    response: NextResponse.json({
+                        type: 'question',
+                        text: followupQ.text,
+                        options: followupOptions,
+                        detectedLightType: lightType,
+                        lightSeverity: uiSeverity,
+                        kbSource: true,
+                        context: mergeContext(context, {
+                            firstAnswerState: optionId, // Save the first answer (steady/flashing)
+                            askedQuestionIds: [...(context.askedQuestionIds || []), 'first_question'],
+                            currentQuestionId: followupQ.id || `followup_${optionId}`,
+                            currentQuestionText: followupQ.text,
+                            currentQuestionOptions: followupOptions
+                        })
+                    })
+                };
+            }
+        }
+
+        console.log(`[KBFlow] No scenario and no followup found for answer: "${effectiveText}"`);
+        return { response: null, handled: false };
+    }
+
+    // Immediate action check
     const immediateAction = checkImmediateAction(lightType, scenarioId);
     const shownImmediate = context.shownInstructionIds?.includes('immediate_action');
 
     if (immediateAction && !shownImmediate) {
-        console.log('[KBFlow] 🚨 IMMEDIATE ACTION:', immediateAction);
-
-        // Build resolution paths for the confirmation question
-        // These will trigger the appropriate next action based on user response
-        const immediateResolutionPaths: Record<string, any> = {
-            'כן, עצרתי': {
-                status: 'wait_and_verify',
-                next_action: 'check_dipstick_emergency',
-                message: 'מצוין! עכשיו נבדוק את מפלס השמן.'
-            },
-            'אני בדרך לעצור': {
-                status: 'critical',
-                message: '⚠️ עצור לחלוטין וכבה את המנוע מיד!'
-            },
-            'לא יכול': {
-                status: 'needs_tow',
-                diagnosis: 'לא ניתן לעצור את הרכב',
-                recommendation: 'נסה לעצור בצד הדרך. אם לא ניתן - התקשר לגרר מיד.'
+        // Resolution paths depend on light type
+        const immediateResolutionPaths: Record<string, any> = lightType === 'oil_pressure_light'
+            ? {
+                'כן, עצרתי': { status: 'wait_and_verify', next_action: 'check_dipstick_emergency', message: 'מצוין! עכשיו נבדוק את מפלס השמן.' },
+                'אני בדרך לעצור': { status: 'critical', message: '⚠️ עצור לחלוטין וכבה את המנוע מיד!' },
+                'לא יכול': { status: 'needs_tow', diagnosis: 'לא ניתן לעצור את הרכב', recommendation: 'נסה לעצור בצד הדרך. אם לא ניתן - התקשר לגרר מיד.' }
             }
-        };
-
+            : {
+                // For other lights (check_engine, etc) - proceed to diagnostic questions
+                'כן, עצרתי': { status: 'continue_diagnosis', message: 'מצוין! עכשיו נאבחן את הבעיה.' },
+                'אני בדרך לעצור': { status: 'critical', message: '⚠️ עצור לחלוטין וכבה את המנוע מיד!' },
+                'לא יכול': { status: 'needs_tow', diagnosis: 'לא ניתן לעצור את הרכב', recommendation: 'עצור בצד הדרך והזמן גרר דרך האפליקציה.' }
+            };
         return {
             handled: true,
             response: NextResponse.json({
@@ -770,73 +504,48 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 options: ['כן, עצרתי', 'אני בדרך לעצור', 'לא יכול'],
                 context: mergeContext(context, {
                     currentLightScenario: scenarioId,
-                    shownInstructionIds: [...(context.shownInstructionIds || []), 'immediate_action'],
+                    shownInstructionIds: ['immediate_action'],
                     currentQuestionId: 'immediate_action_confirm',
                     currentQuestionText: 'האם עצרת וכיבית את המנוע?',
                     currentQuestionOptions: ['כן, עצרתי', 'אני בדרך לעצור', 'לא יכול'],
-                    pendingResolutionPaths: immediateResolutionPaths,
-                    optionMapAttempts: 0
+                    pendingResolutionPaths: immediateResolutionPaths
                 })
             })
         };
     }
 
-    // NEW: Apply initial score boost when scenario is newly determined
-    // Some scenarios already indicate a strong symptom (e.g., "car pulling to side" = puncture)
+    // Score updates
     let baseScores = { ...(context.causeScores || {}) };
-    if (isNewScenario) {
-        baseScores = applyScenarioBoost(lightType, scenarioId, baseScores);
-    }
-
-    // Score update based on last asked question
+    if (isNewScenario) baseScores = applyScenarioBoost(lightType, scenarioId, baseScores);
     const lastQuestionId = context.currentQuestionId || 'first_question';
     const updatedScores = updateScores(baseScores, lastQuestionId, effectiveText, lightType, scenarioId);
 
-
-    // ---------------------------------------------------------------------------
-    // Check for KB resolution_paths (from followup_question of self_fix_action)
-    // ---------------------------------------------------------------------------
-
-    // First check if we have pending resolution_paths from a nested verification question
+    // Check pending resolution_paths
     if ((context as any).pendingResolutionPaths) {
         const pendingPaths = (context as any).pendingResolutionPaths;
-
-        // Try to find the option ID from the effectiveText (it might be a label)
         let optionId = effectiveText;
-        const currentOpts = (context as any).currentQuestionOptions as string[] | undefined;
-
-        // If currentQuestionOptions are available, try matching by index or exact match
-        if (currentOpts && pendingPaths) {
-            // Check each key in pendingPaths
-            for (const key of Object.keys(pendingPaths)) {
-                if (effectiveText.includes(key) || key.includes(effectiveText) || effectiveText === key) {
-                    optionId = key;
-                    break;
-                }
+        for (const key of Object.keys(pendingPaths)) {
+            if (effectiveText.includes(key) || key.includes(effectiveText) || effectiveText === key) {
+                optionId = key;
+                break;
             }
         }
-
         const resolution = pendingPaths[optionId];
         if (resolution) {
-            console.log(`[KBFlow] 📋 Found pending resolution_path for: ${optionId} `);
             const result = handleResolutionPath(resolution, lightType, scenarioId, context, updatedScores);
             if (result) return result;
         }
     }
 
-    // Then try to look up resolution_paths from KB
+    // KB resolution lookup
     const kbResolution = lookupResolutionPath(lightType, scenarioId, context.currentQuestionId, effectiveText);
     if (kbResolution) {
         const result = handleResolutionPath(kbResolution, lightType, scenarioId, context, updatedScores);
         if (result) return result;
     }
 
-    // ---------------------------------------------------------------------------
-    // Fallback: Check for RESOLVED option by pattern matching
-    // ---------------------------------------------------------------------------
+    // Resolved option fallback
     if (isResolvedOption(effectiveText)) {
-        console.log('[KBFlow] ✅ User indicated problem is RESOLVED');
-        const resolvedIssue = getResolvedIssueDescription(lightType, context);
         return {
             handled: true,
             response: NextResponse.json({
@@ -844,78 +553,32 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 title: 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [
-                    {
-                        issue: resolvedIssue,
-                        probability: 0.8,
-                        explanation: 'המשתמש דיווח שהנורה כבתה לאחר הפעולה שביצע'
-                    }
-                ],
-                status: {
-                    color: 'green',
-                    text: 'הבעיה נפתרה',
-                    instruction: 'ניתן להמשיך כרגיל'
-                },
-                recommendations: [
-                    'בדוק שוב מחר בבוקר',
-                    'אם הנורה חוזרת – פנה למוסך'
-                ],
+                results: [{ issue: getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: 'המשתמש דיווח שהנורה כבתה' }],
+                status: { color: 'green', text: 'הבעיה נפתרה', instruction: 'ניתן להמשיך כרגיל' },
+                recommendations: ['בדוק שוב מחר בבוקר', 'אם הנורה חוזרת – פנה למוסך'],
                 endConversation: true,
-                context: mergeContext(context, {
-                    currentLightScenario: scenarioId,
-                    causeScores: updatedScores
-                })
+                context: mergeContext(context, { currentLightScenario: scenarioId, causeScores: updatedScores })
             })
         };
     }
 
-    // Build askedIds BEFORE checking shouldDiagnose
+    // Build askedIds
     const askedIds = [...(context.askedQuestionIds || [])];
     if (!askedIds.includes(lastQuestionId)) askedIds.push(lastQuestionId);
 
-    // FIXED: Use askedIds.length (KB questions only) instead of answers.length (all answers including AI Expert)
-    // This prevents premature diagnosis when KB flow starts after several AI Expert questions
-    const kbQuestionCount = askedIds.length;
-
-    if (shouldDiagnose(updatedScores, kbQuestionCount, uiSeverity)) {
-        const diagnosis = generateDiagnosis(
-            lightType,
-            scenarioId,
-            updatedScores,
-            answers,
-            context.vehicleInfo,
-            context.shownInstructionIds
-        );
-        console.log(`[KBFlow] ✅ Generating KB diagnosis`);
-        console.log(`  Top Issue: ${diagnosis.results?.[0]?.issue} `);
-        console.log(`  Confidence: ${(diagnosis.confidence * 100).toFixed(0)}% (${(diagnosis.confidenceLevel || 'unknown').toUpperCase()})`);
-        console.log(`  Final Scores: ${JSON.stringify(updatedScores)} `);
-        return {
-            handled: true,
-            response: NextResponse.json(diagnosis)
-        };
+    // Check if should diagnose
+    if (shouldDiagnose(updatedScores, askedIds.length, uiSeverity)) {
+        const diagnosis = generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds);
+        return { handled: true, response: NextResponse.json(diagnosis) };
     }
 
-    // ---------------------------------------------------------------------------
-    // Get next step: instruction (self_fix_action) or question (cause.key_question)
-    // ---------------------------------------------------------------------------
+    // Get next step
     const shownInstructionIds = context.shownInstructionIds || [];
     const nextStep = getNextStep(lightType, scenarioId, askedIds, shownInstructionIds, effectiveText);
 
-    // Handle INSTRUCTION (self_fix_action with steps)
     if (nextStep?.kind === 'instruction') {
         const action = nextStep.action;
-        const followupOptions = action.followup_question?.options || [];
-        const followupLabels = followupOptions.map((opt: any) =>
-            typeof opt === 'string' ? opt : opt?.label || ''
-        ).filter(Boolean);
-
-        console.log(`[KBFlow] 📋 INSTRUCTION: `);
-        console.log(`  ID: ${action.id} `);
-        console.log(`  Name: "${action.name}"`);
-        console.log(`  Steps: ${action.steps.length} steps`);
-        console.log(`  Has followup: ${!!action.followup_question} `);
-
+        const followupLabels = (action.followup_question?.options || []).map((opt: any) => typeof opt === 'string' ? opt : opt?.label || '').filter(Boolean);
         return {
             handled: true,
             response: NextResponse.json({
@@ -925,7 +588,6 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 steps: action.steps,
                 warning: action.warning,
                 condition: action.condition,
-                // Followup question (verification after completing instruction)
                 question: action.followup_question?.text,
                 options: followupLabels.length > 0 ? followupLabels : undefined,
                 detectedLightType: lightType,
@@ -934,28 +596,21 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 context: mergeContext(context, {
                     currentLightScenario: scenarioId,
                     causeScores: updatedScores,
-                    askedQuestionIds: askedIds,
-                    shownInstructionIds: [...shownInstructionIds, action.id],
+                    askedQuestionIds: [lastQuestionId],
+                    shownInstructionIds: [action.id],
                     lastInstructionId: action.id,
                     awaitingInstructionResult: true,
-                    currentQuestionId: action.id, // Use instruction ID for tracking
+                    currentQuestionId: action.id,
                     currentQuestionText: action.followup_question?.text,
                     currentQuestionOptions: followupLabels,
-                    pendingResolutionPaths: action.followup_question?.resolution_paths,
-                    optionMapAttempts: 0
+                    pendingResolutionPaths: action.followup_question?.resolution_paths
                 })
             })
         };
     }
 
-    // Handle QUESTION (cause.key_question or followup)
     if (nextStep?.kind === 'question') {
         const nextQ = nextStep.question;
-        console.log(`[KBFlow] ❓ NEXT QUESTION: `);
-        console.log(`  ID: ${nextQ.id} `);
-        console.log(`  Text: "${nextQ.text}"`);
-        console.log(`  Options: [${nextQ.options.join(', ')}]`);
-        console.log(`  Asked so far: [${askedIds.join(', ')}]`);
         return {
             handled: true,
             response: NextResponse.json({
@@ -968,33 +623,27 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 context: mergeContext(context, {
                     currentLightScenario: scenarioId,
                     causeScores: updatedScores,
-                    askedQuestionIds: askedIds,
+                    askedQuestionIds: [lastQuestionId],
                     currentQuestionId: nextQ.id,
                     currentQuestionText: nextQ.text,
-                    currentQuestionOptions: nextQ.options,
-                    optionMapAttempts: 0
+                    currentQuestionOptions: nextQ.options
                 })
             })
         };
     }
 
     // No more steps: generate diagnosis
-    return {
-        handled: true,
-        response: NextResponse.json(generateDiagnosis(
-            lightType,
-            scenarioId,
-            updatedScores,
-            answers,
-            context.vehicleInfo,
-            context.shownInstructionIds
-        ))
-    };
+    // For HYBRID_LIGHTS, use AI diagnosis instead of KB scoring
+    if (HYBRID_LIGHTS.includes(lightType as any)) {
+        console.log(`[KBFlow] Hybrid diagnosis for ${lightType}`);
+        const aiDiagnosis = await generateAIDiagnosis(lightType, scenarioId, answers, context.vehicleInfo, context);
+        return { handled: true, response: aiDiagnosis };
+    }
+
+    return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds)) };
 }
 
-// =============================================================================
-// Scenario flow (static trees in scenarios.ts)
-// =============================================================================
+// Scenario flow (static trees)
 export async function handleScenarioStep(req: RequestContext): Promise<FlowResult> {
     const { userText, context, answers } = req;
 
@@ -1006,77 +655,36 @@ export async function handleScenarioStep(req: RequestContext): Promise<FlowResul
     const step = scenario?.steps?.[context.currentStepId];
 
     if (!scenario || !step) {
-        console.log('[ScenarioStep] ⚠️ Scenario state error');
         return { response: null, handled: false };
     }
 
-    // Choose option by label match (buttons send label text)
     const normalized = (userText || '').trim();
     const optionLabels = step.options.map(o => o.label);
     let selectedOption = step.options.find(o => o.label === normalized) ?? null;
 
-    // ---------------------------------------------------------------------------
-    // Option Mapping: If no direct match, try AI mapping
-    // ---------------------------------------------------------------------------
+    // Deterministic selection (no AI)
     if (!selectedOption && normalized && optionLabels.length > 0) {
-        const optionMapAttempts = ((context as any).optionMapAttempts ?? 0) as number;
-
-        if (optionMapAttempts < 1) {
-            const mapResult = await callOptionMapperAI({
-                userText: normalized,
-                detectedLightType: (context as any).detectedLightType,
-                answers: answers || [],
-                questionText: step.text,
-                options: optionLabels,
-                context
-            });
-
-            if (mapResult.selectedOptionLabel) {
-                selectedOption = step.options.find(o => o.label === mapResult.selectedOptionLabel) ?? null;
-                if (selectedOption) {
-                    console.log(`[ScenarioStep] 🔄 Mapped user input to: "${mapResult.selectedOptionLabel}"`);
-                }
-            } else if (mapResult.needClarification) {
-                // Re-ask with clarification
-                return {
-                    handled: true,
-                    response: NextResponse.json({
-                        type: 'scenario_step',
-                        step: { id: step.id, text: mapResult.needClarification, options: optionLabels },
-                        context: mergeContext(context, {
-                            optionMapAttempts: optionMapAttempts + 1
-                        })
-                    })
-                };
-            }
+        const { selected } = normalizeSelection(normalized, optionLabels);
+        if (selected) {
+            selectedOption = step.options.find(o => o.label === selected) ?? null;
         }
     }
 
     if (!selectedOption) {
-        // Fallback: re-ask current step
         return {
             handled: true,
             response: NextResponse.json({
                 type: 'scenario_step',
-                step: { id: step.id, text: step.text, options: optionLabels },
-                context: mergeContext(context, {
-                    optionMapAttempts: 0
-                })
+                step: { id: step.id, text: 'כדי להמשיך, בבקשה בחר אחת מהאפשרויות.', options: optionLabels },
+                context
             })
         };
     }
 
-    // Apply actions using existing utility (keeps your report format consistent)
     const reportData = context.reportData ?? { verified: [], ruledOut: [], skipped: [], criticalFindings: [] };
-    const { newScores, newReport } = updateSuspectsAndReport(
-        context.suspects || {},
-        selectedOption,
-        scenario,
-        reportData
-    );
+    const { newScores, newReport } = updateSuspectsAndReport(context.suspects || {}, selectedOption, scenario, reportData);
     const hasCritical = Array.isArray(newReport?.criticalFindings) && newReport.criticalFindings.length > 0;
 
-    // Stop alert at option level
     if (selectedOption.stopAlert) {
         return {
             handled: true,
@@ -1093,63 +701,48 @@ export async function handleScenarioStep(req: RequestContext): Promise<FlowResul
 
     const nextStepId = selectedOption.nextStepId;
 
-    // End of scenario → report
     if (!nextStepId) {
-        const report = generateScenarioReport(scenario, { suspects: newScores, reportData: newReport } as DiagnosticState);
+        // Use unified AI diagnosis for consistent output (same as what mechanic receives)
+        const conversationHistory = answers?.map((a: UserAnswer) => ({
+            role: 'user' as const,
+            content: `${a.question} → ${a.answer}`
+        })) || [];
+
+        const unifiedDiag = await generateUnifiedDiagnosis({
+            description: userText || '',
+            conversationHistory,
+            vehicleInfo: undefined,
+            detectedLightType: context?.detectedLightType
+        });
+
+        const hasCritical = unifiedDiag.urgency === 'critical' || unifiedDiag.urgency === 'high';
+
         return {
             handled: true,
             response: NextResponse.json({
                 type: 'diagnosis_report',
-                title: `🔍 אבחון: ${report.topSuspect} `,
-                confidence: Math.min(0.9, 0.5 + report.score * 0.1),
-                summary: { detected: newReport.verified, reported: newReport.criticalFindings },
-                results: [
-                    { issue: report.topSuspect, probability: 0.8, explanation: newReport.verified.join(', ') || '' }
-                ],
-                status: {
-                    color: hasCritical ? 'red' : 'yellow',
-                    text: report.status,
-                    instruction: report.instruction
-                },
+                title: 'אבחון תקלה',
+                confidence: unifiedDiag.confidence,
+                confidenceLevel: unifiedDiag.confidenceLevel,
+                results: unifiedDiag.diagnoses,
+                status: unifiedDiag.status,
                 selfFix: [],
-                nextSteps: 'פנה למוסך לאבחון מקצועי.',
-                recommendations:
-                    report.blindSpots.length > 0
-                        ? [`דילגת על ${report.blindSpots.length} בדיקות`, 'מומלץ לפנות למוסך']
-                        : ['מומלץ לפנות למוסך'],
+                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
+                recommendations: unifiedDiag.recommendations,
                 disclaimer: 'האבחון מבוסס על תיאור בלבד ואינו מחליף בדיקה מקצועית במוסך.',
-                mechanicReport: {
-                    topSuspect: report.topSuspect,
-                    score: report.score,
-                    severity: report.severity,
-                    status: report.status,
-                    instruction: report.instruction,
-                    towConditions: report.towConditions,
-                    blindSpots: report.blindSpots
-                },
-                towConditions: report.towConditions,
-                showTowButton: hasCritical || report.severity === 'high',
-                severity: report.severity,
+                showTowButton: unifiedDiag.needsTow || hasCritical,
+                severity: hasCritical ? 'high' : 'low',
+                category: unifiedDiag.category,
                 endConversation: true,
-                context: mergeContext(context, {
-                    suspects: newScores,
-                    reportData: newReport,
-                    currentScenarioId: null,
-                    currentStepId: null,
-                    activeFlow: null
-                })
+                context: mergeContext(context, { suspects: newScores, reportData: newReport, currentScenarioId: null, currentStepId: null, activeFlow: null, unifiedDiagnosis: true })
             })
         };
     }
 
-    // Next step
     const nextStep = scenario.steps[nextStepId];
-    if (!nextStep) {
-        return { response: null, handled: false };
-    }
+    if (!nextStep) return { response: null, handled: false };
 
     const nextOptions = nextStep.options.map(o => o.label);
-
     return {
         handled: true,
         response: NextResponse.json({
@@ -1161,92 +754,99 @@ export async function handleScenarioStep(req: RequestContext): Promise<FlowResul
                 suspects: newScores,
                 reportData: newReport,
                 currentQuestionText: nextStep.text,
-                currentQuestionOptions: nextOptions,
-                optionMapAttempts: 0
+                currentQuestionOptions: nextOptions
             })
         })
     };
 }
 
-// =============================================================================
 // Expert AI fallback
-// =============================================================================
 export async function callExpertAI(body: any): Promise<any> {
     const { message, description, answers = [], image_urls = [], context } = body;
     const currentInput = message || description || '';
     const detectedLight = context?.detectedLightType;
 
-    // 🔧 CHECK: If user picked a light from the picker, jump directly to KB
     const pickedId = extractLightIdFromPicker(currentInput || '');
+    // Route all lights to KB flow (HYBRID_LIGHTS will use AI for diagnosis only)
     if (pickedId && (warningLightsKB as any)[pickedId]) {
         const sev = (warningLightsKB as any)[pickedId]?.severity ?? 'low';
-        console.log(`[Expert AI] 🎯 User picked light from picker: ${pickedId}`);
         return handleWarningLightDetection(pickedId, sev === 'critical' ? 'danger' : 'caution', context);
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-        return NextResponse.json(
-            { error: 'No API Key', context: mergeContext(context, { lastError: 'NO_API_KEY' }) },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'No API Key', context: mergeContext(context, { lastError: 'NO_API_KEY' }) }, { status: 500 });
     }
 
     const client: any = createOpenAIClient(apiKey, 'gpt-4o', { responseFormat: { type: 'json_object' } });
-
-    const images = await Promise.all(
-        (image_urls || []).slice(0, 3).map((url: string) => fetchImageAsInlineData(url).catch(() => null))
-    ).then(res => res.filter(Boolean));
-
+    const images = await Promise.all((image_urls || []).slice(0, 3).map((url: string) => fetchImageAsInlineData(url).catch(() => null))).then(res => res.filter(Boolean));
     const hasImages = images.length > 0;
 
-    // 🔧 BRIDGE MODE: Text-only goes through bridge first (up to 3 questions)
     const bridgeCount = Number(context?.bridgeQuestionCount ?? 0);
-    const canBridge = !hasImages && !detectedLight && bridgeCount < 3;
 
-    const ctx = {
-        mode: canBridge ? ('bridge' as const) : ('expert' as const),
-        bridgeQuestionCount: bridgeCount
-    };
+    // Check if user indicated no warning light - switch to symptom-based expert mode
+    const noLightPhrases = ['אין נורה', 'לא, אין נורה', 'אין נורת אזהרה', 'לא דולקת', 'נורה לא דולקת', 'בלי נורה', 'ללא נורה'];
+    const userSaidNoLight = noLightPhrases.some(phrase => currentInput.includes(phrase)) ||
+        answers.some((a: UserAnswer) => noLightPhrases.some(phrase => (a.answer || '').includes(phrase)));
 
-    console.log(`[Expert AI] 🧠 Mode: ${hasImages ? 'IMAGE' : detectedLight ? 'KB' : canBridge ? 'BRIDGE' : 'EXPERT'}, bridgeCount: ${bridgeCount}`);
+    // Force expert mode if: no light detected, user said no light, OR we've asked too many bridge questions
+    const shouldUseExpertMode = userSaidNoLight || (!detectedLight && bridgeCount >= 3) || context?.isSymptomFlow;
+    const canBridge = !hasImages && !detectedLight && !shouldUseExpertMode && bridgeCount < 3;
+    const ctx = { mode: canBridge ? ('bridge' as const) : ('expert' as const), bridgeQuestionCount: bridgeCount };
 
-    // 🔧 All modes use buildChatPrompt for consistent JSON output
-    const prompt = (hasImages || detectedLight || canBridge)
-        ? buildChatPrompt(currentInput, answers, hasImages, answers.length, detectedLight ?? null, ctx)
-        : buildChatPrompt(currentInput, answers, hasImages, answers.length, null, { mode: 'expert' as const });
+    // Use appropriate prompt based on mode
+    let prompt: string;
+    if (shouldUseExpertMode) {
+        console.log(`[Expert AI] Using symptom-based expert mode (noLight: ${userSaidNoLight}, bridgeCount: ${bridgeCount})`);
+        prompt = buildGeneralExpertPrompt(currentInput, answers, hasImages, ctx);
+    } else if (hasImages || detectedLight || canBridge) {
+        prompt = buildChatPrompt(currentInput, answers, hasImages, answers.length, detectedLight ?? null, ctx);
+    } else {
+        prompt = buildChatPrompt(currentInput, answers, hasImages, answers.length, null, { mode: 'expert' as const });
+    }
 
     try {
-        const raw = await client.generateContent(prompt, {
-            images: images as any,
-            responseFormat: { type: 'json_object' }
-        });
-
+        const raw = await client.generateContent(prompt, { images: images as any, responseFormat: { type: 'json_object' } });
         const parsed = extractJSON(raw);
         const result: any = parsed ?? {};
 
-        // Normalize light type from AI response (many aliases)
-        let lightType =
-            result.warning_light ||
-            result.light_type ||
-            result.detected_light ||
-            result.light_id ||
-            result.detectedLightType ||
-            detectedLight;
-
+        // Check both top-level and candidate.warning_light from AI response
+        let lightType = result.warning_light || result.light_type || result.detected_light || result.light_id || result.detectedLightType || result.candidate?.warning_light || detectedLight;
         if (typeof lightType === 'string') lightType = lightType.trim();
 
-        console.log(`[Expert AI] 🔍 Detected light: ${lightType || 'none'}`);
+        // Get confidence from candidate if available
+        const candidateConfidence = result.candidate?.confidence ?? 0;
 
-        // If we identified a known light, jump to KB flow
-        if (lightType && (warningLightsKB as any)[lightType]) {
+        // STRICT VALIDATION: Only accept warning light detection if:
+        // 1. There's an image (visual proof), OR
+        // 2. User explicitly mentioned light-related keywords, OR
+        // 3. Light was already detected in context (continuing flow)
+        const lightKeywords = ['נורה', 'נורת', 'אור', 'הבהוב', 'דולק', 'נדלק', 'נדלקה', 'מהבהב', 'מהבהבת', 'לוח מחוונים', 'אזהרה'];
+        const allText = [currentInput, ...answers.map((a: UserAnswer) => `${a.question || ''} ${a.answer || ''}`)].join(' ');
+        const userMentionedLight = lightKeywords.some(kw => allText.includes(kw));
+        const hasExistingLight = Boolean(detectedLight) || Boolean(context?.detectedLightType);
+
+        const canRouteToKB = hasImages || userMentionedLight || hasExistingLight;
+
+        if (!canRouteToKB && lightType && !detectedLight) {
+            console.log(`[Expert AI] Ignoring false positive light detection: "${lightType}" (no image, no light keywords)`);
+            lightType = null; // Clear false detection
+        }
+
+        // Route detected lights to KB flow (HYBRID_LIGHTS will use AI for diagnosis, but KB for questions)
+        if (lightType && (warningLightsKB as any)[lightType] && candidateConfidence >= 0.6 && canRouteToKB) {
+            const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
+            console.log(`[Expert AI] Detected light from candidate: ${lightType} (confidence: ${candidateConfidence}) - routing to KB flow`);
+            return handleWarningLightDetection(lightType, severity, context);
+        }
+
+        // Direct detection without candidate (only if valid)
+        if (lightType && (warningLightsKB as any)[lightType] && !result.candidate && canRouteToKB) {
             const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
             return handleWarningLightDetection(lightType, severity, context);
         }
 
-        // 🔧 BRIDGE EXHAUSTED: Show light picker if bridge questions are exhausted
         if (!lightType && bridgeCount >= 3 && !context?.lightPickerShown) {
-            console.log('[Expert AI] 🎨 Bridge exhausted, showing light picker');
             return NextResponse.json({
                 type: 'question',
                 text: 'כדי לדייק: איזו נורת אזהרה ראית? אם אתה לא בטוח, בחר את הקרובה ביותר.',
@@ -1255,70 +855,74 @@ export async function callExpertAI(body: any): Promise<any> {
             });
         }
 
-        // Handle diagnosis_report or ai_response - ensure conversation ends
         if (result.type === 'diagnosis_report' || result.type === 'ai_response') {
-            console.log('[Expert AI] 📋 Final response, ending conversation');
+            return NextResponse.json({ ...result, type: result.type === 'ai_response' ? 'diagnosis_report' : result.type, endConversation: true, context: mergeContext(context, result?.context) });
+        }
+
+        // Normalize options for all AI responses (AI may return {id, label} objects)
+        const normalizedResult = { ...result };
+        if (Array.isArray(result.options)) {
+            normalizedResult.options = result.options.map((o: any) => typeof o === 'string' ? o : o?.label || String(o)).filter(Boolean);
+        }
+
+        // DEAD-END DETECTION: Check for empty/stuck responses or too many questions
+        const questionCount = answers.length;
+        const MAX_QUESTIONS = 8;
+        const emptyPhrases = ['המשך', 'המשך...', 'continue', 'ok', 'אוקיי'];
+        const isEmptyResponse = !result.text || emptyPhrases.some(p => (result.text || '').trim().toLowerCase() === p.toLowerCase());
+        const hasNoOptions = !normalizedResult.options || normalizedResult.options.length === 0;
+        const isStuck = isEmptyResponse || (hasNoOptions && result.type === 'question');
+
+        if (isStuck || questionCount >= MAX_QUESTIONS) {
+            console.log(`[Expert AI] Dead-end detected: isStuck=${isStuck}, questionCount=${questionCount} - using unified diagnosis`);
+
+            // Use unified diagnosis generator for consistent quality
+            const conversationHistory = answers.map((a: UserAnswer) => ({
+                role: 'user' as const,
+                content: `${a.question} → ${a.answer}`
+            }));
+
+            const unifiedDiag = await generateUnifiedDiagnosis({
+                description: currentInput,
+                conversationHistory,
+                vehicleInfo: undefined, // Not available in this context
+                detectedLightType: context?.detectedLightType
+            });
+
             return NextResponse.json({
-                ...result,
-                type: result.type === 'ai_response' ? 'diagnosis_report' : result.type,
+                type: 'diagnosis_report',
+                title: 'אבחון תקלה',
+                confidence: unifiedDiag.confidence,
+                confidenceLevel: unifiedDiag.confidenceLevel,
+                results: unifiedDiag.diagnoses,
+                status: unifiedDiag.status,
+                selfFix: [],
+                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
+                recommendations: unifiedDiag.recommendations,
+                disclaimer: 'האבחון מבוסס על תיאור הבעיה. מומלץ אישור במוסך.',
                 endConversation: true,
-                context: mergeContext(context, result?.context)
+                showTowButton: unifiedDiag.needsTow,
+                category: unifiedDiag.category,
+                context: mergeContext(context, { unifiedDiagnosis: true })
             });
         }
 
-        // 🔧 BRIDGE QUESTION: Increment counter for bridge questions
         if (result.type === 'question' && canBridge) {
-            return NextResponse.json({
-                ...result,
-                context: mergeContext(context, {
-                    bridgeQuestionCount: bridgeCount + 1,
-                    isSymptomFlow: true,
-                    activeFlow: null,
-                    ...(result?.context ?? {})
-                })
-            });
+            return NextResponse.json({ ...normalizedResult, context: mergeContext(context, { bridgeQuestionCount: bridgeCount + 1, isSymptomFlow: true, activeFlow: null, ...(result?.context ?? {}) }) });
         }
 
-        // Otherwise return the AI payload as-is, but persist context
-        return NextResponse.json({
-            ...result,
-            context: mergeContext(context, result?.context)
-        });
+        return NextResponse.json({ ...normalizedResult, context: mergeContext(context, result?.context) });
     } catch (err: any) {
         console.error('[Expert AI] Error:', err);
-
-        // Check if this is a content filter refusal
-        const isContentFilter = err?.message?.includes('content filter') ||
-            err?.message?.includes('refusal') ||
-            err?.message?.includes("can't assist");
-
+        const isContentFilter = err?.message?.includes('content filter') || err?.message?.includes('refusal');
         if (isContentFilter && hasImages) {
-            // Content filter blocked the image - ask user to describe in text
-            return NextResponse.json({
-                type: 'question',
-                text: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים? (למשל: צורת הסמל, הצבע, מתי הופיעה)',
-                options: buildLightPickerOptions(),
-                context: mergeContext(context, {
-                    activeFlow: null,
-                    detectedLightType: 'unidentified_light',
-                    isSymptomFlow: true,
-                    bridgeQuestionCount: 0
-                })
-            });
+            return NextResponse.json({ type: 'question', text: 'לא הצלחתי לזהות את התמונה. האם תוכל לתאר את נורת האזהרה במילים?', options: buildLightPickerOptions(), context: mergeContext(context, { activeFlow: null, isSymptomFlow: true, bridgeQuestionCount: 0 }) });
         }
-
-        return NextResponse.json({
-            type: 'question',
-            text: 'נתקלתי בבעיה. נסה לתאר שוב את הבעיה.',
-            options: ['אנסה שוב', 'אעדיף לגשת למוסך'],
-            context: mergeContext(context, { lastError: 'EXPERT_AI_ERROR' })
-        });
+        return NextResponse.json({ type: 'question', text: 'נתקלתי בבעיה. נסה לתאר שוב את הבעיה.', options: ['אנסה שוב', 'אעדיף לגשת למוסך'], context: mergeContext(context, { lastError: 'EXPERT_AI_ERROR' }) });
     }
 }
 
-// =============================================================================
 // Initial flow starters
-// =============================================================================
 export function handleWarningLightDetection(lightId: string, severity: string, existingContext?: any): any {
     const lightData = (warningLightsKB as any)[lightId];
     if (!lightData?.first_question) return null;
@@ -1327,20 +931,7 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
     const name = lightData.names?.he?.[0] || lightId;
     const isCritical = (CRITICAL_LIGHTS as any).includes(lightId);
     const questionOptions = q.options?.map((o: any) => o.label || o) || ['כן', 'לא', 'לא בטוח'];
-    const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text} `;
-
-    const newContext = {
-        detectedLightType: lightId,
-        lightSeverity: isCritical ? 'danger' : severity,
-        isLightContext: true,
-        askedQuestionIds: ['first_question'],
-        currentQuestionId: 'first_question',
-        causeScores: {},
-        currentQuestionText: questionText,
-        currentQuestionOptions: questionOptions,
-        optionMapAttempts: 0,
-        activeFlow: "KB" as const
-    };
+    const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text}`;
 
     return NextResponse.json({
         type: 'question',
@@ -1349,7 +940,7 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
         detectedLightType: lightId,
         lightSeverity: isCritical ? 'danger' : severity,
         kbSource: true,
-        context: { ...(existingContext ?? {}), ...newContext }
+        context: { ...(existingContext ?? {}), detectedLightType: lightId, lightSeverity: isCritical ? 'danger' : severity, isLightContext: true, askedQuestionIds: ['first_question'], currentQuestionId: 'first_question', causeScores: {}, currentQuestionText: questionText, currentQuestionOptions: questionOptions, activeFlow: 'KB' as const }
     });
 }
 
@@ -1357,7 +948,6 @@ export function handleScenarioStart(scenarioId: string): any {
     const scenario: Scenario | undefined = (SCENARIOS as any)[scenarioId];
     if (!scenario) return null;
 
-    console.log(`[FlowHandler] 🎬 Starting scenario: ${scenario.title} `);
     const firstStep = scenario.steps[scenario.startingStepId];
     const suspects: Record<string, number> = {};
     scenario.suspects.forEach(s => (suspects[s.id] = 0));
@@ -1367,128 +957,36 @@ export function handleScenarioStart(scenarioId: string): any {
         type: 'scenario_start',
         title: scenario.title,
         step: { id: firstStep.id, text: firstStep.text, options: stepOptions },
-        context: {
-            currentScenarioId: scenario.id,
-            currentStepId: firstStep.id,
-            suspects,
-            reportData: { verified: [], ruledOut: [], skipped: [], criticalFindings: [] },
-            currentQuestionText: firstStep.text,
-            currentQuestionOptions: stepOptions,
-            optionMapAttempts: 0,
-            activeFlow: "SCENARIO" as const
-        }
+        context: { currentScenarioId: scenario.id, currentStepId: firstStep.id, suspects, reportData: { verified: [], ruledOut: [], skipped: [], criticalFindings: [] }, currentQuestionText: firstStep.text, currentQuestionOptions: stepOptions, activeFlow: 'SCENARIO' as const }
     });
 }
 
 export function handleSafetyStop(rule: SafetyRule): any {
-    console.log(`[FlowHandler] 🚨 CRITICAL SAFETY STOP: ${rule.id} `);
-
-    // Rule-specific emergency instructions
-    const ruleConfigs: Record<string, {
-        detected: string[];
-        issue: string;
-        explanation: string;
-        nextSteps: string;
-        recommendations: string[];
-        towConditions: string[];
-    }> = {
-        smoke_fire: {
-            detected: ['עשן או אש מהרכב'],
-            issue: 'סכנת שריפה ברכב',
-            explanation: 'זוהו סימני עשן או אש. יש לעצור מיידית, לכבות את המנוע ולהתרחק מהרכב.',
-            nextSteps: 'התרחק מהרכב לפחות 30 מטר והתקשר לכיבוי אש (102) ואז לביטוח.',
-            recommendations: ['אל תפתח את המכסה!', 'התרחק מהרכב מיד', 'התקשר ל-102', 'אל תנסה לכבות לבד'],
-            towConditions: ['עשן מהמנוע', 'ריח שריפה', 'להבות נראות']
-        },
-        brake_failure: {
-            detected: ['כשל בבלמים'],
-            issue: 'תקלת בלמים קריטית',
-            explanation: 'הבלמים אינם פועלים כראוי. אסור להמשיך בנסיעה.',
-            nextSteps: 'עצור במקום הבטוח הקרוב והזמן גרר.',
-            recommendations: ['אל תמשיך לנסוע!', 'השתמש בבלם יד בזהירות', 'הזמן גרר מיידית'],
-            towConditions: ['בלמים לא מגיבים', 'דוושה שוקעת לרצפה', 'רעש חריג בבלימה']
-        },
-        oil_pressure: {
-            detected: ['אובדן לחץ שמן'],
-            issue: 'לחץ שמן קריטי',
-            explanation: 'לחץ השמן במנוע ירד לרמה מסוכנת. המשך נסיעה עלול לגרום לנזק בלתי הפיך למנוע.',
-            nextSteps: 'כבה את המנוע מיידית ואל תנסה להניע שוב. הזמן גרר.',
-            recommendations: ['כבה את המנוע מיד', 'אל תנסה להניע!', 'הזמן גרר', 'בדוק מפלס שמן אחרי שהמנוע קר'],
-            towConditions: ['נורת שמן אדומה דולקת', 'רעש מנוע חריג', 'ריח שמן שרוף']
-        },
-        coolant_temp: {
-            detected: ['התחממות יתר של המנוע'],
-            issue: 'טמפרטורת מנוע קריטית',
-            explanation: 'המנוע מתחמם יתר על המידה. המשך נסיעה עלול לגרום לנזק חמור.',
-            nextSteps: 'עצור מיידית, כבה את המנוע והמתן שיתקרר. אל תפתח את מכסה הרדיאטור!',
-            recommendations: ['עצור מיד', 'כבה את המנוע', 'אל תפתח מכסה רדיאטור!', 'המתן 30 דקות לפני בדיקה'],
-            towConditions: ['מחוג טמפרטורה באדום', 'אדים מהמנוע', 'ריח מתוק של נוזל קירור']
-        },
-        steering_fail: {
-            detected: ['תקלה בהגה'],
-            issue: 'כשל במערכת ההיגוי',
-            explanation: 'מערכת ההיגוי אינה מגיבה כראוי. נסיעה בתנאים אלה מסוכנת ביותר.',
-            nextSteps: 'עצור בצד הדרך בזהירות מרבית והזמן גרר.',
-            recommendations: ['עצור בזהירות', 'הדלק אורות חירום', 'אל תמשיך לנסוע', 'הזמן גרר'],
-            towConditions: ['הגה כבד מאוד', 'הגה לא מגיב', 'רעשים בהיגוי']
-        }
+    const ruleConfigs: Record<string, { detected: string[]; issue: string; explanation: string; nextSteps: string; recommendations: string[]; towConditions: string[] }> = {
+        smoke_fire: { detected: ['עשן או אש מהרכב'], issue: 'סכנת שריפה ברכב', explanation: 'זוהו סימני עשן או אש. יש לעצור מיידית, לכבות את המנוע ולהתרחק מהרכב.', nextSteps: 'התרחק מהרכב לפחות 30 מטר והתקשר לכיבוי אש (102) ואז לביטוח.', recommendations: ['אל תפתח את המכסה!', 'התרחק מהרכב מיד', 'התקשר ל-102', 'אל תנסה לכבות לבד'], towConditions: ['עשן מהמנוע', 'ריח שריפה', 'להבות נראות'] },
+        brake_failure: { detected: ['כשל בבלמים'], issue: 'תקלת בלמים קריטית', explanation: 'הבלמים אינם פועלים כראוי. אסור להמשיך בנסיעה.', nextSteps: 'עצור במקום הבטוח הקרוב והזמן גרר.', recommendations: ['אל תמשיך לנסוע!', 'השתמש בבלם יד בזהירות', 'הזמן גרר מיידית'], towConditions: ['בלמים לא מגיבים', 'דוושה שוקעת לרצפה', 'רעש חריג בבלימה'] },
+        oil_pressure: { detected: ['אובדן לחץ שמן'], issue: 'לחץ שמן קריטי', explanation: 'לחץ השמן במנוע ירד לרמה מסוכנת. המשך נסיעה עלול לגרום לנזק בלתי הפיך למנוע.', nextSteps: 'כבה את המנוע מיידית ואל תנסה להניע שוב. הזמן גרר.', recommendations: ['כבה את המנוע מיד', 'אל תנסה להניע!', 'הזמן גרר', 'בדוק מפלס שמן אחרי שהמנוע קר'], towConditions: ['נורת שמן אדומה דולקת', 'רעש מנוע חריג', 'ריח שמן שרוף'] },
+        coolant_temp: { detected: ['התחממות יתר של המנוע'], issue: 'טמפרטורת מנוע קריטית', explanation: 'המנוע מתחמם יתר על המידה. המשך נסיעה עלול לגרום לנזק חמור.', nextSteps: 'עצור מיידית, כבה את המנוע והמתן שיתקרר. אל תפתח את מכסה הרדיאטור!', recommendations: ['עצור מיד', 'כבה את המנוע', 'אל תפתח מכסה רדיאטור!', 'המתן 30 דקות לפני בדיקה'], towConditions: ['מחוג טמפרטורה באדום', 'אדים מהמנוע', 'ריח מתוק של נוזל קירור'] },
+        steering_fail: { detected: ['תקלה בהגה'], issue: 'כשל במערכת ההיגוי', explanation: 'מערכת ההיגוי אינה מגיבה כראוי. נסיעה בתנאים אלה מסוכנת ביותר.', nextSteps: 'עצור בצד הדרך בזהירות מרבית והזמן גרר.', recommendations: ['עצור בזהירות', 'הדלק אורות חירום', 'אל תמשיך לנסוע', 'הזמן גרר'], towConditions: ['הגה כבד מאוד', 'הגה לא מגיב', 'רעשים בהיגוי'] }
     };
 
-    // Find matching config or use default
     const matchedKey = Object.keys(ruleConfigs).find(key => rule.id.includes(key));
-    const config = matchedKey ? ruleConfigs[matchedKey] : {
-        detected: ['מצב חירום'],
-        issue: 'תקלה קריטית ברכב',
-        explanation: rule.message,
-        nextSteps: 'עצור מיידית במקום בטוח והזמן גרר.',
-        recommendations: ['עצור מיד', 'הדלק אורות חירום', 'הזמן גרר'],
-        towConditions: ['מצב חירום כללי']
-    };
+    const config = matchedKey ? ruleConfigs[matchedKey] : { detected: ['מצב חירום'], issue: 'תקלה קריטית ברכב', explanation: rule.message, nextSteps: 'עצור מיידית במקום בטוח והזמן גרר.', recommendations: ['עצור מיד', 'הדלק אורות חירום', 'הזמן גרר'], towConditions: ['מצב חירום כללי'] };
 
-    // Build finalCard for FinalDiagnosisCard
     const finalCard = {
         title: 'מצב חירום',
-        summary: {
-            detected: config.detected,
-            reported: [rule.message]
-        },
-        results: [{
-            issue: config.issue,
-            probability: 0.95,
-            explanation: config.explanation
-        }],
+        summary: { detected: config.detected, reported: [rule.message] },
+        results: [{ issue: config.issue, probability: 0.95, explanation: config.explanation }],
         confidence: 0.95,
-        status: {
-            color: 'red' as const,
-            text: 'עצור מיד!',
-            instruction: rule.message
-        },
+        status: { color: 'red' as const, text: 'עצור מיד!', instruction: rule.message },
         nextSteps: config.nextSteps,
         recommendations: config.recommendations,
         disclaimer: 'זהו מצב חירום. האבחון מבוסס על המידע שסיפקת. פעל בהתאם להנחיות הבטיחות.',
         showTowButton: true,
         severity: 'critical' as const,
         towConditions: config.towConditions,
-        mechanicReport: {
-            topSuspect: config.issue,
-            score: 10,
-            severity: 'critical' as const,
-            status: 'עצור מיד!',
-            instruction: config.nextSteps,
-            towConditions: config.towConditions,
-            blindSpots: []
-        }
+        mechanicReport: { topSuspect: config.issue, score: 10, severity: 'critical' as const, status: 'עצור מיד!', instruction: config.nextSteps, towConditions: config.towConditions, blindSpots: [] }
     };
 
-    return NextResponse.json({
-        type: 'safety_alert',
-        title: 'עצור מיד!',
-        message: rule.message,
-        level: rule.level,
-        stopChat: !!rule.endConversation,
-        endConversation: !!rule.endConversation,
-        followUpMessage: rule.followUpMessage,
-        nextScenarioId: rule.nextScenarioId,
-        finalCard
-    });
+    return NextResponse.json({ type: 'safety_alert', title: 'עצור מיד!', message: rule.message, level: rule.level, stopChat: !!rule.endConversation, endConversation: !!rule.endConversation, followUpMessage: rule.followUpMessage, nextScenarioId: rule.nextScenarioId, finalCard });
 }

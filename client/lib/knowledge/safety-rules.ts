@@ -1,15 +1,9 @@
 import { SafetyRule } from '@/lib/types/knowledge';
 
 export const SAFETY_RULES: SafetyRule[] = [
-  // =================================================================
-  // LEVEL: CRITICAL
-  // משמעות: סכנת חיים או נזק טוטאלי לרכב.
-  // פעולה: הקפצת מסגרת אדומה -> המתנה לאישור עצירה -> סיום שיחה או מעבר לתרחיש.
-  // =================================================================
-
+  // CRITICAL rules - סכנת חיים או נזק טוטאלי
   {
     id: 'brakes_fail',
-    // מילות מפתח ספציפיות יותר כדי להימנע מ-false positives (לא רק "בלמים")
     keywords: ['אין בלמים', 'הבלמים לא עובדים', 'בלמים לא עובדים', 'דוושה רכה', 'דוושה ספוגית', 'דוושה שוקעת', 'לא עוצר', 'דוושה ירדה לרצפה', 'איבוד בלמים', 'אין ברקסים', 'בלמים נכשלו', 'בלמים לא תופסים', 'אין עצירה'],
     message: 'עצור במקום בטוח בהקדם! בעיה בבלמים היא סכנת חיים. אל תמשיך בנסיעה. הזמן גרר.',
     level: 'CRITICAL',
@@ -26,8 +20,23 @@ export const SAFETY_RULES: SafetyRule[] = [
   },
   {
     id: 'smoke_fire',
-    // מילות מפתח לזיהוי עשן/אש - כוללות גם וריאציות נפוצות
-    keywords: ['יוצא עשן', 'עשן מהמנוע', 'יש עשן', 'עשן יוצא', 'אש ברכב', 'אש', 'מנוע מעשן', 'להבות', 'גיצים', 'ניצוצות', 'עשן שחור', 'רואה עשן'],
+    keywords: [
+      'יוצא עשן',
+      'עשן מהמנוע',
+      'יש עשן',
+      'עשן יוצא',
+      'מנוע מעשן',
+      'עשן שחור',
+      'רואה עשן',
+      'אש ברכב',
+      'שריפה ברכב',
+      'הרכב בוער',
+      'עלה באש',
+      'להבות מהרכב',
+      'להבות',
+      'גיצים',
+      'ניצוצות'
+    ],
     message: 'עצור במקום בטוח, כבה את המנוע מיד, צא מהרכב, התרחק למרחק בטחון והזמן מכבי אש (102).',
     level: 'CRITICAL',
     endConversation: true,
@@ -35,7 +44,7 @@ export const SAFETY_RULES: SafetyRule[] = [
   },
   {
     id: 'fuel_leak',
-    keywords: ['ריח דלק', 'ריח בנזין', 'ריח בנזין חזק', 'ריח סולר חזק', 'נזילת דלק', 'דלק מטפטף', 'שלולית דלק', 'ריח חריף של דלק', 'ריח חזק של דלק'],
+    keywords: ['ריח דלק', 'ריח בנזין', 'ריח סולר', 'נזילת דלק', 'דלק מטפטף', 'שלולית דלק', 'ריח חזק של דלק'],
     message: 'חשד לדליפת דלק! כבה את המנוע מיד ואל תנסה להניע שוב. התרחק מהרכב ואל תעשן או תדליק אש בקרבתו.',
     level: 'CRITICAL',
     endConversation: true,
@@ -43,10 +52,6 @@ export const SAFETY_RULES: SafetyRule[] = [
   },
   {
     id: 'overheating_extreme',
-    // =================================================================
-    // התחממות קיצונית - קיטור, אדים, רתיחה - סיום שיחה מיידי!
-    // Rule זה חייב להופיע לפני overheating_severe כדי לתפוס קודם
-    // =================================================================
     keywords: [
       'אדים מהמנוע',
       'קיטור מהמנוע',
@@ -57,7 +62,7 @@ export const SAFETY_RULES: SafetyRule[] = [
       'נוזל קירור נשפך',
       'נוזל קירור על הרצפה',
       'מים יוצאים מהמנוע',
-      'ריח מתוק חזק' // ריח נוזל קירור
+      'ריח מתוק חזק'
     ],
     message: '🚨 חשד לרתיחה! עצור בצד הדרך מיד, כבה את המנוע ואל תפתח את מכסה המנוע בשום מצב! סכנת כוויות. התרחק מהרכב והזמן גרר.',
     level: 'CRITICAL',
@@ -66,7 +71,6 @@ export const SAFETY_RULES: SafetyRule[] = [
   },
   {
     id: 'overheating_severe',
-    // מילות מפתח להתחממות שאינה רתיחה - מד חום, נורה אדומה
     keywords: ['מחוג חום באדום', 'נורת חום אדומה', 'נורת טמפרטורה אדומה', 'מד חום עולה', 'מד חום גבוה', 'מחוג באדום'],
     message: 'חשד להתחממות יתר! עצור בצד בבטחה וכבה את המנוע. אסור לפתוח את פקק הרדיאטור כשהמנוע חם - סכנת כוויות.',
     level: 'CRITICAL',
@@ -83,12 +87,7 @@ export const SAFETY_RULES: SafetyRule[] = [
     followUpMessage: 'עצרת? מצוין. הזמן גרר למוסך לטיפול בבעיית השימון.'
   },
 
-  // =================================================================
-  // LEVEL: WARNING
-  // משמעות: אזהרה לפני פעולה מסוכנת.
-  // פעולה: הודעה בתוך הצ'אט -> המשתמש מאשר -> השיחה ממשיכה מאותה נקודה.
-  // =================================================================
-
+  // WARNING rules - אזהרה לפני פעולה מסוכנת
   {
     id: 'safety_hood',
     keywords: ['פתח מכסה מנוע', 'לבדוק שמן', 'לבדוק מים', 'בדיקת מנוע', 'בדיקת שמן', 'בדיקת נוזל קירור'],
@@ -107,7 +106,6 @@ export const SAFETY_RULES: SafetyRule[] = [
   },
   {
     id: 'battery_acid',
-    // מילות מפתח ספציפיות יותר
     keywords: ['קורוזיה על המצבר', 'אבקה לבנה על המצבר', 'נוזל מהמצבר', 'מצבר מדליף', 'חומצה מהמצבר'],
     message: 'זהירות: האבקה או הנוזל על המצבר הם חומצה. אל תיגע בידיים חשופות ושטוף היטב במים אם נגעת.',
     level: 'WARNING',

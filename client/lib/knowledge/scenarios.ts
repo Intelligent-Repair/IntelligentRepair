@@ -1,7 +1,6 @@
 import { Scenario, StepOption } from '@/lib/types/knowledge';
 
-// --- Helpers ---
-// פונקציית עזר ליצירת כפתור מילוט מהיר
+// Helper: escape button
 const createSkipOption = (nextStepId: string): StepOption => ({
   label: 'לא יודע / דלג',
   nextStepId: nextStepId,
@@ -9,9 +8,7 @@ const createSkipOption = (nextStepId: string): StepOption => ({
 });
 
 export const SCENARIOS: Record<string, Scenario> = {
-  // ---------------------------------------------------------
-  // תרחיש 1: הרכב לא מניע (Car Won't Start)
-  // ---------------------------------------------------------
+  // תרחיש: הרכב לא מניע
   car_wont_start: {
     id: 'car_wont_start',
     title: 'הרכב לא מניע',
@@ -32,7 +29,7 @@ export const SCENARIOS: Record<string, Scenario> = {
             label: 'יש רעש של "תיקתוק" מהיר או חזק',
             nextStepId: 'check_lights',
             actions: [
-              { type: 'VERIFIES', suspectId: 'starter', weight: 2 }, // חשד חזק לסטרטר תפוס או מצבר גמור
+              { type: 'VERIFIES', suspectId: 'starter', weight: 2 },
               { type: 'VERIFIES', suspectId: 'battery', weight: 1 }
             ]
           },
@@ -40,20 +37,20 @@ export const SCENARIOS: Record<string, Scenario> = {
             label: 'שקט מוחלט, אין שום רעש',
             nextStepId: 'check_lights',
             actions: [
-              { type: 'VERIFIES', suspectId: 'battery', weight: 2 }, // סבירות גבוהה למצבר מת
+              { type: 'VERIFIES', suspectId: 'battery', weight: 2 },
               { type: 'VERIFIES', suspectId: 'immobilizer', weight: 1 }
             ]
           },
           {
             label: 'המנוע מנסה להניע ("משתעל") אבל לא מצליח',
-            nextStepId: 'check_fuel', // דילוג לחשד דלק
+            nextStepId: 'check_fuel',
             actions: [
-              { type: 'RULES_OUT', suspectId: 'battery', weight: 2 }, // אם יש סטרטר, המצבר כנראה תקין
+              { type: 'RULES_OUT', suspectId: 'battery', weight: 2 },
               { type: 'RULES_OUT', suspectId: 'starter', weight: 2 },
               { type: 'VERIFIES', suspectId: 'fuel_system', weight: 2 }
             ]
           },
-          createSkipOption('check_lights') // Escape Hatch
+          createSkipOption('check_lights')
         ]
       },
       check_lights: {
@@ -64,7 +61,7 @@ export const SCENARIOS: Record<string, Scenario> = {
             label: 'האורות חלשים מאוד או מהבהבים',
             nextStepId: 'check_immobilizer',
             actions: [
-              { type: 'VERIFIES', suspectId: 'battery', weight: 3 }, // כמעט ודאי מצבר
+              { type: 'VERIFIES', suspectId: 'battery', weight: 3 },
               { type: 'RULES_OUT', suspectId: 'starter', weight: 1 }
             ]
           },
@@ -73,10 +70,10 @@ export const SCENARIOS: Record<string, Scenario> = {
             nextStepId: 'check_immobilizer',
             actions: [
               { type: 'RULES_OUT', suspectId: 'battery', weight: 2 },
-              { type: 'VERIFIES', suspectId: 'starter', weight: 2 } // חשמל יש, אבל לא מניע -> סטרטר
+              { type: 'VERIFIES', suspectId: 'starter', weight: 2 }
             ]
           },
-          createSkipOption('check_immobilizer') // Escape Hatch: "לא יודע להבדיל"
+          createSkipOption('check_immobilizer')
         ]
       },
       check_immobilizer: {
@@ -96,7 +93,6 @@ export const SCENARIOS: Record<string, Scenario> = {
           createSkipOption('finish_report')
         ]
       },
-      // צעד חסר: בדיקת מערכת דלק
       check_fuel: {
         id: 'check_fuel',
         text: 'האם תדלקת לאחרונה? האם יש דלק במיכל (לפי מד הדלק)?',
@@ -133,9 +129,7 @@ export const SCENARIOS: Record<string, Scenario> = {
     }
   },
 
-  // ---------------------------------------------------------
-  // תרחיש 2: התחממות מנוע (Overheating) - בטיחות קריטית
-  // ---------------------------------------------------------
+  // תרחיש: התחממות מנוע (בטיחות קריטית)
   overheating: {
     id: 'overheating',
     title: 'התחממות מנוע',
@@ -152,7 +146,7 @@ export const SCENARIOS: Record<string, Scenario> = {
         options: [
           {
             label: 'כן, יש אדים/עשן',
-            nextStepId: 'critical_stop', // סיום מיידי
+            nextStepId: 'critical_stop',
             actions: [{ type: 'INFO' }]
           },
           {
@@ -179,7 +173,6 @@ export const SCENARIOS: Record<string, Scenario> = {
               { type: 'VERIFIES', suspectId: 'radiator', weight: 1 }
             ]
           },
-          // מילוט קריטי: משתמש שלא יודע לפתוח מכסה מנוע
           createSkipOption('check_fan')
         ]
       },
@@ -200,7 +193,6 @@ export const SCENARIOS: Record<string, Scenario> = {
           createSkipOption('finish_report')
         ]
       },
-      // צעד חסר: עצירה קריטית כשיש אדים
       critical_stop: {
         id: 'critical_stop',
         text: 'זהירות! אדים או עשן מהמנוע מעידים על התחממות חמורה. כבה את המנוע מיד ואל תפתח את מכסה המנוע!',
@@ -232,14 +224,12 @@ export const SCENARIOS: Record<string, Scenario> = {
     }
   },
 
-  // ---------------------------------------------------------
-  // תרחיש 4: פנצ'ר (Flat Tire) - דוגמה לתרחיש תפעולי
-  // ---------------------------------------------------------
+  // תרחיש: פנצ'ר (תפעולי)
   flat_tire: {
     id: 'flat_tire',
     title: 'פנצ\'ר בגלגל',
     startingStepId: 'safety_location',
-    suspects: [], // תרחיש זה אינו דיאגנוסטי אלא תפעולי, אין "חשודים"
+    suspects: [],
     steps: {
       safety_location: {
         id: 'safety_location',
@@ -252,7 +242,7 @@ export const SCENARIOS: Record<string, Scenario> = {
           },
           {
             label: 'לא, אני בשוליים מסוכנים',
-            nextStepId: 'call_rescue', // הפניה לגרר
+            nextStepId: 'call_rescue',
             actions: [{ type: 'INFO' }]
           }
         ]
@@ -274,7 +264,6 @@ export const SCENARIOS: Record<string, Scenario> = {
           createSkipOption('call_rescue')
         ]
       },
-      // צעד חסר: התחלת מדריך החלפה
       start_guide: {
         id: 'start_guide',
         text: 'מעולה! יש לך את כל הציוד. האם אתה מרגיש בטוח להחליף גלגל בעצמך, או שתעדיף להזמין עזרה?',
@@ -292,7 +281,6 @@ export const SCENARIOS: Record<string, Scenario> = {
           }
         ]
       },
-      // צעד חסר: הזמנת גרר/עזרה
       call_rescue: {
         id: 'call_rescue',
         text: 'אין בעיה! מומלץ להזמין שירות דרך או גרר. הישאר במקום בטוח עם אורות חירום דולקים.',
@@ -321,3 +309,29 @@ export const SCENARIOS: Record<string, Scenario> = {
   }
 };
 
+// Dev-only: validate step graph integrity
+function validateScenarios(scenarios: Record<string, Scenario>) {
+  for (const [scenarioId, sc] of Object.entries(scenarios)) {
+    const steps = (sc as any).steps ?? {};
+    const start = (sc as any).startingStepId;
+    if (!start || !steps[start]) {
+      throw new Error(`[SCENARIOS] ${scenarioId}: startingStepId missing or not found`);
+    }
+    for (const [stepId, step] of Object.entries<any>(steps)) {
+      const nextIds: string[] = [];
+      if (step?.nextStepId) nextIds.push(step.nextStepId);
+      if (Array.isArray(step?.options)) {
+        for (const opt of step.options) if (opt?.nextStepId) nextIds.push(opt.nextStepId);
+      }
+      for (const nid of nextIds) {
+        if (nid && !steps[nid]) {
+          throw new Error(`[SCENARIOS] ${scenarioId}: step ${stepId} points to missing nextStepId ${nid}`);
+        }
+      }
+    }
+  }
+}
+
+if (process.env.NODE_ENV !== 'production') {
+  validateScenarios(SCENARIOS);
+}
