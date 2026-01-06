@@ -6,7 +6,6 @@ import { extractJSON } from '@/lib/ai/json-utils';
 import { buildChatPrompt, buildGeneralExpertPrompt } from '@/lib/ai/prompt-builder';
 import type { UserAnswer } from '@/lib/ai/types';
 import warningLightsKB from '@/lib/knowledge/warning-lights.json';
-import { SCENARIOS } from '@/lib/knowledge/scenarios';
 import type { DiagnosticState, Scenario, StepOption, SafetyRule } from '@/lib/types/knowledge';
 import {
     CRITICAL_LIGHTS,
@@ -643,121 +642,11 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds)) };
 }
 
-// Scenario flow (static trees)
+// Scenario flow - DISABLED (scenarios.ts removed, all symptoms now go to AI)
 export async function handleScenarioStep(req: RequestContext): Promise<FlowResult> {
-    const { userText, context, answers } = req;
-
-    if (!context?.currentScenarioId || !context.currentStepId) {
-        return { response: null, handled: false };
-    }
-
-    const scenario: Scenario | undefined = (SCENARIOS as any)[context.currentScenarioId];
-    const step = scenario?.steps?.[context.currentStepId];
-
-    if (!scenario || !step) {
-        return { response: null, handled: false };
-    }
-
-    const normalized = (userText || '').trim();
-    const optionLabels = step.options.map(o => o.label);
-    let selectedOption = step.options.find(o => o.label === normalized) ?? null;
-
-    // Deterministic selection (no AI)
-    if (!selectedOption && normalized && optionLabels.length > 0) {
-        const { selected } = normalizeSelection(normalized, optionLabels);
-        if (selected) {
-            selectedOption = step.options.find(o => o.label === selected) ?? null;
-        }
-    }
-
-    if (!selectedOption) {
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'scenario_step',
-                step: { id: step.id, text: 'כדי להמשיך, בבקשה בחר אחת מהאפשרויות.', options: optionLabels },
-                context
-            })
-        };
-    }
-
-    const reportData = context.reportData ?? { verified: [], ruledOut: [], skipped: [], criticalFindings: [] };
-    const { newScores, newReport } = updateSuspectsAndReport(context.suspects || {}, selectedOption, scenario, reportData);
-    const hasCritical = Array.isArray(newReport?.criticalFindings) && newReport.criticalFindings.length > 0;
-
-    if (selectedOption.stopAlert) {
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'safety_alert',
-                title: selectedOption.stopAlert.title,
-                message: selectedOption.stopAlert.message,
-                level: 'CRITICAL',
-                stopChat: true,
-                context: mergeContext(context, { suspects: newScores, reportData: newReport })
-            })
-        };
-    }
-
-    const nextStepId = selectedOption.nextStepId;
-
-    if (!nextStepId) {
-        // Use unified AI diagnosis for consistent output (same as what mechanic receives)
-        const conversationHistory = answers?.map((a: UserAnswer) => ({
-            role: 'user' as const,
-            content: `${a.question} → ${a.answer}`
-        })) || [];
-
-        const unifiedDiag = await generateUnifiedDiagnosis({
-            description: userText || '',
-            conversationHistory,
-            vehicleInfo: undefined,
-            detectedLightType: context?.detectedLightType
-        });
-
-        const hasCritical = unifiedDiag.urgency === 'critical' || unifiedDiag.urgency === 'high';
-
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'diagnosis_report',
-                title: 'אבחון תקלה',
-                confidence: unifiedDiag.confidence,
-                confidenceLevel: unifiedDiag.confidenceLevel,
-                results: unifiedDiag.diagnoses,
-                status: unifiedDiag.status,
-                selfFix: [],
-                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
-                recommendations: unifiedDiag.recommendations,
-                disclaimer: 'האבחון מבוסס על תיאור בלבד ואינו מחליף בדיקה מקצועית במוסך.',
-                showTowButton: unifiedDiag.needsTow || hasCritical,
-                severity: hasCritical ? 'high' : 'low',
-                category: unifiedDiag.category,
-                endConversation: true,
-                context: mergeContext(context, { suspects: newScores, reportData: newReport, currentScenarioId: null, currentStepId: null, activeFlow: null, unifiedDiagnosis: true })
-            })
-        };
-    }
-
-    const nextStep = scenario.steps[nextStepId];
-    if (!nextStep) return { response: null, handled: false };
-
-    const nextOptions = nextStep.options.map(o => o.label);
-    return {
-        handled: true,
-        response: NextResponse.json({
-            type: 'scenario_step',
-            step: { id: nextStep.id, text: nextStep.text, options: nextOptions },
-            context: mergeContext(context, {
-                currentScenarioId: scenario.id,
-                currentStepId: nextStep.id,
-                suspects: newScores,
-                reportData: newReport,
-                currentQuestionText: nextStep.text,
-                currentQuestionOptions: nextOptions
-            })
-        })
-    };
+    // SCENARIOS removed - scenario flows now bypassed to AI
+    // This function always returns not-handled, routing to AI fallback
+    return { response: null, handled: false };
 }
 
 // Expert AI fallback
@@ -944,21 +833,10 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
     });
 }
 
+// Scenario start - DISABLED (scenarios.ts removed, all symptoms now go to AI)
 export function handleScenarioStart(scenarioId: string): any {
-    const scenario: Scenario | undefined = (SCENARIOS as any)[scenarioId];
-    if (!scenario) return null;
-
-    const firstStep = scenario.steps[scenario.startingStepId];
-    const suspects: Record<string, number> = {};
-    scenario.suspects.forEach(s => (suspects[s.id] = 0));
-    const stepOptions = firstStep.options.map(o => o.label);
-
-    return NextResponse.json({
-        type: 'scenario_start',
-        title: scenario.title,
-        step: { id: firstStep.id, text: firstStep.text, options: stepOptions },
-        context: { currentScenarioId: scenario.id, currentStepId: firstStep.id, suspects, reportData: { verified: [], ruledOut: [], skipped: [], criticalFindings: [] }, currentQuestionText: firstStep.text, currentQuestionOptions: stepOptions, activeFlow: 'SCENARIO' as const }
-    });
+    // SCENARIOS removed - always return null to route to AI
+    return null;
 }
 
 export function handleSafetyStop(rule: SafetyRule): any {

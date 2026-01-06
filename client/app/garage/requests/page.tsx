@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench } from 'lucide-react';
 
 interface GarageRequest {
     id: string;
@@ -74,7 +74,14 @@ export default function GarageInquiriesPage() {
 
         // Filter by status
         if (activeFilter !== 'all') {
-            result = result.filter(r => r.status === activeFilter);
+            if (activeFilter === 'answered') {
+                // Show both answered, closed_no, and closed_yes as "נקראו ונענו"
+                result = result.filter(r => 
+                    r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
+                );
+            } else {
+                result = result.filter(r => r.status === activeFilter);
+            }
         }
 
         // Filter by search term
@@ -147,6 +154,10 @@ export default function GarageInquiriesPage() {
                 return { label: 'נצפה', className: 'bg-yellow-900/50 text-yellow-300' };
             case 'answered':
                 return { label: 'נענה', className: 'bg-green-900/50 text-green-300' };
+            case 'closed_no':
+                return { label: 'נסגר ללא דיווח', className: 'bg-gray-900/50 text-gray-300' };
+            case 'closed_yes':
+                return { label: 'נסגר עם דיווח', className: 'bg-green-900/50 text-green-300' };
             default:
                 return { label: 'חדש', className: 'bg-red-900/50 text-red-300' };
         }
@@ -301,6 +312,10 @@ export default function GarageInquiriesPage() {
                         const isActive = activeFilter === filter.key;
                         const count = filter.key === 'all'
                             ? requests.length
+                            : filter.key === 'answered'
+                            ? requests.filter(r => 
+                                r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
+                            ).length
                             : requests.filter(r => r.status === filter.key).length;
 
                         return (
@@ -475,13 +490,36 @@ export default function GarageInquiriesPage() {
                             >
                                 סגור
                             </button>
-                            <button
-                                onClick={() => router.push(`/garage/chats/${selectedRequest.id}`)}
-                                className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
-                            >
-                                <MessageSquare className="w-4 h-4" />
-                                פתח צ'אט
-                            </button>
+                            
+                            {/* Show action buttons only for pending or viewed status */}
+                            {(selectedRequest.status === 'pending' || selectedRequest.status === 'viewed') && (
+                                <>
+                                    <button
+                                        onClick={async () => {
+                                            await updateStatus(selectedRequest.id, 'closed_no');
+                                            setSelectedRequest(null);
+                                        }}
+                                        disabled={updatingStatus}
+                                        className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {updatingStatus ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <X className="w-4 h-4" />
+                                        )}
+                                        סגור ללא דיווח
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            router.push(`/garage/requests/${selectedRequest.id}/report`);
+                                        }}
+                                        className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
+                                    >
+                                        <Wrench className="w-4 h-4" />
+                                        דווח על סיום טיפול
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

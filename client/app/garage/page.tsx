@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { BarChart3, User, MessageCircle, Inbox, LogOut } from "lucide-react";
+import { BarChart3, User, Inbox, LogOut } from "lucide-react";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
 export default function GaragePage() {
@@ -38,12 +38,6 @@ export default function GaragePage() {
       subtitle: "נהל את הפרופיל וההגדרות",
       icon: User,
       link: "/garage/profile",
-    },
-    {
-      title: "צ'אטים עם לקוחות",
-      subtitle: "נהל שיחות עם הלקוחות",
-      icon: MessageCircle,
-      link: "/garage/chats",
     },
     {
       title: "פניות לקוחות",

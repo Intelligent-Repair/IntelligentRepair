@@ -1,63 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "description": "מיפוי מילות מפתח לנורות אזהרה בלבד. סימפטומים טקסטואליים מועברים ישירות ל-AI.",
   "symptoms": [
-    {
-      "category": "visuals",
-      "description": "ממצאים ויזואליים",
-      "mappings": [
-        {
-          "keywords": [
-            "גלגל שטוח",
-            "צמיג ריק",
-            "פנצר",
-            "פנצ'ר",
-            "גלגל תקוע"
-          ],
-          "targetId": "flat_tire",
-          "type": "scenario"
-        }
-      ]
-    },
-    {
-      "category": "starting_issues",
-      "description": "בעיות התנעה",
-      "mappings": [
-        {
-          "keywords": [
-            "לא מניע",
-            "לא מתניע",
-            "הרכב לא נדלק",
-            "משתעל",
-            "מנסה להניע ולא מצליח",
-            "סטרטר לא עובד",
-            "אין סטרטר",
-            "שקט בהתנעה",
-            "רק קליק",
-            "קליק אחד",
-            "תקתוקים בהתנעה"
-          ],
-          "targetId": "car_wont_start",
-          "type": "scenario"
-        }
-      ]
-    },
-    {
-      "category": "temperature",
-      "description": "בעיות טמפרטורה",
-      "mappings": [
-        {
-          "keywords": [
-            "המנוע מתחמם",
-            "רכב מתחמם",
-            "מד חום גבוה",
-            "מחוג חום באדום",
-            "התחממות יתר"
-          ],
-          "targetId": "overheating",
-          "type": "scenario"
-        }
-      ]
-    },
     {
       "category": "warning_lights",
       "description": "דיווח מפורש על נורות אזהרה בלוח השעונים",
@@ -85,9 +29,7 @@
             "נורית לחץ אוויר",
             "TPMS",
             "נורית TPMS",
-            "מילאתי אוויר והנורה לא כבתה",
-            "מילאתי אוויר אבל הנורה דולקת",
-            "מילאתי אוויר והנורה עדיין דולקת"
+            "מילאתי אוויר והנורה לא כבתה"
           ],
           "targetId": "tpms_light",
           "type": "light"
@@ -121,8 +63,7 @@
             "נורית ABS",
             "ABS",
             "סמל ABS",
-            "Anti-lock",
-            "Anti lock"
+            "Anti-lock"
           ],
           "targetId": "abs_light",
           "type": "light"
@@ -177,8 +118,7 @@
             "נורת מפתח",
             "סמל מפתח",
             "Immobilizer",
-            "Security Light",
-            "Key Not Detected"
+            "Security Light"
           ],
           "targetId": "immobilizer_light",
           "type": "light"
