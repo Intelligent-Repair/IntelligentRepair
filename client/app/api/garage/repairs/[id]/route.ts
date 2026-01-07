@@ -93,7 +93,7 @@ export async function GET(
     }
 
     // Get the garage for this user to verify access
-    const { data: garage, error: garageError } = await supabase
+    const { data: garage } = await supabase
       .from("garages")
       .select("id")
       .or(`owner_user_id.eq.${user.id},user_id.eq.${user.id}`)
@@ -294,7 +294,7 @@ export async function PATCH(
     }
 
     // Build the update object with only provided fields
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 

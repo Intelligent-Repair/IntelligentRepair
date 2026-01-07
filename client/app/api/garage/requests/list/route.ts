@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type UserRow = { id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null };
+type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalog | null; user?: UserRow | null };
+type RequestRow = {
+  id: string;
+  description: string | null;
+  ai_mechanic_summary: string | null;
+  status: string | null;
+  image_urls: string[] | null;
+  ai_diagnosis: unknown;
+  ai_confidence: number | null;
+  created_at: string;
+  user_id: string | null;
+  car?: CarRow | null;
+};
+
 /**
  * GET /api/garage/requests/list
  * 
@@ -76,7 +92,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const { data: requests, error: requestsError } = await query;
+    const { data: requestsRaw, error: requestsError } = await query;
 
     if (requestsError) {
       return NextResponse.json(
@@ -84,13 +100,14 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const requests = (requestsRaw ?? []) as RequestRow[];
 
     // Apply search filter in memory
-    let filteredRequests = requests || [];
+    let filteredRequests = requests;
     
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      filteredRequests = filteredRequests.filter((req: any) => {
+      filteredRequests = filteredRequests.filter((req) => {
         const car = req.car;
         const user = car?.user;
         const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim().toLowerCase();
@@ -108,7 +125,7 @@ export async function GET(request: Request) {
     }
 
     // Transform the data
-    const transformedRequests = filteredRequests.map((req: any) => {
+    const transformedRequests = filteredRequests.map((req) => {
       const car = req.car;
       const user = car?.user;
       const manufacturer = car?.vehicle_catalog?.manufacturer;

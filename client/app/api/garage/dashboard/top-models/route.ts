@@ -2,7 +2,22 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 // Helper function to get garage ID
-async function getGarageId(supabase: any, userId: string, mode: string): Promise<number | null> {
+type SupabaseServerClient = Awaited<ReturnType<typeof createServerSupabase>>;
+type HasGte<T> = { gte: (column: string, value: string) => T };
+type VehicleCatalog = { manufacturer: string | null; model: string | null };
+type RequestRow = {
+  id: string;
+  description: string | null;
+  ai_mechanic_summary: string | null;
+  created_at: string;
+  car?: { vehicle_catalog?: VehicleCatalog | null } | null;
+};
+
+async function getGarageId(
+  supabase: SupabaseServerClient,
+  userId: string,
+  mode: string
+): Promise<string | null> {
   if (mode === "global") return null;
   
   const { data: garage, error } = await supabase
@@ -12,11 +27,12 @@ async function getGarageId(supabase: any, userId: string, mode: string): Promise
     .single();
 
   if (error || !garage) return null;
-  return garage.id;
+  const id = (garage as { id?: unknown }).id;
+  return typeof id === "string" ? id : null;
 }
 
 // Helper function to apply date range filter
-function applyDateRangeFilter(query: any, dateRange: string | null) {
+function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
   if (!dateRange || dateRange === "all") return query;
   
   const now = new Date();
@@ -110,7 +126,9 @@ export async function GET(request: Request) {
         .select("request_id")
         .eq("garage_id", garageId);
 
-      const requestIds = repairsData?.map((r: any) => r.request_id) || [];
+      const requestIds = (repairsData ?? [])
+        .map((r) => (r as { request_id?: unknown }).request_id)
+        .filter((id): id is string => typeof id === "string");
       if (requestIds.length > 0) {
         query = query.in("id", requestIds);
       } else {
@@ -119,7 +137,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const { data: requests, error: requestsError } = await query;
+    const { data: requestsRaw, error: requestsError } = await query;
 
     if (requestsError) {
       return NextResponse.json(
@@ -127,11 +145,12 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const requests = (requestsRaw ?? []) as RequestRow[];
 
     // Filter and count vehicles
     const vehicleCounts = new Map<string, { manufacturer: string; model: string; count: number }>();
 
-    requests?.forEach((req: any) => {
+    requests.forEach((req) => {
       const catalog = req.car?.vehicle_catalog;
       if (!catalog || !catalog.manufacturer || !catalog.model) return;
 

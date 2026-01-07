@@ -1,7 +1,27 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
-export async function GET(request: Request) {
+type ManufacturerRow = { manufacturer: string | null };
+type ModelRow = { manufacturer: string | null; model: string | null };
+
+function isManufacturerRow(value: unknown): value is ManufacturerRow {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "manufacturer" in value
+  );
+}
+
+function isModelRow(value: unknown): value is ModelRow {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "manufacturer" in value &&
+    "model" in value
+  );
+}
+
+export async function GET() {
   try {
     const supabase = await createServerSupabase();
 
@@ -43,12 +63,17 @@ export async function GET(request: Request) {
 
     // Extract unique manufacturers
     const manufacturers = Array.from(
-      new Set(manufacturersData?.map((item: any) => item.manufacturer).filter(Boolean))
+      new Set(
+        (manufacturersData ?? [])
+          .filter(isManufacturerRow)
+          .map((item) => item.manufacturer)
+          .filter((m): m is string => typeof m === "string" && m.length > 0)
+      )
     ).sort();
 
     // Extract unique models grouped by manufacturer
     const modelsByManufacturer = new Map<string, string[]>();
-    modelsData?.forEach((item: any) => {
+    (modelsData ?? []).filter(isModelRow).forEach((item) => {
       if (item.manufacturer && item.model) {
         if (!modelsByManufacturer.has(item.manufacturer)) {
           modelsByManufacturer.set(item.manufacturer, []);
@@ -61,7 +86,7 @@ export async function GET(request: Request) {
     });
 
     // Sort models within each manufacturer
-    modelsByManufacturer.forEach((models, manufacturer) => {
+    modelsByManufacturer.forEach((models) => {
       models.sort();
     });
 

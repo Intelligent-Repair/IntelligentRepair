@@ -79,7 +79,7 @@ export async function GET(
     }
 
     // Check if there's an associated repair
-    const { data: repair, error: repairError } = await supabase
+    const { data: repair } = await supabase
       .from("repairs")
       .select(`
         id,

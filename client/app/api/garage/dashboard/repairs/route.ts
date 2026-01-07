@@ -2,7 +2,22 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 // Helper function to apply date range filter
-function applyDateRangeFilter(query: any, dateRange: string | null) {
+type HasGte<T> = { gte: (column: string, value: string) => T };
+type VehicleCatalog = { manufacturer: string | null; model: string | null };
+type RepairRow = {
+  id: string;
+  mechanic_notes: string | null;
+  created_at: string;
+  request?: {
+    id: string;
+    description: string | null;
+    ai_mechanic_summary: string | null;
+    created_at: string;
+    car?: { license_plate: string | null; vehicle_catalog?: VehicleCatalog | null } | null;
+  } | null;
+};
+
+function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
   if (!dateRange || dateRange === "all") return query;
   
   const now = new Date();
@@ -71,7 +86,7 @@ export async function GET(request: Request) {
       );
     }
 
-    let garageId: number | null = null;
+    let garageId: string | null = null;
 
     // If mode is not "global", get the garage_id for this user
     if (mode !== "global") {
@@ -89,7 +104,8 @@ export async function GET(request: Request) {
         );
       }
 
-      garageId = garage.id;
+      const id = (garage as { id?: unknown }).id;
+      garageId = typeof id === "string" ? id : null;
     }
 
     // Build query for repairs with all required fields
@@ -124,7 +140,7 @@ export async function GET(request: Request) {
     }
 
     // Get all repairs first (we'll filter in memory for complex filters)
-    const { data: repairs, error: repairsError } = await query;
+    const { data: repairsRaw, error: repairsError } = await query;
 
     if (repairsError) {
       return NextResponse.json(
@@ -132,9 +148,10 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const repairs = (repairsRaw ?? []) as RepairRow[];
 
     // Apply filters in memory
-    let filteredRepairs = repairs?.filter((repair: any) => {
+    const filteredRepairs = repairs.filter((repair) => {
       const request = repair.request;
       const car = request?.car;
       const catalog = car?.vehicle_catalog;
@@ -156,7 +173,7 @@ export async function GET(request: Request) {
       }
 
       return true;
-    }) || [];
+    });
 
     // Get total count before pagination
     const totalCount = filteredRepairs.length;
@@ -165,7 +182,7 @@ export async function GET(request: Request) {
     const paginatedRepairs = filteredRepairs.slice(offset, offset + limit);
 
     // Transform the data to match the expected structure
-    const transformedRepairs = paginatedRepairs.map((repair: any) => {
+    const transformedRepairs = paginatedRepairs.map((repair) => {
       const request = repair.request;
       const car = request?.car;
       const catalog = car?.vehicle_catalog;

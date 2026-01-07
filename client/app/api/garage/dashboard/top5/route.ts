@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+type VehicleCatalog = { manufacturer: string | null; model: string | null };
+type RepairRow = { request?: { car?: { vehicle_catalog?: VehicleCatalog | null } | null } | null };
+
 export async function GET(request: Request) {
   try {
     const supabase = await createServerSupabase();
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
       );
     }
 
-    let garageId: number | null = null;
+    let garageId: string | null = null;
 
     // If mode is not "global", get the garage_id for this user
     if (mode !== "global") {
@@ -38,7 +41,8 @@ export async function GET(request: Request) {
         );
       }
 
-      garageId = garage.id;
+      const id = (garage as { id?: unknown }).id;
+      garageId = typeof id === "string" ? id : null;
     }
 
     // Build query to count repairs by vehicle
@@ -61,7 +65,7 @@ export async function GET(request: Request) {
       query = query.eq("garage_id", garageId);
     }
 
-    const { data: repairs, error: repairsError } = await query;
+    const { data: repairsRaw, error: repairsError } = await query;
 
     if (repairsError) {
       return NextResponse.json(
@@ -69,11 +73,12 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const repairs = (repairsRaw ?? []) as RepairRow[];
 
     // Count vehicles by manufacturer + model combination
     const vehicleCounts = new Map<string, { manufacturer: string; model: string; count: number }>();
 
-    repairs?.forEach((repair: any) => {
+    repairs.forEach((repair) => {
       const catalog = repair.request?.car?.vehicle_catalog;
       if (catalog && catalog.manufacturer && catalog.model) {
         const key = `${catalog.manufacturer}|${catalog.model}`;

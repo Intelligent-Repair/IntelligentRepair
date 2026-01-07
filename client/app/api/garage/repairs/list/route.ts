@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type UserRow = { id: string; first_name: string | null; last_name: string | null; phone: string | null; email?: string | null };
+type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalog | null; user?: UserRow | null };
+type RequestRow = { id: string; description: string | null; ai_mechanic_summary: string | null; created_at: string; car?: CarRow | null };
+type GarageRow = { id: string; garage_name: string | null };
+type RepairRow = {
+  id: string;
+  ai_summary: string | null;
+  mechanic_notes: string | null;
+  status: string | null;
+  final_issue_type: string | null;
+  created_at: string;
+  updated_at: string | null;
+  garage_id: string;
+  request?: RequestRow | null;
+  garage?: GarageRow | null;
+};
+
 export async function GET(request: Request) {
   try {
     const supabase = await createServerSupabase();
@@ -93,7 +111,7 @@ export async function GET(request: Request) {
     }
 
     // Order by created_at descending
-    const { data: repairs, error: repairsError } = await query.order("created_at", { ascending: false });
+    const { data: repairsRaw, error: repairsError } = await query.order("created_at", { ascending: false });
 
     if (repairsError) {
       return NextResponse.json(
@@ -101,12 +119,13 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const repairs = (repairsRaw ?? []) as RepairRow[];
 
     // Apply additional filters in memory (for nested fields)
-    let filteredRepairs = repairs || [];
+    let filteredRepairs = repairs;
     
     if (manufacturer || model) {
-      filteredRepairs = filteredRepairs.filter((repair: any) => {
+      filteredRepairs = filteredRepairs.filter((repair) => {
         const car = repair.request?.car;
         const carManufacturer = car?.vehicle_catalog?.manufacturer;
         const carModel = car?.vehicle_catalog?.model;
@@ -124,7 +143,7 @@ export async function GET(request: Request) {
     }
 
     // Transform the data to match the expected structure
-    const transformedRepairs = filteredRepairs.map((repair: any) => {
+    const transformedRepairs = filteredRepairs.map((repair) => {
       const request = repair.request;
       const car = request?.car;
       const user = car?.user;

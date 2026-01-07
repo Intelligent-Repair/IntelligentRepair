@@ -2,7 +2,23 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 // Helper function to get garage ID
-async function getGarageId(supabase: any, userId: string, mode: string): Promise<number | null> {
+type SupabaseServerClient = Awaited<ReturnType<typeof createServerSupabase>>;
+type HasGte<T> = { gte: (column: string, value: string) => T };
+
+type VehicleCatalog = { manufacturer: string | null; model: string | null };
+type RequestRow = {
+  id: string;
+  description: string | null;
+  ai_mechanic_summary: string | null;
+  created_at: string;
+  car?: { vehicle_catalog?: VehicleCatalog | null } | null;
+};
+
+async function getGarageId(
+  supabase: SupabaseServerClient,
+  userId: string,
+  mode: string
+): Promise<string | null> {
   if (mode === "global") return null;
   
   const { data: garage, error } = await supabase
@@ -12,11 +28,12 @@ async function getGarageId(supabase: any, userId: string, mode: string): Promise
     .single();
 
   if (error || !garage) return null;
-  return garage.id;
+  const id = (garage as { id?: unknown }).id;
+  return typeof id === "string" ? id : null;
 }
 
 // Helper function to apply date range filter
-function applyDateRangeFilter(query: any, dateRange: string | null) {
+function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
   if (!dateRange || dateRange === "all") return query;
   
   const now = new Date();
@@ -102,14 +119,16 @@ export async function GET(request: Request) {
     requestsQuery = applyDateRangeFilter(requestsQuery, dateRange);
 
     // Filter by garage_id if in local mode
-    let requestIds: number[] = [];
+    let requestIds: string[] = [];
     if (garageId !== null) {
       const { data: repairsData } = await supabase
         .from("repairs")
         .select("request_id")
         .eq("garage_id", garageId);
 
-      requestIds = repairsData?.map((r: any) => r.request_id) || [];
+      requestIds = (repairsData ?? [])
+        .map((r) => (r as { request_id?: unknown }).request_id)
+        .filter((id): id is string => typeof id === "string");
       if (requestIds.length > 0) {
         requestsQuery = requestsQuery.in("id", requestIds);
       } else {
@@ -117,7 +136,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const { data: requests, error: requestsError } = await requestsQuery;
+    const { data: requestsRaw, error: requestsError } = await requestsQuery;
 
     if (requestsError) {
       return NextResponse.json(
@@ -125,16 +144,21 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const requests = (requestsRaw ?? []) as RequestRow[];
 
     // Get all repair IDs for resolved issues check
-    let repairRequestIds = new Set<number>();
+    let repairRequestIds = new Set<string>();
     if (chartMode === "resolvedIssues" || chartMode === "unresolvedIssues") {
       let repairsQuery = supabase.from("repairs").select("request_id");
       if (garageId !== null) {
         repairsQuery = repairsQuery.eq("garage_id", garageId);
       }
       const { data: repairs } = await repairsQuery;
-      repairRequestIds = new Set(repairs?.map((r: any) => r.request_id) || []);
+      repairRequestIds = new Set(
+        (repairs ?? [])
+          .map((r) => (r as { request_id?: unknown }).request_id)
+          .filter((id): id is string => typeof id === "string")
+      );
     }
 
     // Process data based on chart mode
@@ -142,41 +166,41 @@ export async function GET(request: Request) {
 
     if (chartMode === "totalIssues") {
       // Count all issues
-      const filtered = requests?.filter((req: any) => {
+      const filtered = requests.filter((req) => {
         const catalog = req.car?.vehicle_catalog;
         if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
         if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
-      }) || [];
+      });
       
       data.push({ label: "סה״כ פניות", value: filtered.length });
     } else if (chartMode === "resolvedIssues") {
-      const filtered = requests?.filter((req: any) => {
+      const filtered = requests.filter((req) => {
         if (!repairRequestIds.has(req.id)) return false;
         const catalog = req.car?.vehicle_catalog;
         if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
         if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
-      }) || [];
+      });
       
       data.push({ label: "פניות שנפתרו", value: filtered.length });
     } else if (chartMode === "unresolvedIssues") {
-      const filtered = requests?.filter((req: any) => {
+      const filtered = requests.filter((req) => {
         if (repairRequestIds.has(req.id)) return false;
         const catalog = req.car?.vehicle_catalog;
         if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
         if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
-      }) || [];
+      });
       
       data.push({ label: "פניות שלא נפתרו", value: filtered.length });
     } else if (chartMode === "issuesByManufacturer") {
       const manufacturerCounts = new Map<string, number>();
       
-      requests?.forEach((req: any) => {
+      requests.forEach((req) => {
         const catalog = req.car?.vehicle_catalog;
         if (!catalog || !catalog.manufacturer) return;
         
@@ -201,7 +225,7 @@ export async function GET(request: Request) {
     } else if (chartMode === "issuesByModel") {
       const modelCounts = new Map<string, number>();
       
-      requests?.forEach((req: any) => {
+      requests.forEach((req) => {
         const catalog = req.car?.vehicle_catalog;
         if (!catalog || !catalog.model) return;
         
