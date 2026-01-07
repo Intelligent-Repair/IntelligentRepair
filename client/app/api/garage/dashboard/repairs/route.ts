@@ -101,8 +101,8 @@ export async function GET(request: Request) {
         created_at,
         request:requests (
           id,
-          problem_description,
           description,
+          ai_mechanic_summary,
           created_at,
           car:people_cars (
             license_plate,
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       }
 
       // Issue type filter
-      const description = request?.problem_description || request?.description || "";
+      const description = request?.ai_mechanic_summary || request?.description || "";
       if (!matchesIssueType(description, issueType)) {
         return false;
       }
@@ -176,7 +176,7 @@ export async function GET(request: Request) {
         license_plate: car?.license_plate || null,
         manufacturer: catalog?.manufacturer || null,
         model: catalog?.model || null,
-        problem_description: request?.problem_description || request?.description || null,
+        problem_description: request?.ai_mechanic_summary || request?.description || null,
         mechanic_notes: repair.mechanic_notes || null,
         created_at: repair.created_at,
       };

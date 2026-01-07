@@ -88,7 +88,7 @@ export async function GET(request: Request) {
       .select(`
         id,
         description,
-        problem_description,
+        ai_mechanic_summary,
         created_at,
         car:people_cars (
           vehicle_catalog:vehicle_catalog_id (
@@ -142,7 +142,7 @@ export async function GET(request: Request) {
       if (models.length > 0 && !models.includes(catalog.model)) return;
 
       // Apply issue type filter
-      const description = req.problem_description || req.description || "";
+      const description = req.ai_mechanic_summary || req.description || "";
       if (!matchesIssueType(description, issueType)) return;
 
       const key = `${catalog.manufacturer}|${catalog.model}`;
