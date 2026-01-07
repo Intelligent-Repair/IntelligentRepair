@@ -1,6 +1,37 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type VehicleCatalogJoin = VehicleCatalog | VehicleCatalog[] | null | undefined;
+type UserJoin = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email?: string | null;
+};
+type UserJoinValue = UserJoin | UserJoin[] | null | undefined;
+type CarJoin = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalogJoin; user?: UserJoinValue };
+type CarJoinValue = CarJoin | CarJoin[] | null | undefined;
+type RequestJoin = {
+  id: string;
+  description: string | null;
+  ai_mechanic_summary: string | null;
+  status: string | null;
+  image_urls: string[] | null;
+  ai_diagnosis: unknown;
+  ai_confidence: number | null;
+  created_at: string;
+  user_id: string | null;
+  car?: CarJoinValue;
+};
+type RequestJoinValue = RequestJoin | RequestJoin[] | null | undefined;
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 /**
  * GET /api/garage/repairs/[id]
  * 
@@ -8,11 +39,12 @@ import { createServerSupabase } from "@/lib/supabaseServer";
  */
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase();
-    const repairId = params.id;
+    const { id } = await params;
+    const repairId = id;
 
     // repairs.id is a UUID in Supabase
     const isUuid =
@@ -102,7 +134,10 @@ export async function GET(
     // Check if user has access to this repair
     // User can access if they're the garage owner OR if they're the customer
     const isGarageOwner = garage && repair.garage_id === garage.id;
-    const isCustomer = repair.request?.user_id === user.id;
+    const requestJoin = firstOrNull(
+      (repair as unknown as { request?: RequestJoinValue }).request
+    );
+    const isCustomer = requestJoin?.user_id === user.id;
 
     if (!isGarageOwner && !isCustomer) {
       return NextResponse.json(
@@ -112,6 +147,14 @@ export async function GET(
     }
 
     // Transform the data
+    const carJoin = firstOrNull(requestJoin?.car as CarJoinValue);
+    const catalogJoin = firstOrNull(carJoin?.vehicle_catalog as VehicleCatalogJoin);
+    const carUserJoin = firstOrNull(carJoin?.user as UserJoinValue);
+    const garageJoin = firstOrNull(
+      (repair as unknown as { garage?: { id: string; garage_name: string | null } | { id: string; garage_name: string | null }[] | null })
+        .garage
+    );
+
     const transformedRepair = {
       id: repair.id,
       ai_summary: repair.ai_summary,
@@ -120,35 +163,35 @@ export async function GET(
       final_issue_type: repair.final_issue_type,
       created_at: repair.created_at,
       updated_at: repair.updated_at,
-      request: repair.request ? {
-        id: repair.request.id,
-        description: repair.request.description,
+      request: requestJoin ? {
+        id: requestJoin.id,
+        description: requestJoin.description,
         // Backward-compatible field name used by the UI.
-        problem_description: repair.request.ai_mechanic_summary || repair.request.description || null,
-        status: repair.request.status,
-        image_urls: repair.request.image_urls,
-        ai_diagnosis: repair.request.ai_diagnosis,
-        ai_confidence: repair.request.ai_confidence,
-        created_at: repair.request.created_at,
-        car: repair.request.car ? {
-          id: repair.request.car.id,
-          license_plate: repair.request.car.license_plate,
-          manufacturer: repair.request.car.vehicle_catalog?.manufacturer,
-          model: repair.request.car.vehicle_catalog?.model,
-          year: repair.request.car.vehicle_catalog?.year,
-          user: repair.request.car.user ? {
-            id: repair.request.car.user.id,
-            full_name: `${repair.request.car.user.first_name || ''} ${repair.request.car.user.last_name || ''}`.trim(),
-            first_name: repair.request.car.user.first_name,
-            last_name: repair.request.car.user.last_name,
-            phone: repair.request.car.user.phone,
-            email: repair.request.car.user.email,
+        problem_description: requestJoin.ai_mechanic_summary || requestJoin.description || null,
+        status: requestJoin.status,
+        image_urls: requestJoin.image_urls,
+        ai_diagnosis: requestJoin.ai_diagnosis,
+        ai_confidence: requestJoin.ai_confidence,
+        created_at: requestJoin.created_at,
+        car: carJoin ? {
+          id: carJoin.id,
+          license_plate: carJoin.license_plate,
+          manufacturer: catalogJoin?.manufacturer ?? null,
+          model: catalogJoin?.model ?? null,
+          year: catalogJoin?.year ?? null,
+          user: carUserJoin ? {
+            id: carUserJoin.id,
+            full_name: `${carUserJoin.first_name || ''} ${carUserJoin.last_name || ''}`.trim(),
+            first_name: carUserJoin.first_name,
+            last_name: carUserJoin.last_name,
+            phone: carUserJoin.phone,
+            email: carUserJoin.email ?? null,
           } : null,
         } : null,
       } : null,
-      garage: repair.garage ? {
-        id: repair.garage.id,
-        name: repair.garage.garage_name,
+      garage: garageJoin ? {
+        id: garageJoin.id,
+        name: garageJoin.garage_name,
       } : null,
     };
 
@@ -180,11 +223,12 @@ export async function GET(
  */
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase();
-    const repairId = params.id;
+    const { id } = await params;
+    const repairId = id;
     const body = await req.json();
 
     const isUuid =

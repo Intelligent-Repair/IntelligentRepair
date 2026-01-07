@@ -155,10 +155,10 @@ export async function GET(request: Request) {
       if (!catalog || !catalog.manufacturer || !catalog.model) return;
 
       // Apply manufacturer filter
-      if (manufacturers.length > 0 && !manufacturers.includes(catalog.manufacturer)) return;
+      if (manufacturers.length > 0 && (!catalog.manufacturer || !manufacturers.includes(catalog.manufacturer))) return;
 
       // Apply model filter
-      if (models.length > 0 && !models.includes(catalog.model)) return;
+      if (models.length > 0 && (!catalog.model || !models.includes(catalog.model))) return;
 
       // Apply issue type filter
       const description = req.ai_mechanic_summary || req.description || "";

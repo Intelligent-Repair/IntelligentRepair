@@ -92,7 +92,8 @@ export async function POST(req: Request) {
     const validationResult = ResearchResponseSchema.safeParse(parsed);
     
     if (!validationResult.success) {
-      console.error("[Research API] Zod validation failed:", validationResult.error.errors);
+      // ZodError exposes details under `.issues` (not `.errors`)
+      console.error("[Research API] Zod validation failed:", validationResult.error.issues);
       console.error("[Research API] Invalid response structure, using fallback");
       return NextResponse.json(fallbackResearch(), { status: 200 });
     }

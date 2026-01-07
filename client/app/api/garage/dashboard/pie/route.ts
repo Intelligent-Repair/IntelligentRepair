@@ -168,8 +168,8 @@ export async function GET(request: Request) {
       // Count all issues
       const filtered = requests.filter((req) => {
         const catalog = req.car?.vehicle_catalog;
-        if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
-        if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
+        if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) return false;
+        if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
       });
@@ -179,8 +179,8 @@ export async function GET(request: Request) {
       const filtered = requests.filter((req) => {
         if (!repairRequestIds.has(req.id)) return false;
         const catalog = req.car?.vehicle_catalog;
-        if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
-        if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
+        if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) return false;
+        if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
       });
@@ -190,8 +190,8 @@ export async function GET(request: Request) {
       const filtered = requests.filter((req) => {
         if (repairRequestIds.has(req.id)) return false;
         const catalog = req.car?.vehicle_catalog;
-        if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return false;
-        if (models.length > 0 && catalog && !models.includes(catalog.model)) return false;
+        if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) return false;
+        if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) return false;
         const desc = req.ai_mechanic_summary || req.description || "";
         return matchesIssueType(desc, issueType);
       });
@@ -229,7 +229,7 @@ export async function GET(request: Request) {
         const catalog = req.car?.vehicle_catalog;
         if (!catalog || !catalog.model) return;
         
-        if (manufacturers.length > 0 && !manufacturers.includes(catalog.manufacturer)) return;
+        if (manufacturers.length > 0 && (!catalog.manufacturer || !manufacturers.includes(catalog.manufacturer))) return;
         if (models.length > 0 && !models.includes(catalog.model)) return;
         
         const desc = req.ai_mechanic_summary || req.description || "";

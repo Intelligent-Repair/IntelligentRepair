@@ -151,10 +151,10 @@ export async function GET(request: Request) {
       const catalog = req.car?.vehicle_catalog;
 
       // Apply manufacturer filter
-      if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return;
+      if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) return;
 
       // Apply model filter
-      if (models.length > 0 && catalog && !models.includes(catalog.model)) return;
+      if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) return;
 
       const description = req.ai_mechanic_summary || req.description || "";
       

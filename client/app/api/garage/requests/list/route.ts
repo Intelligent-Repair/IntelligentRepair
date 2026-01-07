@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type VehicleCatalogJoin = VehicleCatalog | VehicleCatalog[] | null | undefined;
 type UserRow = { id: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null };
-type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalog | null; user?: UserRow | null };
+type UserJoin = UserRow | UserRow[] | null | undefined;
+type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalogJoin; user?: UserJoin };
+type CarJoin = CarRow | CarRow[] | null | undefined;
 type RequestRow = {
   id: string;
   description: string | null;
@@ -14,8 +17,13 @@ type RequestRow = {
   ai_confidence: number | null;
   created_at: string;
   user_id: string | null;
-  car?: CarRow | null;
+  car?: CarJoin;
 };
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 /**
  * GET /api/garage/requests/list
@@ -100,7 +108,9 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
-    const requests = (requestsRaw ?? []) as RequestRow[];
+    // Supabase nested selects can come back as arrays depending on FK metadata.
+    // We normalize via `firstOrNull` below.
+    const requests = (requestsRaw ?? []) as unknown as RequestRow[];
 
     // Apply search filter in memory
     let filteredRequests = requests;
@@ -108,11 +118,12 @@ export async function GET(request: Request) {
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filteredRequests = filteredRequests.filter((req) => {
-        const car = req.car;
-        const user = car?.user;
+        const car = firstOrNull(req.car as CarJoin);
+        const user = firstOrNull(car?.user as UserJoin);
+        const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
         const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim().toLowerCase();
-        const manufacturer = (car?.vehicle_catalog?.manufacturer || "").toLowerCase();
-        const model = (car?.vehicle_catalog?.model || "").toLowerCase();
+        const manufacturer = (catalog?.manufacturer || "").toLowerCase();
+        const model = (catalog?.model || "").toLowerCase();
         const licensePlate = (car?.license_plate || "").toLowerCase();
 
         return (
@@ -126,11 +137,12 @@ export async function GET(request: Request) {
 
     // Transform the data
     const transformedRequests = filteredRequests.map((req) => {
-      const car = req.car;
-      const user = car?.user;
-      const manufacturer = car?.vehicle_catalog?.manufacturer;
-      const model = car?.vehicle_catalog?.model;
-      const year = car?.vehicle_catalog?.year;
+      const car = firstOrNull(req.car as CarJoin);
+      const user = firstOrNull(car?.user as UserJoin);
+      const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
+      const manufacturer = catalog?.manufacturer ?? null;
+      const model = catalog?.model ?? null;
+      const year = catalog?.year ?? null;
       const problemDescription = req.ai_mechanic_summary || req.description || null;
 
       return {

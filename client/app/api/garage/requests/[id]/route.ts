@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type VehicleCatalogJoin = VehicleCatalog | VehicleCatalog[] | null | undefined;
+type UserJoin = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+type UserJoinValue = UserJoin | UserJoin[] | null | undefined;
+type CarJoin = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalogJoin; user?: UserJoinValue };
+type CarJoinValue = CarJoin | CarJoin[] | null | undefined;
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 /**
  * GET /api/garage/requests/[id]
  * 
@@ -8,11 +26,12 @@ import { createServerSupabase } from "@/lib/supabaseServer";
  */
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase();
-    const requestId = params.id;
+    const { id } = await params;
+    const requestId = id;
 
     // requests.id is a UUID in Supabase
     const isUuid =
@@ -93,12 +112,13 @@ export async function GET(
       .eq("request_id", requestId)
       .maybeSingle();
 
-    // Transform the data
-    const car = requestData.car;
-    const carUser = car?.user;
-    const manufacturer = car?.vehicle_catalog?.manufacturer;
-    const model = car?.vehicle_catalog?.model;
-    const year = car?.vehicle_catalog?.year;
+    // Transform the data (normalize nested joins which may come back as arrays)
+    const car = firstOrNull(requestData.car as unknown as CarJoinValue);
+    const carUser = firstOrNull(car?.user as UserJoinValue);
+    const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
+    const manufacturer = catalog?.manufacturer ?? null;
+    const model = catalog?.model ?? null;
+    const year = catalog?.year ?? null;
 
     const transformedRequest = {
       id: requestData.id,

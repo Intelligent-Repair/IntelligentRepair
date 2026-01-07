@@ -251,7 +251,7 @@ export default function GarageRequestDetailsPage() {
                         </div>
 
                         {/* AI Diagnosis */}
-                        {requestData.ai_diagnosis && (
+                        {Boolean(requestData.ai_diagnosis) && (
                             <div className="rounded-xl border border-sky-400/30 bg-sky-900/10 p-6 shadow-xl backdrop-blur-md">
                                 <h2 className="text-xl font-semibold mb-3 text-sky-300">אבחון AI ראשוני (AI Diagnosis)</h2>
                                 <div className="text-sky-100 border-t border-sky-400/20 pt-3">

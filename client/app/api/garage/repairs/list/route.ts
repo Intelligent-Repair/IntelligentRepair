@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 type VehicleCatalog = { manufacturer: string | null; model: string | null; year: number | null };
+type VehicleCatalogJoin = VehicleCatalog | VehicleCatalog[] | null | undefined;
 type UserRow = { id: string; first_name: string | null; last_name: string | null; phone: string | null; email?: string | null };
-type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalog | null; user?: UserRow | null };
-type RequestRow = { id: string; description: string | null; ai_mechanic_summary: string | null; created_at: string; car?: CarRow | null };
+type UserJoin = UserRow | UserRow[] | null | undefined;
+type CarRow = { id: string; license_plate: string | null; vehicle_catalog?: VehicleCatalogJoin; user?: UserJoin };
+type CarJoin = CarRow | CarRow[] | null | undefined;
+type RequestRow = { id: string; description: string | null; ai_mechanic_summary: string | null; created_at: string; car?: CarJoin };
+type RequestJoin = RequestRow | RequestRow[] | null | undefined;
 type GarageRow = { id: string; garage_name: string | null };
+type GarageJoin = GarageRow | GarageRow[] | null | undefined;
 type RepairRow = {
   id: string;
   ai_summary: string | null;
@@ -15,9 +20,14 @@ type RepairRow = {
   created_at: string;
   updated_at: string | null;
   garage_id: string;
-  request?: RequestRow | null;
-  garage?: GarageRow | null;
+  request?: RequestJoin;
+  garage?: GarageJoin;
 };
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 export async function GET(request: Request) {
   try {
@@ -119,16 +129,20 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
-    const repairs = (repairsRaw ?? []) as RepairRow[];
+    // Supabase nested selects can come back as arrays depending on FK metadata.
+    // We normalize via `firstOrNull` below.
+    const repairs = (repairsRaw ?? []) as unknown as RepairRow[];
 
     // Apply additional filters in memory (for nested fields)
     let filteredRepairs = repairs;
     
     if (manufacturer || model) {
       filteredRepairs = filteredRepairs.filter((repair) => {
-        const car = repair.request?.car;
-        const carManufacturer = car?.vehicle_catalog?.manufacturer;
-        const carModel = car?.vehicle_catalog?.model;
+        const request = firstOrNull(repair.request as RequestJoin);
+        const car = firstOrNull(request?.car as CarJoin);
+        const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
+        const carManufacturer = catalog?.manufacturer ?? null;
+        const carModel = catalog?.model ?? null;
 
         if (manufacturer && carManufacturer !== manufacturer) {
           return false;
@@ -144,13 +158,14 @@ export async function GET(request: Request) {
 
     // Transform the data to match the expected structure
     const transformedRepairs = filteredRepairs.map((repair) => {
-      const request = repair.request;
-      const car = request?.car;
-      const user = car?.user;
-      const garage = repair.garage;
-      const carManufacturer = car?.vehicle_catalog?.manufacturer;
-      const carModel = car?.vehicle_catalog?.model;
-      const carYear = car?.vehicle_catalog?.year;
+      const request = firstOrNull(repair.request as RequestJoin);
+      const car = firstOrNull(request?.car as CarJoin);
+      const user = firstOrNull(car?.user as UserJoin);
+      const garage = firstOrNull(repair.garage as GarageJoin);
+      const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
+      const carManufacturer = catalog?.manufacturer ?? null;
+      const carModel = catalog?.model ?? null;
+      const carYear = catalog?.year ?? null;
 
       return {
         id: repair.id,

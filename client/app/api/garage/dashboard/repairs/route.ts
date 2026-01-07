@@ -4,18 +4,35 @@ import { createServerSupabase } from "@/lib/supabaseServer";
 // Helper function to apply date range filter
 type HasGte<T> = { gte: (column: string, value: string) => T };
 type VehicleCatalog = { manufacturer: string | null; model: string | null };
+type VehicleCatalogJoin = VehicleCatalog | VehicleCatalog[] | null | undefined;
+type CarJoin =
+  | {
+      license_plate: string | null;
+      vehicle_catalog?: VehicleCatalogJoin;
+    }
+  | null
+  | undefined;
+type RequestJoin =
+  | {
+      id: string;
+      description: string | null;
+      ai_mechanic_summary: string | null;
+      created_at: string;
+      car?: CarJoin | CarJoin[] | null;
+    }
+  | null
+  | undefined;
 type RepairRow = {
   id: string;
   mechanic_notes: string | null;
   created_at: string;
-  request?: {
-    id: string;
-    description: string | null;
-    ai_mechanic_summary: string | null;
-    created_at: string;
-    car?: { license_plate: string | null; vehicle_catalog?: VehicleCatalog | null } | null;
-  } | null;
+  request?: RequestJoin | RequestJoin[] | null;
 };
+
+function firstOrNull<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
   if (!dateRange || dateRange === "all") return query;
@@ -148,21 +165,23 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
-    const repairs = (repairsRaw ?? []) as RepairRow[];
+    // Supabase nested selects can come back as arrays depending on FK metadata.
+    // We normalize via `firstOrNull` below.
+    const repairs = (repairsRaw ?? []) as unknown as RepairRow[];
 
     // Apply filters in memory
     const filteredRepairs = repairs.filter((repair) => {
-      const request = repair.request;
-      const car = request?.car;
-      const catalog = car?.vehicle_catalog;
+      const request = firstOrNull(repair.request as RequestJoin | RequestJoin[] | null | undefined);
+      const car = firstOrNull(request?.car as CarJoin | CarJoin[] | null | undefined);
+      const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
 
       // Manufacturer filter
-      if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) {
+      if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) {
         return false;
       }
 
       // Model filter
-      if (models.length > 0 && catalog && !models.includes(catalog.model)) {
+      if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) {
         return false;
       }
 
@@ -183,9 +202,9 @@ export async function GET(request: Request) {
 
     // Transform the data to match the expected structure
     const transformedRepairs = paginatedRepairs.map((repair) => {
-      const request = repair.request;
-      const car = request?.car;
-      const catalog = car?.vehicle_catalog;
+      const request = firstOrNull(repair.request as RequestJoin | RequestJoin[] | null | undefined);
+      const car = firstOrNull(request?.car as CarJoin | CarJoin[] | null | undefined);
+      const catalog = firstOrNull(car?.vehicle_catalog as VehicleCatalogJoin);
 
       return {
         repair_id: repair.id,
