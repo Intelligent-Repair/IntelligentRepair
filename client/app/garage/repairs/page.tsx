@@ -2,11 +2,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Wrench, Loader2, AlertCircle, Filter, FileText, Edit } from 'lucide-react';
 
 type Repair = {
-    id: number;
+    id: string;
     ai_summary: string;
     mechanic_notes: string;
     status: string;
@@ -14,13 +13,13 @@ type Repair = {
     created_at: string;
     updated_at: string;
     request: {
-        id: number;
+        id: string;
         problem_description: string;
         created_at: string;
     } | null;
     car: {
         id: string;
-        plate_number: string;
+        license_plate: string;
         manufacturer: string;
         model: string;
     } | null;
@@ -32,7 +31,6 @@ type Repair = {
 };
 
 export default function GarageRepairsPage() {
-    const router = useRouter();
     const [repairs, setRepairs] = useState<Repair[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -285,7 +283,7 @@ export default function GarageRepairsPage() {
                                                 </td>
                                                 <td className="py-3 px-4 text-slate-200">
                                                     <div>{repair.car?.manufacturer} {repair.car?.model}</div>
-                                                    <div className="text-xs text-slate-400">{repair.car?.plate_number}</div>
+                                                    <div className="text-xs text-slate-400">{repair.car?.license_plate}</div>
                                                 </td>
                                                 <td className="py-3 px-4 text-slate-200 max-w-xs truncate">
                                                     {repair.request?.problem_description || '—'}

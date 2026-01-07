@@ -7,12 +7,12 @@ import { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 
 type RequestData = {
-    id: number;
+    id: string;
     description: string;
     problem_description: string;
     status: string;
     image_urls: string[];
-    ai_diagnosis: any;
+    ai_diagnosis: unknown;
     ai_confidence: number;
     created_at: string;
     client: {
@@ -30,7 +30,7 @@ type RequestData = {
         full_name: string;
     } | null;
     repair: {
-        id: number;
+        id: string;
         status: string;
         mechanic_notes: string;
         final_issue_type: string;
@@ -293,7 +293,7 @@ export default function GarageRequestDetailsPage() {
                                 onClick={handleGoToChat}
                                 className="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-4 rounded-full flex items-center gap-2 transition"
                             >
-                                <MessageSquare className="w-5 h-5" /> מעבר לצ'אט עם הלקוח
+                                <MessageSquare className="w-5 h-5" /> מעבר לצ׳אט עם הלקוח
                             </button>
                             <button
                                 onClick={handleDownloadPdf}

@@ -1,7 +1,7 @@
 // client/app/garage/profile/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 // ייבוא כל האייקונים הדרושים (כדי למנוע ReferenceError)
 import { User, Mail, Phone, MapPin, Loader2, Save, Clock } from 'lucide-react'; 
 
@@ -31,17 +31,8 @@ export default function GarageProfilePage() {
     const [operatingHours, setOperatingHours] = useState(initialOperatingHours);
     const [isSaving, setIsSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-    const loadProfile = async () => {
-        setProfile(prev => ({ ...prev, is_loading: true }));
-        setStatusMessage(null);
-        await new Promise(resolve => setTimeout(resolve, 800)); 
-        setProfile({ ...mockGarageProfile, is_loading: false });
-    };
-
-    useEffect(() => {
-        loadProfile();
-    }, []);
+    // NOTE: This page currently uses mocked data. We intentionally avoid
+    // setState-in-effect patterns to satisfy lint rules.
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setProfile({ ...profile, [e.target.name]: e.target.value });
