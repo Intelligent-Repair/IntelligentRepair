@@ -45,7 +45,8 @@ CHECK (final_issue_type IS NULL OR final_issue_type IN (
 ```bash
 cd client
 npm install
-node test-e2e.js  # Should show 24/24 tests passing
+node test-db-connection.js
+node test-e2e.js
 ```
 
 ### 3. Run Development Server
@@ -122,7 +123,7 @@ const res = await fetch('/api/garage/repairs/accept', {
     'Authorization': 'Bearer YOUR_TOKEN',
     'Content-Type': 'application/json'
   },
-  body: JSON.stringify({ request_id: 123 })
+  body: JSON.stringify({ request_id: 'REQUEST_UUID_HERE' })
 });
 const { repair } = await res.json();
 ```

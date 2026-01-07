@@ -12,9 +12,13 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerSupabase();
-    const requestId = parseInt(params.id, 10);
+    const requestId = params.id;
 
-    if (isNaN(requestId)) {
+    // requests.id is a UUID in Supabase
+    const isUuid =
+      typeof requestId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId);
+    if (!isUuid) {
       return NextResponse.json(
         { error: "Invalid request ID" },
         { status: 400 }
@@ -40,7 +44,7 @@ export async function GET(
       .select(`
         id,
         description,
-        problem_description,
+        ai_mechanic_summary,
         status,
         image_urls,
         ai_diagnosis,
@@ -98,8 +102,9 @@ export async function GET(
 
     const transformedRequest = {
       id: requestData.id,
-      description: requestData.description || requestData.problem_description,
-      problem_description: requestData.problem_description,
+      description: requestData.description || requestData.ai_mechanic_summary,
+      // Backward-compatible field name used by the UI.
+      problem_description: requestData.ai_mechanic_summary || requestData.description || null,
       status: requestData.status,
       image_urls: requestData.image_urls,
       ai_diagnosis: requestData.ai_diagnosis,

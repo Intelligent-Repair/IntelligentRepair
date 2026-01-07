@@ -12,9 +12,13 @@ export async function GET(
 ) {
   try {
     const supabase = await createServerSupabase();
-    const repairId = parseInt(params.id, 10);
+    const repairId = params.id;
 
-    if (isNaN(repairId)) {
+    // repairs.id is a UUID in Supabase
+    const isUuid =
+      typeof repairId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(repairId);
+    if (!isUuid) {
       return NextResponse.json(
         { error: "Invalid repair ID" },
         { status: 400 }
@@ -49,7 +53,7 @@ export async function GET(
         request:requests (
           id,
           description,
-          problem_description,
+          ai_mechanic_summary,
           status,
           image_urls,
           ai_diagnosis,
@@ -119,7 +123,8 @@ export async function GET(
       request: repair.request ? {
         id: repair.request.id,
         description: repair.request.description,
-        problem_description: repair.request.problem_description,
+        // Backward-compatible field name used by the UI.
+        problem_description: repair.request.ai_mechanic_summary || repair.request.description || null,
         status: repair.request.status,
         image_urls: repair.request.image_urls,
         ai_diagnosis: repair.request.ai_diagnosis,
@@ -179,10 +184,13 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createServerSupabase();
-    const repairId = parseInt(params.id, 10);
+    const repairId = params.id;
     const body = await req.json();
 
-    if (isNaN(repairId)) {
+    const isUuid =
+      typeof repairId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(repairId);
+    if (!isUuid) {
       return NextResponse.json(
         { error: "Invalid repair ID" },
         { status: 400 }

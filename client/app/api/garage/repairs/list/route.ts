@@ -37,8 +37,8 @@ export async function GET(request: Request) {
         garage_id,
         request:requests (
           id,
-          problem_description,
           description,
+          ai_mechanic_summary,
           created_at,
           car:people_cars (
             id,
@@ -144,7 +144,8 @@ export async function GET(request: Request) {
         request: request
           ? {
               id: request.id,
-              problem_description: request.problem_description || request.description || null,
+              // Backward-compatible field name used by the UI.
+              problem_description: request.ai_mechanic_summary || request.description || null,
               created_at: request.created_at,
             }
           : null,

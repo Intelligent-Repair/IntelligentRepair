@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       .select(`
         id,
         description,
-        problem_description,
+        ai_mechanic_summary,
         status,
         image_urls,
         ai_diagnosis,
@@ -114,11 +114,14 @@ export async function GET(request: Request) {
       const manufacturer = car?.vehicle_catalog?.manufacturer;
       const model = car?.vehicle_catalog?.model;
       const year = car?.vehicle_catalog?.year;
+      const problemDescription = req.ai_mechanic_summary || req.description || null;
 
       return {
         id: req.id,
-        description: req.description || req.problem_description,
-        problem_description: req.problem_description,
+        description: req.description || problemDescription,
+        // Backward-compatible field name used by the UI. The DB does not have
+        // `requests.problem_description`, so we map to `ai_mechanic_summary`.
+        problem_description: problemDescription,
         status: req.status,
         image_urls: req.image_urls,
         ai_diagnosis: req.ai_diagnosis,

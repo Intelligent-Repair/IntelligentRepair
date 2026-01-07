@@ -9,7 +9,7 @@ import { createServerSupabase } from "@/lib/supabaseServer";
  * 
  * Request body:
  * {
- *   request_id: number;
+ *   request_id: string; // UUID
  *   ai_summary?: string; // Optional AI diagnosis summary
  * }
  */
@@ -20,7 +20,10 @@ export async function POST(req: Request) {
     const { request_id, ai_summary } = body;
 
     // Validate request_id
-    if (!request_id || typeof request_id !== "number") {
+    const isUuid =
+      typeof request_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request_id);
+    if (!isUuid) {
       return NextResponse.json(
         { error: "Missing or invalid request_id" },
         { status: 400 }
@@ -93,7 +96,7 @@ export async function POST(req: Request) {
     const { data: repair, error: repairError } = await supabase
       .from("repairs")
       .insert({
-        request_id: request_id,
+        request_id,
         garage_id: garage.id,
         ai_summary: ai_summary || request.ai_diagnosis || null,
         status: "in_progress",
