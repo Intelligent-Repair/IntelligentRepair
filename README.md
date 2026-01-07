@@ -2,17 +2,13 @@
 
 Complete API for garages to manage customer repair requests from start to finish.
 
-**Branch:** `cursor/garage-repair-management-api-8320`
-
 ---
 
 ## 🚀 Quick Start
 
 ### 1. Database Migration (Required)
 
-Go to: https://rdrlxmpwkkeryfcszltc.supabase.co/project/_/sql/new
-
-Run this SQL:
+Run the SQL in `SUPABASE_MIGRATION.sql` in the Supabase SQL editor.
 
 ```sql
 -- Add required columns
@@ -45,7 +41,8 @@ CHECK (final_issue_type IS NULL OR final_issue_type IN (
 ```bash
 cd client
 npm install
-node test-e2e.js  # Should show 24/24 tests passing
+node test-db-connection.js
+node test-e2e.js
 ```
 
 ### 3. Run Development Server

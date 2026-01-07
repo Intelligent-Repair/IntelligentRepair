@@ -7,8 +7,22 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://rdrlxmpwkkeryfcszltc.supabase.co';
-const SERVICE_KEY = 'sb_secret_DXi46cYHb8E-6iYsR4dZEw_71zHELz7';
+// IMPORTANT:
+// Never hardcode secrets in the repo. Use `client/.env.local` instead.
+// Required:
+// - NEXT_PUBLIC_SUPABASE_URL
+// - SUPABASE_SERVICE_ROLE_KEY
+require('dotenv').config({ path: '.env.local' });
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error('Missing env vars. Ensure client/.env.local includes:');
+  console.error('- NEXT_PUBLIC_SUPABASE_URL');
+  console.error('- SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
