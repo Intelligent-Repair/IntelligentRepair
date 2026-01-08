@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 3,
+  "description": "מיפוי מילות מפתח לנורות אזהרה בלבד. סימפטומים טקסטואליים מועברים ישירות ל-AI.",
+  "symptoms": [
+    {
+      "category": "warning_lights",
+      "description": "דיווח מפורש על נורות אזהרה בלוח השעונים",
+      "mappings": [
+        {
+          "keywords": [
+            "נורת מנוע",
+            "נורית מנוע",
+            "סמל מנוע",
+            "מנוע כתום",
+            "מנוע צהוב",
+            "צ׳ק אנג׳ין",
+            "צק אנגין",
+            "Check Engine",
+            "MIL",
+            "מנוע מהבהב",
+            "נורת מנוע מהבהבת",
+            "נדלקה נורת מנוע",
+            "נדלקה לי נורת מנוע",
+            "אזהרת מנוע",
+            "חיווי מנוע"
+          ],
+          "targetId": "check_engine_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת לחץ אוויר",
+            "נורית לחץ אוויר",
+            "TPMS",
+            "נורית TPMS",
+            "מילאתי אוויר והנורה לא כבתה",
+            "נדלקה נורת לחץ אוויר",
+            "אזהרת לחץ אוויר"
+          ],
+          "targetId": "tpms_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת שמן",
+            "נורת שמן אדומה",
+            "נורית שמן",
+            "מנורת שמן",
+            "מנורת אלדין",
+            "נורת אלדין",
+            "נדלקה נורת שמן",
+            "אזהרת שמן"
+          ],
+          "targetId": "oil_pressure_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת דלק",
+            "סמל משאבת דלק",
+            "אייקון משאבת דלק",
+            "Low Fuel",
+            "נדלקה נורת דלק",
+            "אזהרת דלק"
+          ],
+          "targetId": "fuel_level_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת ABS",
+            "נורית ABS",
+            "סמל ABS",
+            "Anti-lock",
+            "נדלקה נורת ABS"
+          ],
+          "targetId": "abs_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת כרית אוויר",
+            "AIRBAG",
+            "נורית SRS",
+            "סמל כרית אוויר",
+            "נדלקה נורת כרית אוויר"
+          ],
+          "targetId": "airbag_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת הגה",
+            "נורת הגה כוח",
+            "Power Steering",
+            "נורית EPS",
+            "נדלקה נורת הגה"
+          ],
+          "targetId": "power_steering_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת גיר",
+            "AT OIL TEMP",
+            "Transmission Temp",
+            "Transmission Overheat",
+            "אזהרת גיר",
+            "נדלקה נורת גיר"
+          ],
+          "targetId": "transmission_temperature_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "ESP",
+            "ESC",
+            "ESP OFF",
+            "TC OFF",
+            "נורת ESP",
+            "נורית ESP"
+          ],
+          "targetId": "esp_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "אימובילייזר",
+            "נורת מפתח",
+            "סמל מפתח",
+            "Immobilizer",
+            "נדלקה נורת מפתח"
+          ],
+          "targetId": "immobilizer_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נוזל שמשות",
+            "נוזל שפריצר",
+            "נורת שפריצר",
+            "Low Washer Fluid",
+            "אזהרת נוזל שמשות",
+            "נדלקה נורת שפריצר"
+          ],
+          "targetId": "washer_fluid_light",
+          "type": "light"
+        }
+      ]
+    }
+  ]
+}

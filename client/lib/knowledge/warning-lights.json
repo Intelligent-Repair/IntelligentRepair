@@ -1,0 +1,3899 @@
+{
+    "schemaVersion": 2,
+    "battery_light": {
+        "severity": "critical",
+        "names": {
+            "he": [
+                "נורת מצבר",
+                "נורת טעינה",
+                "נורת אלטרנטור"
+            ],
+            "en": [
+                "Battery Light",
+                "Charging Light"
+            ]
+        },
+        "symbol": "קופסה עם + ו-",
+        "colors": [
+            "red"
+        ],
+        "first_question": {
+            "text": "מתי נדלקה הנורה? האם היא הופיעה פתאום בזמן שהרכב כבר היה בנסיעה, או שהיא דולקת עכשיו כשאתה מנסה להניע והרכב לא 'תופס'?",
+            "options": [
+                {
+                    "id": "while_driving",
+                    "label": "נדלקה בזמן נסיעה"
+                },
+                {
+                    "id": "wont_start",
+                    "label": "הרכב לא מניע"
+                }
+            ]
+        },
+        "scenarios": {
+            "while_driving": {
+                "description": "המנוע פועל, אך המערכת לא מקבלת חשמל מהאלטרנטור ופורקת את המצבר",
+                "severity": "critical",
+                "risk": "הרכב עלול להיכבות תוך זמן קצר (המצבר ייגמר כשהאלטרנטור לא טוען). אם התקלה קשורה לרצועת אביזרים/רצועת אלטרנטור שנקרעה או נפלה — ברכבים רבים היא מניעה גם מערכות נוספות (ולעיתים גם משאבת מים), ולכן קיימת גם סכנת התחממות. אם יש סימני התחממות/הגה כבד/רעשים חריגים — עצור והזמן גרר.",
+                "go_to_mechanic": {
+                    "reason": "אם ההגה קשה או שהרצועה קרועה - הזמן גרר. אין לנסוע עם מערכת טעינה תקולה.",
+                    "urgency": "now"
+                },
+                "causes": [
+                    {
+                        "id": "alternator_failure",
+                        "name": "אלטרנטור תקול",
+                        "probability": 0.7,
+                        "symptoms": [
+                            "אורות נחלשים",
+                            "מגבים איטיים",
+                            "רדיו כבה"
+                        ],
+                        "key_question": {
+                            "text": "האם חלקים חשמליים (כמו חלונות) זזים לאט מהרגיל?",
+                            "options": [
+                                "כן, הכל איטי",
+                                "לא, הכל רגיל",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, הכל איטי": "confirms",
+                                "לא, הכל רגיל": "rules_out",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "belt_broken",
+                        "name": "רצועת אביזרים קרועה",
+                        "probability": 0.25,
+                        "symptoms": [
+                            "הגה כבד מאוד",
+                            "חום המנוע עולה מהר"
+                        ],
+                        "key_question": {
+                            "text": "האם קשה לך מאוד לסובב את ההגה כרגע?",
+                            "options": [
+                                "כן, כבד מאוד",
+                                "לא, רגיל",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, כבד מאוד": "confirms",
+                                "לא, רגיל": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "loose_connections",
+                        "name": "מגעים רופפים",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "הנורה מהבהבת כשעולים על בור או פס האטה"
+                        ],
+                        "key_question": {
+                            "text": "האם הנורה נעלמת וחוזרת בדרכים משובשות?",
+                            "options": [
+                                "כן, מהבהבת",
+                                "לא, דולקת קבוע",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, מהבהבת": "confirms",
+                                "לא, דולקת קבוע": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "reduce_power",
+                        "name": "הפחתת עומס חשמלי",
+                        "actionType": "adjust",
+                        "priority": "FIRST",
+                        "steps": [
+                            "כבה את המזגן מיד",
+                            "כבה את הרדיו",
+                            "כבה אורות מיותרים (השאר רק חובה)",
+                            "אל תפתח חלונות חשמליים",
+                            "נסע ישירות למוסך הקרוב - אל תכבה את המנוע עד שמגיע!"
+                        ],
+                        "followup_question": {
+                            "text": "מה המצב?",
+                            "options": [
+                                {
+                                    "id": "on_way_to_mechanic",
+                                    "label": "כיביתי הכל ובדרך למוסך"
+                                },
+                                {
+                                    "id": "car_died",
+                                    "label": "הרכב כבה לפני שהגעתי"
+                                },
+                                {
+                                    "id": "still_driving",
+                                    "label": "עדיין בדרך"
+                                },
+                                {
+                                    "id": "cant_reach_mechanic",
+                                    "label": "אני לא יכול להגיע למוסך"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "on_way_to_mechanic": {
+                                    "status": "resolved_temp",
+                                    "diagnosis": "✅ פעלת נכון - הפחתת עומס מרוויחה זמן",
+                                    "recommendation": "המשך ישירות למוסך. אל תכבה את המנוע עד שמגיע!"
+                                },
+                                "car_died": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "המצבר התרוקן - האלטרנטור לא טען",
+                                    "recommendation": "הזמן גרר."
+                                },
+                                "still_driving": {
+                                    "status": "needs_more_info",
+                                    "message": "המשך למוסך. אם אורות נחלשים — עצור והזמן גרר."
+                                },
+                                "cant_reach_mechanic": {
+                                    "status": "needs_tow",
+                                    "recommendation": "עצור במקום בטוח והזמן גרר."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_belt",
+                        "name": "בדיקת רצועה (אם עצרת)",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "condition": "אם נאלצת לעצור",
+                        "steps": [
+                            "כבה את המנוע",
+                            "פתח את מכסה המנוע",
+                            "חפש רצועת גומי שחורה רחבה בצד המנוע",
+                            "בדוק אם היא קרועה, רפויה או חסרה"
+                        ],
+                        "followup_question": {
+                            "text": "האם הרצועה נראית שלמה או קרועה?",
+                            "options": [
+                                {
+                                    "id": "intact",
+                                    "label": "שלמה ומתוחה"
+                                },
+                                {
+                                    "id": "torn_missing",
+                                    "label": "קרועה או חסרה"
+                                },
+                                {
+                                    "id": "loose",
+                                    "label": "רפויה מאוד"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי אותה"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "intact": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "רצועה תקינה - ייתכן אלטרנטור תקול",
+                                    "recommendation": "הזמן גרר למוסך."
+                                },
+                                "torn_missing": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "⛔ רצועה קרועה - אסור להניע!",
+                                    "recommendation": "הזמן גרר מיד."
+                                },
+                                "loose": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "רצועה רפויה",
+                                    "recommendation": "הזמן גרר."
+                                },
+                                "not_found": {
+                                    "status": "needs_tow",
+                                    "recommendation": "הזמן גרר למוסך."
+                                }
+                            }
+                        },
+                        "warning": "⚠️ אם ההגה קשה מאוד - הרצועה קרועה. אסור להניע!"
+                    },
+                    {
+                        "id": "check_terminals",
+                        "name": "בדיקת חיבורי מצבר",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "condition": "אם הנורה מהבהבת או נדלקת/נכבית",
+                        "steps": [
+                            "פתח מכסה מנוע",
+                            "בדוק את חיבורי המצבר (קטבים)",
+                            "חפש אבקה לבנה/ירקרקה או חיבורים רופפים",
+                            "אם רופף - נסה להדק בעדינות (בלי כלים אם אפשר)"
+                        ],
+                        "followup_question": {
+                            "text": "מה מצאת בבדיקת החיבורים?",
+                            "options": [
+                                {
+                                    "id": "tightened",
+                                    "label": "חיבור רופף - הידקתי"
+                                },
+                                {
+                                    "id": "corrosion",
+                                    "label": "יש קורוזיה (אבקה לבנה/ירקרקה)"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "הכל נראה תקין"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "tightened": {
+                                    "status": "needs_verification",
+                                    "next_action": "verify_terminals_fixed",
+                                    "message": "הנע את הרכב ובדוק אם הנורה כבתה."
+                                },
+                                "corrosion": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "קורוזיה על חיבורי המצבר",
+                                    "recommendation": "מומלץ לפנות למוסך לניקוי."
+                                },
+                                "all_ok": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן אלטרנטור או מצבר תקולים",
+                                    "recommendation": "פנה למוסך לבדיקה."
+                                },
+                                "cant_check": {
+                                    "status": "needs_mechanic",
+                                    "recommendation": "פנה למוסך לבדיקה."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "verify_terminals_fixed",
+                        "name": "אימות תיקון חיבורי מצבר",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "condition": "אחרי הידוק חיבורים רופפים",
+                        "steps": [
+                            "הנע את הרכב",
+                            "בדוק אם הנורה כבתה",
+                            "אם הנורה עדיין דולקת - הבעיה לא בחיבור"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי ההתנעה?",
+                            "options": [
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_try",
+                                    "label": "לא ניסיתי עדיין"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: חיבורי מצבר היו רופפים",
+                                    "recommendation": "נסע למוסך לבדיקה."
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "הבעיה לא בחיבורי המצבר",
+                                    "recommendation": "פנה למוסך לבדיקה."
+                                },
+                                "didnt_try": {
+                                    "status": "pending",
+                                    "message": "הנע את הרכב ובדוק אם הנורה כבתה."
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "wont_start": {
+                "description": "הרכב חנה, וכשניסית להניע הנורה דולקת והמנוע לא פועל",
+                "severity": "moderate",
+                "risk": "אתה תקוע. אם תמשיך לנסות להניע שוב ושוב ללא הצלחה, אתה עלול לגרום נזק לסטארטר או למערכות חשמל מהתחממות.",
+                "go_to_mechanic": {
+                    "reason": "אם לאחר חיבור כבלים המנוע עדיין לא מסתובב, או ששומעים רק קליק אחד, או שהמצבר נראה מנופח או יש ממנו ריח חומצה.",
+                    "urgency": "soon"
+                },
+                "tow_conditions": [
+                    "לאחר חיבור כבלים המנוע עדיין לא מסתובב",
+                    "שומעים רק קליק אחד",
+                    "המנוע מסתובב בזכות הכבלים אבל לא נדלק",
+                    "המצבר נראה מנופח (דפנות מעוגלות)",
+                    "יש ריח חריף של חומצה מהמצבר"
+                ],
+                "summary_for_user": "אם הכבלים לא עזרו – הבעיה היא כנראה בסטארטר או שהמצבר 'מקצר' פנימית. אין לך אפשרות לתקן זאת בשטח. זה הזמן להתקשר לשירותי הגרירה.",
+                "causes": [
+                    {
+                        "id": "dead_battery",
+                        "name": "מצבר מת (ישן)",
+                        "probability": 0.8,
+                        "symptoms": [
+                            "נשמעים קליקים",
+                            "לוח המחוונים מהבהב"
+                        ],
+                        "key_question": {
+                            "text": "האם שמעת קליקים מהירים כשסובבת את המפתח?",
+                            "options": [
+                                "כן, שמעתי קליקים",
+                                "לא, שקט לגמרי",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "drained_battery",
+                        "name": "פריקה (אור דולק)",
+                        "probability": 0.15,
+                        "symptoms": [
+                            "אין תגובה בכלל",
+                            "הרכב מת לחלוטין"
+                        ],
+                        "key_question": {
+                            "text": "האם ייתכן ששכחת אור פנימי או פנס דולק בלילה?",
+                            "options": [
+                                "כן, יתכן",
+                                "לא, לא שכחתי כלום",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "corrosion",
+                        "name": "קורוזיה/מגעים",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "אבקה לבנה על חיבורי המצבר"
+                        ],
+                        "key_question": {
+                            "text": "האם אתה רואה לכלוך לבן או כחול על חיבורי המצבר?",
+                            "options": [
+                                "כן, יש אבקה",
+                                "לא, נקי",
+                                "לא בדקתי"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "check_battery_terminals",
+                        "name": "בדיקת חיבורי מצבר",
+                        "actionType": "inspect",
+                        "priority": "FIRST",
+                        "steps": [
+                            "פתח את מכסה המנוע ואתר את המצבר",
+                            "בדוק את הקטבים (+ אדום, - שחור)",
+                            "חפש אבקה לבנה/ירקרקה או חיבורים רופפים",
+                            "נסה להזיז בעדינות את הכבלים - האם רופפים?"
+                        ],
+                        "followup_question": {
+                            "text": "מה מצב חיבורי המצבר?",
+                            "options": [
+                                {
+                                    "id": "has_corrosion",
+                                    "label": "יש אבקה לבנה/ירקרקה"
+                                },
+                                {
+                                    "id": "loose",
+                                    "label": "חיבורים רופפים"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "הכל נראה תקין ומהודק"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "has_corrosion": {
+                                    "status": "needs_more_info",
+                                    "next_action": "clean_terminals",
+                                    "message": "קורוזיה עלולה למנוע מעבר זרם. נסה לנקות."
+                                },
+                                "loose": {
+                                    "status": "needs_more_info",
+                                    "message": "נסה להדק את החיבורים ולהניע."
+                                },
+                                "all_ok": {
+                                    "status": "needs_more_info",
+                                    "next_action": "jump_start",
+                                    "message": "ייתכן שהמצבר פרוק. נסה הנעה עם כבלים."
+                                },
+                                "cant_check": {
+                                    "status": "needs_more_info",
+                                    "next_action": "jump_start",
+                                    "message": "נסה הנעה עם כבלים."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "clean_terminals",
+                        "name": "ניקוי מגעים",
+                        "actionType": "adjust",
+                        "priority": "STANDARD",
+                        "condition": "אם יש אבקה לבנה/כחולה על הקטבים",
+                        "steps": [
+                            "נתק קודם את הקוטב השלילי (-) שחור",
+                            "ערבב כפית סודה לשתייה בכוס מים",
+                            "שפוך על הקטבים ושפשף עם מברשת ישנה או מטלית",
+                            "יבש היטב עם מטלית נקייה",
+                            "חבר בחזרה - קודם חיובי (+) אדום, אח\"כ שלילי (-) שחור",
+                            "נסה להניע"
+                        ],
+                        "warning": "אזהרה: אל תיגע בשני הקטבים במקביל עם כלי מתכת - סכנת קצר!",
+                        "followup_question": {
+                            "text": "מה קרה אחרי הניקוי?",
+                            "options": [
+                                {
+                                    "id": "cleaned_started",
+                                    "label": "✅ ניקיתי והרכב התניע!"
+                                },
+                                {
+                                    "id": "cleaned_not_started",
+                                    "label": "ניקיתי אבל עדיין לא מניע"
+                                },
+                                {
+                                    "id": "couldnt_clean",
+                                    "label": "לא הצלחתי לנקות"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "cleaned_started": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: קורוזיה מנעה מעבר זרם",
+                                    "recommendation": "פנה למוסך לניקוי יסודי."
+                                },
+                                "cleaned_not_started": {
+                                    "status": "needs_more_info",
+                                    "next_action": "jump_start",
+                                    "message": "המצבר כנראה פרוק. נסה הנעה עם כבלים."
+                                },
+                                "couldnt_clean": {
+                                    "status": "needs_more_info",
+                                    "next_action": "jump_start",
+                                    "message": "נסה הנעה עם כבלים."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "jump_start",
+                        "name": "הנעה עם כבלים",
+                        "actionType": "fill",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "1. חבר כבל אדום (+) לקוטב החיובי של הרכב התקול",
+                            "2. חבר הקצה השני של האדום לקוטב החיובי (+) של הרכב התקין",
+                            "3. חבר כבל שחור (-) לקוטב השלילי של הרכב התקין",
+                            "4. חבר הקצה השני של השחור לנקודת הארקה (בורג מתכת על המנוע) ברכב התקול - לא לקוטב השלילי!",
+                            "5. הנע את הרכב התקין והמתן 5 דקות",
+                            "6. נסה להניע את הרכב התקול"
+                        ],
+                        "warning": "אזהרה: חיבור שחור ישירות לקוטב שלילי של מצבר מת עלול לגרום לניצוצות ליד גזי מימן!",
+                        "followup_question": {
+                            "text": "מה קרה אחרי שניסית להתניע עם הכבלים?",
+                            "options": [
+                                {
+                                    "id": "started_light_off",
+                                    "label": "✅ הרכב התניע והנורה כבתה"
+                                },
+                                {
+                                    "id": "started_light_on",
+                                    "label": "הרכב התניע אבל הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_start",
+                                    "label": "הרכב לא התניע בכלל"
+                                },
+                                {
+                                    "id": "no_cables",
+                                    "label": "אין לי כבלים / רכב עזר"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "started_light_off": {
+                                    "status": "resolved_temp",
+                                    "diagnosis": "✅ נפתר זמנית: מצבר חלש/מפורק",
+                                    "recommendation": "נסע כ-20 דקות לטעינה. אם הנורה חוזרת = אלטרנטור תקול."
+                                },
+                                "started_light_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "האלטרנטור לא טוען",
+                                    "recommendation": "נסע ישירות למוסך. כבה צרכנים חשמליים.",
+                                    "drive_ok": true
+                                },
+                                "didnt_start": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "מצבר גמור או סטרטר תקול",
+                                    "recommendation": "הזמן גרר."
+                                },
+                                "no_cables": {
+                                    "status": "needs_tow",
+                                    "recommendation": "התקשר לשירותי דרך או הזמן גרר."
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "brake_light": {
+        "severity": "critical",
+        "safetyRuleId": "brakes_fail",
+        "names": {
+            "he": [
+                "נורת בלמים",
+                "נורת בלם יד",
+                "נורת הבלם"
+            ],
+            "en": [
+                "Brake Light",
+                "Brake Warning Light"
+            ]
+        },
+        "symbol": "עיגול עם סימן קריאה (!) או האות (P) במרכזו",
+        "colors": [
+            "red",
+            "orange"
+        ],
+        "color_meaning": {
+            "red": "סכנה/מצב פעיל",
+            "orange": "התראת תחזוקה/רפידות"
+        },
+        "first_question": {
+            "text": "האם הנורה דולקת כרגע כשאתה מנסה להתחיל נסיעה מהחניה, או שהיא נדלקה פתאום בזמן שהרכב כבר היה בתנועה?",
+            "options": [
+                {
+                    "id": "from_parking",
+                    "label": "דולקת בתחילת נסיעה מחניה"
+                },
+                {
+                    "id": "while_driving",
+                    "label": "נדלקה פתאום בזמן נסיעה"
+                }
+            ]
+        },
+        "scenarios": {
+            "from_parking": {
+                "description": "הנורה דולקת בתחילת נסיעה - רוב הסיכויים שמדובר בעניין תפעולי פשוט",
+                "severity": "moderate",
+                "risk": "סכנת שחיקה וחימום הבלמים אם נוסעים עליו",
+                "go_to_mechanic": {
+                    "reason": "אם הבלם משוחרר והנורה נשארת דולקת - אסור להתחיל נסיעה.",
+                    "urgency": "now"
+                },
+                "causes": [
+                    {
+                        "id": "handbrake_engaged",
+                        "name": "בלם יד משוך",
+                        "probability": 0.9,
+                        "symptoms": [
+                            "הרכב מתנגד לתנועה",
+                            "נשמע צפצוף אזהרה (גונג)"
+                        ],
+                        "key_question": {
+                            "text": "האם הורדת את הידית עד הסוף למטה?",
+                            "options": [
+                                "כן, הורדתי לגמרי",
+                                "לא, עדיין למעלה",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, הורדתי לגמרי": "rules_out",
+                                "לא, עדיין למעלה": "confirms",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "low_brake_fluid",
+                        "name": "נוזל בלמים נמוך",
+                        "probability": 0.1,
+                        "symptoms": [
+                            "הנורה נשארת דולקת גם אחרי שהידית למטה"
+                        ],
+                        "key_question": {
+                            "text": "האם שחררת את בלם היד והנורה עדיין מסרבת להיכבות?",
+                            "options": [
+                                "כן, עדיין דולקת",
+                                "לא, היא כבתה",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, עדיין דולקת": "confirms",
+                                "לא, היא כבתה": "rules_out",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "release_handbrake",
+                        "name": "שחרור מלא של בלם יד",
+                        "actionType": "adjust",
+                        "priority": "FIRST",
+                        "steps": [
+                            "וודא שבלם היד מורד עד הסוף",
+                            "או לחיצה על הכפתור החשמלי (ברכבים חדשים)",
+                            "בדוק שהנורה כבתה"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי שחרור בלם היד?",
+                            "options": [
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: בלם יד היה משוך",
+                                    "recommendation": "ניתן להמשיך בנסיעה."
+                                },
+                                "still_on": {
+                                    "status": "needs_inspection",
+                                    "next_action": "check_brake_fluid",
+                                    "message": "יש לבדוק מפלס נוזל בלמים."
+                                },
+                                "unsure": {
+                                    "status": "needs_more_info",
+                                    "message": "בדוק אם בלם היד מורד לגמרי."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_brake_fluid",
+                        "name": "בדיקת מפלס נוזל בלמים",
+                        "actionType": "inspect",
+                        "condition": "אם הנורה לא נכבית אחרי שחרור בלם היד",
+                        "steps": [
+                            "פתח את מכסה המנוע",
+                            "אתר את מכל נוזל הבלמים (בדרך כלל ליד מכסה המנוע)",
+                            "בדוק את המפלס - צריך להיות בין MIN ל-MAX"
+                        ],
+                        "followup_question": {
+                            "text": "מה מפלס הנוזל?",
+                            "options": [
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין הסימונים)"
+                                },
+                                {
+                                    "id": "low",
+                                    "label": "נמוך (מתחת ל-MIN או קרוב אליו)"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המכל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "normal": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "נוזל תקין אבל הנורה דולקת",
+                                    "recommendation": "פנה למוסך לבדיקה."
+                                },
+                                "low": {
+                                    "status": "needs_mechanic_urgent",
+                                    "diagnosis": "⚠️ נוזל בלמים נמוך",
+                                    "recommendation": "פנה למוסך מיד."
+                                },
+                                "not_found": {
+                                    "status": "needs_mechanic",
+                                    "recommendation": "פנה למוסך."
+                                }
+                            }
+                        },
+                        "warning": "⚠️ אל תמלא נוזל בלמים בעצמך! מילוי שגוי עלול לפגוע במערכת הבלמים."
+                    }
+                ]
+            },
+            "while_driving": {
+                "description": "הנורה נדלקה פתאום בזמן נסיעה - מצב חירום בטיחותי המחייב התייחסות מיידית",
+                "severity": "critical",
+                "risk": "נסיעה עם בלמים לא תקינים עלולה לגרום לאובדן יכולת עצירה. מומלץ לעצור ולבדוק את המצב.",
+                "immediate_action": "עצירה בטוחה בצד הדרך מיד!",
+                "tow_conditions": [
+                    "הדוושה מרגישה רכה או שוקעת",
+                    "חסר נוזל בלמים באופן משמעותי (מעיד על נזילה)",
+                    "הנורה אדומה וקבועה בזמן נסיעה"
+                ],
+                "model_summary": "אם המשתמש עונה שהנורה נדלקה בזמן נסיעה והדוושה מרגישה רכה - הדיאגנוזה היא כשל במערכת הבלימה וההנחיה היא עצירה מיידית והזמנת גרר",
+                "causes": [
+                    {
+                        "id": "low_brake_fluid_driving",
+                        "name": "חוסר בנוזל בלמים",
+                        "probability": 0.7,
+                        "symptoms": [
+                            "הנורה נדלקת בעיקר בסיבובים או בלימות חזקות"
+                        ],
+                        "key_question": {
+                            "text": "האם הנורה נדלקת ונכבית כשאתה פונה בחדות?",
+                            "options": [
+                                "כן, מהבהבת בפניות",
+                                "לא, דולקת קבוע",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "spongy_pedal",
+                        "name": "דוושה ספוגית (תקלה הידראולית)",
+                        "probability": 0.2,
+                        "symptoms": [
+                            "הבלם מרגיש רך",
+                            "הדוושה שוקעת עמוק",
+                            "דורש פמפום כדי לעצור"
+                        ],
+                        "key_question": {
+                            "text": "האם הדוושה מרגישה רכה יותר או שוקעת עמוק יותר מהרגיל?",
+                            "options": [
+                                "כן, רכה מאוד",
+                                "לא, רגילה",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "worn_pads",
+                        "name": "רפידות שחוקות",
+                        "probability": 0.1,
+                        "note": "בדרך כלל נורה כתומה",
+                        "symptoms": [
+                            "רעשי חריקה מתכתית בזמן בלימה"
+                        ],
+                        "key_question": {
+                            "text": "האם אתה שומע רעש של שפשוף מתכת כשאתה בולם?",
+                            "options": [
+                                "כן, יש רעש חריקה",
+                                "לא, שקט",
+                                "לא בטוח"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "safe_stop",
+                        "name": "עצירה בטוחה",
+                        "actionType": "safety",
+                        "priority": "FIRST",
+                        "steps": [
+                            "השתמש בבלימת מנוע - הורד הילוכים בהדרגה",
+                            "בלום בעדינות - לא בחדות!",
+                            "עצור בצד הדרך במקום בטוח",
+                            "הדלק אורות חירום"
+                        ],
+                        "followup_question": {
+                            "text": "האם הצלחת לעצור בבטחה בצד הדרך?",
+                            "options": [
+                                {
+                                    "id": "stopped_safely",
+                                    "label": "כן, עצרתי בבטחה"
+                                },
+                                {
+                                    "id": "still_moving",
+                                    "label": "לא, עדיין בתנועה"
+                                },
+                                {
+                                    "id": "almost_stopped",
+                                    "label": "כמעט עצרתי"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "stopped_safely": {
+                                    "status": "wait_and_verify",
+                                    "next_action": "check_pedal_feel",
+                                    "message": "מצוין! עכשיו נבדוק את מצב הדוושה."
+                                },
+                                "still_moving": {
+                                    "status": "critical",
+                                    "message": "⛔ עצור מיד! השתמש בבלימת מנוע."
+                                },
+                                "almost_stopped": {
+                                    "status": "critical",
+                                    "message": "המשך לעצור לגמרי בצד."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_pedal_feel",
+                        "name": "בדיקת תחושת הדוושה",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "כשהרכב עומד, לחץ על דוושת הבלם",
+                            "בדוק: האם הדוושה מרגישה רכה או שוקעת?",
+                            "האם צריך ללחוץ כמה פעמים (פמפום) כדי שתתקשה?"
+                        ],
+                        "followup_question": {
+                            "text": "איך הדוושה מרגישה?",
+                            "options": [
+                                {
+                                    "id": "soft_sinking",
+                                    "label": "הדוושה רכה מאוד או שוקעת עמוק"
+                                },
+                                {
+                                    "id": "normal_feel",
+                                    "label": "הדוושה מרגישה רגילה"
+                                },
+                                {
+                                    "id": "needs_pumping",
+                                    "label": "צריך כמה לחיצות עד שמתקשה"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "soft_sinking": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "⛔ כשל במערכת הבלימה",
+                                    "recommendation": "הזמן גרר מיד!"
+                                },
+                                "normal_feel": {
+                                    "status": "needs_more_info",
+                                    "next_action": "check_brake_fluid_level",
+                                    "message": "הדוושה תקינה - נבדוק את מפלס הנוזל."
+                                },
+                                "needs_pumping": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "אוויר במערכת הבלימה או נזילה",
+                                    "recommendation": "הזמן גרר."
+                                },
+                                "unsure": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אם יש ספק לגבי הבלמים - הזמן גרר."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_brake_fluid_level",
+                        "name": "בדיקת מפלס נוזל בלמים",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "פתח מכסה מנוע",
+                            "אתר את מכל נוזל הבלמים (מיכל פלסטי קטן, בדרך כלל ליד חומת המנוע)",
+                            "בדוק את המפלס - צריך להיות בין MIN ל-MAX"
+                        ],
+                        "followup_question": {
+                            "text": "מה מפלס נוזל הבלמים?",
+                            "options": [
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "very_low",
+                                    "label": "נמוך מאוד או ריק"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המכל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "normal": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "נוזל תקין אך הנורה דולקת",
+                                    "recommendation": "פנה למוסך. אם הדוושה רגילה - אפשר לנסוע בזהירות.",
+                                    "drive_ok": true
+                                },
+                                "very_low": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "⚠️ נוזל בלמים נמוך",
+                                    "recommendation": "הזמן גרר!"
+                                },
+                                "not_found": {
+                                    "status": "needs_tow",
+                                    "recommendation": "הזמן גרר לבטחון."
+                                }
+                            }
+                        },
+                        "warning": "⚠️ אל תמלא נוזל בלמים בעצמך אלא אם יש לך ניסיון! מילוי שגוי מסוכן."
+                    }
+                ],
+                "final_recommendation": "בכל מקרה של נורת בלמים בזמן נסיעה - הזמן גרר. אל תסכן את עצמך בנסיעה עם בלמים לא תקינים."
+            }
+        }
+    },
+    "oil_pressure_light": {
+        "severity": "critical",
+        "names": {
+            "he": [
+                "נורת לחץ שמן",
+                "מנורת אלדין",
+                "נורת שמן"
+            ],
+            "en": [
+                "Oil Pressure Light",
+                "Oil Light"
+            ]
+        },
+        "symbol": "פך שמן קטן עם טיפה שנוטפת מהקצה שלו",
+        "colors": [
+            "red",
+            "orange"
+        ],
+        "color_meaning": {
+            "red": "לחץ שמן נמוך - מסוכן מאוד. עצור במקום בטוח וכבה מנוע.",
+            "orange": "מפלס שמן נמוך - חסר שמן, ניתן להמשיך בנסיעה קצרה למילוי. הערה: זה רלוונטי רק אם ברכב יש נורה צהובה/כתומה נפרדת למפלס. אם יש רק נורה אדומה והיא דולקת - זו נורת לחץ וחובה לכבות מיד!"
+        },
+        "importance": "נורת לחץ שמן היא הנורה המפחידה ביותר. היא סימן לכך שהמנוע נמצא שניות ספורות לפני נזק בלתי הפיך.",
+        "first_question": {
+            "text": "מתי נדלקה הנורה? האם היא נדלקה פתאום באמצע נסיעה, או שהיא נשארה דולקת מיד לאחר שהנעת את הרכב בחניה?",
+            "options": [
+                {
+                    "id": "while_driving",
+                    "label": "נדלקה פתאום באמצע נסיעה"
+                },
+                {
+                    "id": "after_start",
+                    "label": "נשארה דולקת אחרי התנעה בחניה"
+                }
+            ]
+        },
+        "scenarios": {
+            "while_driving": {
+                "description": "המצב המסוכן ביותר - המנוע פועל אך השמן לא מגיע לכל החלקים",
+                "severity": "critical",
+                "risk": "המשך נסיעה ללא לחץ שמן תקין עלול לגרום לנזק בלתי הפיך למנוע תוך זמן קצר.",
+                "immediate_action": "כבה את המנוע מיד!",
+                "causes": [
+                    {
+                        "id": "low_oil_level",
+                        "name": "מפלס שמן נמוך",
+                        "probability": 0.5,
+                        "symptoms": [
+                            "לא בדקתי שמן לאחרונה",
+                            "הרכב צורך שמן"
+                        ],
+                        "key_question": {
+                            "text": "האם בדקת את מפלס השמן במדיד (מוט צהוב) אחרי שעצרת?",
+                            "options": [
+                                "כן, חסר שמן או יבש",
+                                "כן, השמן תקין",
+                                "לא, לא בדקתי עדיין"
+                            ],
+                            "score_mapping": {
+                                "כן, חסר שמן או יבש": "confirms",
+                                "כן, השמן תקין": "rules_out",
+                                "לא, לא בדקתי עדיין": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "extreme_low_oil",
+                        "name": "נזילת שמן משמעותית",
+                        "probability": 0.25,
+                        "symptoms": [
+                            "ריח של שמן שרוף",
+                            "עשן כחלחל מהאגזוז",
+                            "כתמי שמן על הרצפה"
+                        ],
+                        "key_question": {
+                            "text": "האם שמת לב לשלולית שמן מתחת לרכב או לטפטופים?",
+                            "options": [
+                                "כן, ראיתי שמן",
+                                "לא, לא ראיתי",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, ראיתי שמן": "confirms",
+                                "לא, לא ראיתי": "rules_out",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "oil_pump_failure",
+                        "name": "משאבת שמן תקולה",
+                        "probability": 0.2,
+                        "symptoms": [
+                            "רעשי תקתוק",
+                            "דפיקות מתכתיות חזקות מהמנוע"
+                        ],
+                        "key_question": {
+                            "text": "האם שמעת רעשים מתכתיים או תקתוקים מהמנוע לפני שעצרת?",
+                            "options": [
+                                "כן, רעש חזק",
+                                "לא, שקט",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, רעש חזק": "confirms",
+                                "לא, שקט": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "faulty_oil_sensor",
+                        "name": "חיישן לחץ שמן תקול",
+                        "probability": 0.10,
+                        "symptoms": [
+                            "הנורה מהבהבת",
+                            "נדלקת ונכבית ללא רעשים חריגים"
+                        ],
+                        "key_question": {
+                            "text": "האם הנורה מהבהבת או דולקת קבוע?",
+                            "options": [
+                                "מהבהבת והמנוע שקט",
+                                "דולקת קבוע",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "מהבהבת והמנוע שקט": "confirms",
+                                "דולקת קבוע": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "check_dipstick_emergency",
+                        "name": "בדיקת מפלס שמן (לאחר עצירה)",
+                        "actionType": "inspect",
+                        "priority": "FIRST",
+                        "condition": "רק לאחר שכיבית את המנוע והמתנת 5 דקות",
+                        "steps": [
+                            "המתן 5 דקות שהשמן ירד למכל",
+                            "פתח את מכסה המנוע",
+                            "הוצא את מדיד השמן (מוט עם טבעת צהובה/כתומה)",
+                            "נגב אותו עם מטלית נקייה",
+                            "הכנס בחזרה עד הסוף והוצא שוב",
+                            "בדוק את המפלס ביחס לסימונים MIN/MAX"
+                        ],
+                        "followup_question": {
+                            "text": "מה המצב של השמן על המדיד?",
+                            "options": [
+                                {
+                                    "id": "at_max",
+                                    "label": "באזור MAX - מפלס תקין"
+                                },
+                                {
+                                    "id": "at_min",
+                                    "label": "באזור MIN או מתחתיו - חסר שמן"
+                                },
+                                {
+                                    "id": "dry",
+                                    "label": "המדיד יבש לחלוטין - אין שמן!"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "at_max": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "מפלס תקין אך הנורה נדלקה - משאבת שמן או חיישן תקולים",
+                                    "recommendation": "הזמן גרר. אסור להניע!"
+                                },
+                                "at_min": {
+                                    "status": "needs_more_info",
+                                    "message": "יש למלא שמן אם יש לך. בדוק קודם אם יש נזילה.",
+                                    "next_action": "check_under_car"
+                                },
+                                "dry": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "⛔ המנוע עבד ללא שמן - ייתכן נזק חמור",
+                                    "recommendation": "הזמן גרר מיד. אסור להניע!"
+                                },
+                                "cant_check": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "לא ניתן לאבחן",
+                                    "recommendation": "הזמן גרר למוסך."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_under_car",
+                        "name": "בדיקת נזילה מתחת לרכב",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "הסתכל מתחת לרכב משני הצדדים",
+                            "חפש כתמי שמן טריים או טפטופים",
+                            "שמן מנוע בדרך כלל חום כהה או שחור"
+                        ],
+                        "followup_question": {
+                            "text": "האם אתה רואה נזילת שמן מתחת לרכב?",
+                            "options": [
+                                {
+                                    "id": "has_leak",
+                                    "label": "כן, יש נזילה או כתם שמן"
+                                },
+                                {
+                                    "id": "no_leak",
+                                    "label": "לא, הכל יבש"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "has_leak": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "נזילת שמן פעילה - אסור להניע!",
+                                    "recommendation": "הזמן גרר מיד."
+                                },
+                                "no_leak": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_oil_gradual_emergency",
+                                    "message": "אם יש לך שמן מתאים, נסה למלא בהדרגה."
+                                },
+                                "unsure": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אם לא בטוח - הזמן גרר."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_oil_gradual_emergency",
+                        "name": "מילוי שמן הדרגתי (חירום)",
+                        "actionType": "fill",
+                        "priority": "STANDARD",
+                        "condition": "רק אם אין נזילה מתחת לרכב ויש שמן מתאים",
+                        "steps": [
+                            "וודא שהמנוע קר (המתן 5 דקות)",
+                            "פתח את מכסה השמן (סמל פך)",
+                            "מלא 0.5 ליטר שמן",
+                            "המתן דקה",
+                            "בדוק עם המדיד - האם המפלס עלה?",
+                            "אם עדיין נמוך - מלא עוד 0.5 ליטר",
+                            "המשך עד שהמפלס מגיע לאזור MAX (לא יותר!)",
+                            "הנע את הרכב לשנייה אחת בלבד",
+                            "כבה מיד ובדוק אם הנורה כבתה"
+                        ],
+                        "warning": "⚠️ אל תמלא יותר מדי! מפלס יתר מזיק למנוע. עצור ב-MAX.",
+                        "followup_question": {
+                            "text": "מה קרה אחרי המילוי ההדרגתי וההתנעה הקצרה?",
+                            "options": [
+                                {
+                                    "id": "filled_light_off",
+                                    "label": "✅ מילאתי עד MAX, הנעתי והנורה כבתה!"
+                                },
+                                {
+                                    "id": "filled_light_on",
+                                    "label": "מילאתי אבל הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "filled_didnt_start",
+                                    "label": "מילאתי אבל לא ניסיתי להניע"
+                                },
+                                {
+                                    "id": "no_oil",
+                                    "label": "אין לי שמן"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "filled_light_off": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: מפלס שמן היה נמוך",
+                                    "recommendation": "נסע בזהירות למוסך. בדוק מפלס שמן כל שבוע.",
+                                    "drive_ok": true
+                                },
+                                "filled_light_on": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "הנורה לא נכבית - משאבת שמן או חיישן תקולים",
+                                    "recommendation": "כבה את המנוע מיד והזמן גרר!"
+                                },
+                                "filled_didnt_start": {
+                                    "status": "pending",
+                                    "message": "הנע לשנייה בלבד ובדוק אם הנורה כבתה."
+                                },
+                                "no_oil": {
+                                    "status": "needs_tow",
+                                    "recommendation": "הזמן גרר או בקש שמן מתחנת דלק."
+                                }
+                            }
+                        }
+                    }
+                ],
+                "tow_conditions": [
+                    "נורת שמן אדומה בזמן נסיעה = גרר מיידי",
+                    "רעשי מתכת מהמנוע = אסור להניע, רק גרר",
+                    "מדיד שמן יבש לחלוטין = אסור להניע"
+                ],
+                "final_recommendation": "נורת שמן אדומה בזמן נסיעה = כבה מנוע מיד והזמן גרר. המשך נסיעה עלול לגרום לנזק חמור למנוע."
+            },
+            "after_start": {
+                "description": "המערכת לא מצליחה לבנות לחץ ראשוני - הנורה נשארה דולקת אחרי התנעה",
+                "severity": "high",
+                "risk": "ללא לחץ שמן תקין, חלקי המנוע עלולים להינזק. אם הנורה נדלקת מיד בהתנעה כשהמנוע קר, ייתכנו מספר סיבות כגון חיישן/מפלס נמוך/פילטר סתום.",
+                "causes": [
+                    {
+                        "id": "low_oil_level",
+                        "name": "מפלס שמן נמוך (תחזוקה)",
+                        "probability": 0.8,
+                        "symptoms": [
+                            "הנורה נדלקה מיד",
+                            "הרכב עמד זמן רב"
+                        ],
+                        "key_question": {
+                            "text": "מתי בפעם האחרונה בדקת שמן במנוע?",
+                            "options": [
+                                "לאחרונה",
+                                "לפני כמה חודשים",
+                                "לא זוכר"
+                            ],
+                            "score_mapping": {
+                                "לאחרונה": "rules_out",
+                                "לפני כמה חודשים": "confirms",
+                                "לא זוכר": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "clogged_oil_filter",
+                        "name": "פילטר שמן סתום",
+                        "probability": 0.15,
+                        "symptoms": [
+                            "הנורה נכבית רק אחרי כמה שניות ארוכות של עבודה"
+                        ],
+                        "key_question": {
+                            "text": "האם עבר הרבה זמן מאז הטיפול האחרון במוסך?",
+                            "options": [
+                                "כן, יותר משנה",
+                                "לא, לאחרונה טיפלתי",
+                                "לא זוכר"
+                            ],
+                            "score_mapping": {
+                                "כן, יותר משנה": "confirms",
+                                "לא, לאחרונה טיפלתי": "rules_out",
+                                "לא זוכר": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "wrong_oil_viscosity",
+                        "name": "שמן בצמיגות לא מתאימה",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "קורה בעיקר בבקרים קרים מאוד"
+                        ],
+                        "key_question": {
+                            "text": "האם מזג האוויר בחוץ קפוא במיוחד הבוקר?",
+                            "options": [
+                                "כן, קר מאוד",
+                                "לא, רגיל",
+                                "לא יודע"
+                            ],
+                            "score_mapping": {
+                                "כן, קר מאוד": "confirms",
+                                "לא, רגיל": "rules_out",
+                                "לא יודע": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "check_dipstick",
+                        "name": "בדיקת מדיד שמן",
+                        "actionType": "inspect",
+                        "priority": "FIRST",
+                        "steps": [
+                            "כבה את המנוע והמתן 5 דקות שהשמן ירד",
+                            "פתח מכסה מנוע",
+                            "הוצא את המדיד (מוט עם טבעת צהובה/כתומה)",
+                            "נגב אותו עם מטלית נקייה",
+                            "הכנס בחזרה עד הסוף והוצא שוב",
+                            "בדוק אם השמן מגיע לקו המינימום"
+                        ],
+                        "followup_question": {
+                            "text": "איפה השמן נמצא על המדיד?",
+                            "options": [
+                                {
+                                    "id": "at_max",
+                                    "label": "באזור MAX (מלא)"
+                                },
+                                {
+                                    "id": "at_min",
+                                    "label": "באזור MIN או מתחתיו (חסר)"
+                                },
+                                {
+                                    "id": "dry",
+                                    "label": "המדיד יבש לגמרי"
+                                },
+                                {
+                                    "id": "cant_check",
+                                    "label": "לא הצלחתי לבדוק"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "at_max": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "מפלס תקין אך הנורה דולקת - חיישן או פילטר סתום",
+                                    "recommendation": "פנה למוסך. אל תניע עד התייעצות."
+                                },
+                                "at_min": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_oil",
+                                    "message": "יש למלא שמן."
+                                },
+                                "dry": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_oil",
+                                    "message": "⚠️ המנוע ללא שמן! יש למלא מיד."
+                                },
+                                "cant_check": {
+                                    "status": "needs_mechanic",
+                                    "recommendation": "פנה למוסך או בקש עזרה."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_oil",
+                        "name": "מילוי שמן",
+                        "actionType": "fill",
+                        "condition": "אם המדיד הראה שחסר שמן",
+                        "steps": [
+                            "פתח את המכסה עם סמל פך השמן",
+                            "מלא שמן מתאים לרכב (לפי ספר הרכב או מדבקה במנוע)",
+                            "מלא לאט - 0.5 ליטר בכל פעם",
+                            "בדוק עם המדיד אחרי כל מילוי",
+                            "עצור כשהשמן מגיע לאזור MAX (לא יותר!)"
+                        ],
+                        "warning": "אזהרה: מילוי יתר של שמן מזיק למנוע! עצור כשהמפלס מגיע ל-MAX.",
+                        "followup_question": {
+                            "text": "האם מילאת שמן?",
+                            "options": [
+                                {
+                                    "id": "filled",
+                                    "label": "כן, מילאתי עד MAX"
+                                },
+                                {
+                                    "id": "no_oil",
+                                    "label": "אין לי שמן"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה שמן להשתמש"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "filled": {
+                                    "status": "needs_verification",
+                                    "next_action": "verify_light_off",
+                                    "message": "מצוין! עכשיו נבדוק אם הנורה נכבית."
+                                },
+                                "no_oil": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אל תניע. בקש שמן מתחנת דלק או הזמן גרר."
+                                },
+                                "dont_know_type": {
+                                    "status": "needs_more_info",
+                                    "message": "בדוק במדבקה על המנוע או בספר הרכב."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "verify_light_off",
+                        "name": "בדיקת הנורה אחרי מילוי",
+                        "actionType": "inspect",
+                        "condition": "אחרי מילוי שמן עד MAX",
+                        "steps": [
+                            "וודא שהמפלס באזור MAX על המדיד",
+                            "הנע את הרכב",
+                            "תוך 2-3 שניות הנורה אמורה להיכבות",
+                            "אם נשארת דולקת - כבה מיד!"
+                        ],
+                        "followup_question": {
+                            "text": "האם הנורה כבתה אחרי המילוי וההתנעה?",
+                            "options": [
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ כן, הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "לא, עדיין דולקת"
+                                },
+                                {
+                                    "id": "didnt_try",
+                                    "label": "לא ניסיתי"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: מפלס שמן היה נמוך",
+                                    "recommendation": "פנה למוסך לבדוקה. בדוק מפלס שמן כל שבוע."
+                                },
+                                "still_on": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "הנורה לא נכבית - חיישן/משאבה/פילטר תקולים",
+                                    "recommendation": "כבה מיד והזמן גרר!"
+                                },
+                                "didnt_try": {
+                                    "status": "pending",
+                                    "message": "הנע אחרי שווידאת שהמפלס ב-MAX."
+                                }
+                            }
+                        }
+                    }
+                ],
+                "tow_conditions": [
+                    "מילאת שמן והנורה עדיין דולקת באדום",
+                    "שמעת רעשי דפיקות מהמנוע לפני או אחרי שהנורה נדלקה",
+                    "זיהית נזילת שמן גדולה מתחת לרכב"
+                ],
+                "post_fix_recommendation": "גם אם מילאת שמן והנורה כבתה, מומלץ לקפוץ למוסך לבדוק למה השמן נעלם (נזילה או צריכה מוגברת)"
+            }
+        }
+    },
+    "coolant_temperature_light": {
+        "severity": "critical",
+        "names": {
+            "he": [
+                "נורת חום מנוע",
+                "נורת טמפרטורה",
+                "נורת קירור"
+            ],
+            "en": [
+                "Engine Coolant Temperature",
+                "Temperature Warning Light"
+            ]
+        },
+        "symbol": "מדחום (טרמומטר) עם שני קווים גליים מתחתיו (מדמה נוזל)",
+        "colors": [
+            "red",
+            "blue"
+        ],
+        "color_meaning": {
+            "red": "המנוע רותח! סכנה מיידית",
+            "blue": "המנוע עדיין קר - תקין, ייכבה כשהמנוע יתחמם"
+        },
+        "importance": "נורת חום מנוע היא 'תמרור עצור' לכל דבר. התעלמות ממנה, אפילו לדקה אחת, עלולה להוביל להרס מוחלט של המנוע (ראש מנוע) בעלות של אלפי שקלים.",
+        "first_question": {
+            "text": "מתי נדלקה הנורה? האם היא נדלקה פתאום באמצע הנסיעה, או שהיא דולקת מיד כשהנעת את הרכב בבוקר כשהוא עוד קר?",
+            "options": [
+                {
+                    "id": "while_driving",
+                    "label": "נדלקה פתאום באמצע נסיעה"
+                },
+                {
+                    "id": "cold_start",
+                    "label": "דולקת כשהרכב קר (בהתנעה)"
+                }
+            ]
+        },
+        "scenarios": {
+            "while_driving": {
+                "description": "המנוע מייצר חום שאינו מנוקז החוצה - מצב חירום",
+                "severity": "critical",
+                "risk": "הרס מוחלט של המנוע (ראש מנוע) בעלות של אלפי שקלים",
+                "immediate_action": "עצור מיד וכבה את המנוע!",
+                "causes": [
+                    {
+                        "id": "low_coolant_leak",
+                        "name": "מחסור בנוזל קירור (נזילה)",
+                        "probability": 0.6,
+                        "symptoms": [
+                            "אדים יוצאים ממכסה המנוע",
+                            "ריח מתקתק (כמו סירופ)",
+                            "שלולית מתחת לרכב"
+                        ],
+                        "key_question": {
+                            "text": "האם ראית אדים או עשן לבן יוצאים מהחלק הקדמי?",
+                            "options": [
+                                "כן, יש אדים",
+                                "לא, אין אדים",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, יש אדים": "confirms",
+                                "לא, אין אדים": "rules_out",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "fan_thermostat_failure",
+                        "name": "מאוורר או תרמוסטט תקול",
+                        "probability": 0.3,
+                        "symptoms": [
+                            "החום עולה בעיקר בעמידה בפקק",
+                            "יורד מעט בנסיעה מהירה"
+                        ],
+                        "key_question": {
+                            "text": "האם החום עולה כשאתה עומד ברמזור ויורד כשאתה נוסע מהר?",
+                            "options": [
+                                "כן, בדיוק ככה",
+                                "לא, תמיד גבוה",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, בדיוק ככה": "confirms",
+                                "לא, תמיד גבוה": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "water_pump_failure",
+                        "name": "משאבת מים מושבתת (רצועה)",
+                        "probability": 0.1,
+                        "symptoms": [
+                            "הנורה נדלקה יחד עם נורת המצבר",
+                            "ההגה הפך לקשה מאוד"
+                        ],
+                        "key_question": {
+                            "text": "האם גם נורת המצבר דולקת וההגה נהיה קשה?",
+                            "options": [
+                                "כן, שניהם",
+                                "לא, רק נורת חום",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, שניהם": "confirms",
+                                "לא, רק נורת חום": "rules_out",
+                                "לא בטוח": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "immediate_stop_cool",
+                        "name": "עצירה וכיבוי מנוע מיידי",
+                        "actionType": "safety",
+                        "priority": "FIRST",
+                        "steps": [
+                            "עצור בצד הדרך מיד",
+                            "כבה את המנוע לחלוטין",
+                            "הדלק אורות חירום",
+                            "אל תפתח את מכסה המנוע עד שיתקרר (לפחות 30 דקות)!"
+                        ],
+                        "followup_question": {
+                            "text": "האם עצרת וכיבית את המנוע?",
+                            "options": [
+                                {
+                                    "id": "stopped",
+                                    "label": "כן, עצרתי וכיביתי"
+                                },
+                                {
+                                    "id": "still_driving",
+                                    "label": "לא, עדיין נוסע"
+                                },
+                                {
+                                    "id": "almost_stopped",
+                                    "label": "כמעט עצרתי"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "stopped": {
+                                    "status": "wait_and_verify",
+                                    "next_action": "post_cooldown_check",
+                                    "message": "מצוין! המתן 30 דקות עד שהמנוע יתקרר."
+                                },
+                                "still_driving": {
+                                    "status": "critical",
+                                    "message": "⛔ עצור מיד! כל דקה עלולה להרוס את המנוע!"
+                                },
+                                "almost_stopped": {
+                                    "status": "critical",
+                                    "message": "המשך לעצור לגמרי וכבה את המנוע."
+                                }
+                            }
+                        },
+                        "warning": "⚠️ לעולם אל תפתח את מכסה הרדיאטור כשהמנוע חם - סכנת כוויות חמורות!"
+                    },
+                    {
+                        "id": "post_cooldown_check",
+                        "name": "בדיקת מיכל עיבוי לאחר התקררות",
+                        "actionType": "inspect",
+                        "priority": "AFTER_COOLDOWN",
+                        "steps": [
+                            "המתן לפחות 30 דקות שהמנוע יתקרר",
+                            "פתח את מכסה המנוע בזהירות",
+                            "חפש מיכל פלסטיק שקוף/חצי שקוף (מיכל עיבוי/הרחבה)",
+                            "בדוק את מפלס הנוזל - צריך להיות בין MIN ל-MAX",
+                            "בדוק אם יש נזילות או שלוליות מתחת לרכב"
+                        ],
+                        "followup_question": {
+                            "text": "מה מצב נוזל הקירור במיכל העיבוי?",
+                            "options": [
+                                {
+                                    "id": "normal",
+                                    "label": "תקין (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "low",
+                                    "label": "נמוך (מתחת ל-MIN או ריק)"
+                                },
+                                {
+                                    "id": "leak",
+                                    "label": "יש נזילה/שלולית מתחת לרכב"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המיכל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "normal": {
+                                    "status": "needs_verification",
+                                    "next_action": "test_after_cooldown",
+                                    "message": "מפלס תקין. נבדוק אם הנורה חוזרת."
+                                },
+                                "low": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_coolant_emergency",
+                                    "message": "יש למלא נוזל קירור."
+                                },
+                                "leak": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "נזילת נוזל קירור פעילה",
+                                    "recommendation": "הזמן גרר מיד."
+                                },
+                                "not_found": {
+                                    "status": "needs_tow",
+                                    "recommendation": "הזמן גרר לבדיקה."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_coolant_emergency",
+                        "name": "מילוי נוזל קירור (חירום)",
+                        "actionType": "fill",
+                        "priority": "STANDARD",
+                        "condition": "רק כשהמנוע קר למגע!",
+                        "steps": [
+                            "וודא שהמנוע קר (אפשר לגעת במכסה בלי להיכוות)",
+                            "פתח בזהירות (עם סמרטוט) את מכסה מיכל העיבוי",
+                            "מלא נוזל קירור מתאים (לפי מדבקה או ספר רכב)",
+                            "או מים רגילים בלית ברירה (פתרון זמני בלבד)",
+                            "מלא עד לקו MAX (לא יותר!)"
+                        ],
+                        "warning": "⚠️ לעולם אל תפתח את מכסה הרדיאטור עצמו! מלא רק דרך מיכל העיבוי השקוף.",
+                        "followup_question": {
+                            "text": "האם מילאת נוזל קירור?",
+                            "options": [
+                                {
+                                    "id": "filled_coolant",
+                                    "label": "כן, מילאתי עד MAX"
+                                },
+                                {
+                                    "id": "filled_water",
+                                    "label": "כן, מילאתי מים (אין לי נוזל קירור)"
+                                },
+                                {
+                                    "id": "nothing_available",
+                                    "label": "אין לי נוזל ואין מים"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה נוזל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "filled_coolant": {
+                                    "status": "needs_verification",
+                                    "next_action": "test_after_cooldown",
+                                    "message": "מצוין! נבדוק אם הנורה נכבית."
+                                },
+                                "filled_water": {
+                                    "status": "needs_verification",
+                                    "next_action": "test_after_cooldown",
+                                    "message": "מים זה פתרון זמני. נבדוק ואז פנה למוסך להחלפה."
+                                },
+                                "nothing_available": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אל תניע! הזמן גרר או בקש נוזל."
+                                },
+                                "dont_know_type": {
+                                    "status": "needs_more_info",
+                                    "message": "מים רגילים יעבדו זמנית."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "test_after_cooldown",
+                        "name": "בדיקה אם הנורה חוזרת",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "condition": "אחרי מילוי נוזל קירור או אם המפלס היה תקין",
+                        "steps": [
+                            "הנע את הרכב",
+                            "עקוב אחרי מד החום בזמן חימום",
+                            "בדוק שהנורה נכבית",
+                            "אם מד החום עולה מהר או הנורה לא נכבית - כבה מיד!"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי ההתנעה?",
+                            "options": [
+                                {
+                                    "id": "light_off_ok",
+                                    "label": "✅ הנורה כבתה ומד החום תקין"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "temp_rising_fast",
+                                    "label": "מד החום עולה מהר מדי"
+                                },
+                                {
+                                    "id": "light_returned",
+                                    "label": "הנורה חזרה שוב בזמן נסיעה"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off_ok": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: מפלס נוזל קירור היה נמוך",
+                                    "recommendation": "פנה למוסך לבדיקה. בדוק מפלס כל שבוע.",
+                                    "drive_ok": true
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן חיישן טמפרטורה תקול",
+                                    "recommendation": "פנה למוסך. אם מד החום תקין - אפשר לנסוע בזהירות.",
+                                    "drive_ok": true
+                                },
+                                "temp_rising_fast": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "בעית קירור חמורה",
+                                    "recommendation": "כבה מיד והזמן גרר!"
+                                },
+                                "light_returned": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "בעית קירור מתמשכת",
+                                    "recommendation": "הזמן גרר. אל תנסה להמשיך!"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "tow_conditions": [
+                    "נורת חום אדומה בזמן נסיעה = גרר מיידי",
+                    "אדים/עשן לבן מהמנוע = גרר מיידי",
+                    "המנוע רותח = אסור להמשיך בנסיעה"
+                ],
+                "final_recommendation": "נורת חום אדומה = כבה מנוע מיד והזמן גרר. המשך נסיעה יהרוס את המנוע."
+            },
+            "cold_start": {
+                "description": "הנורה דולקת מיד עם ההתנעה כשהמנוע קר - כנראה תקלת מדידה",
+                "severity": "moderate",
+                "risk": "עיוות של ראש המנוע, שריפת אטמים והשבתה מוחלטת של המנוע",
+                "causes": [
+                    {
+                        "id": "faulty_temp_sensor",
+                        "name": "תקלה בחיישן חום",
+                        "probability": 0.7,
+                        "symptoms": [
+                            "המנוע קר לחלוטין (עמד כל הלילה) אך הנורה אדומה"
+                        ],
+                        "key_question": {
+                            "text": "האם הרכב עמד שעות רבות והנורה אדומה מיד עם ההנעה?",
+                            "options": [
+                                "כן, עמד כל הלילה",
+                                "לא, נסעתי לאחרונה",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "severe_coolant_shortage",
+                        "name": "מחסור חמור בנוזל קירור",
+                        "probability": 0.3,
+                        "symptoms": [
+                            "המערכת מזהה שאין נוזל עוד לפני שהמנוע התחמם"
+                        ],
+                        "key_question": {
+                            "text": "האם בדקת לאחרונה אם יש מים במיכל הפלסטיק?",
+                            "options": [
+                                "כן, בדקתי",
+                                "לא בדקתי",
+                                "לא יודע איפה המיכל"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "stop_and_wait",
+                        "name": "עצירה והמתנה",
+                        "actionType": "safety",
+                        "priority": "FIRST",
+                        "steps": [
+                            "עצור בצד וכבה מנוע",
+                            "פתח מכסה מנוע אך אל תיגע בכלום",
+                            "המתן לפחות 20-30 דקות עד שהמנוע יתקרר"
+                        ],
+                        "followup_question": {
+                            "text": "האם המתנת לפחות 20 דקות?",
+                            "options": [
+                                {
+                                    "id": "waited",
+                                    "label": "כן, המתנתי"
+                                },
+                                {
+                                    "id": "not_yet",
+                                    "label": "לא, עוד לא"
+                                },
+                                {
+                                    "id": "waiting_now",
+                                    "label": "אני ממתין עכשיו"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "waited": {
+                                    "status": "needs_verification",
+                                    "next_action": "visual_check_coolant",
+                                    "message": "עכשיו ניתן לבדוק את מיכל נוזל הקירור."
+                                },
+                                "not_yet": {
+                                    "status": "pending",
+                                    "message": "חשוב להמתין! פתיחת מכסה כשהמנוע חם מסוכנת."
+                                },
+                                "waiting_now": {
+                                    "status": "pending",
+                                    "message": "מצוין. המשך להמתין 20-30 דקות."
+                                }
+                            }
+                        },
+                        "warning": "אזהרה: אדים של נוזל קירור הם רותחים ועלולים לגרום לכוויות קשות!"
+                    },
+                    {
+                        "id": "visual_check_coolant",
+                        "name": "בדיקה ויזואלית של נוזל קירור",
+                        "actionType": "inspect",
+                        "priority": "STANDARD",
+                        "condition": "רק אחרי שהמנוע התקרר",
+                        "steps": [
+                            "חפש מיכל פלסטיק חצי שקוף ליד המנוע (מיכל עיבוי/הרחבה)",
+                            "הנוזל בפנים צבעוני (ורוד, ירוק או כחול)",
+                            "בדוק אם הוא ריק או מתחת לקו MIN"
+                        ],
+                        "followup_question": {
+                            "text": "מה מצב הנוזל במיכל?",
+                            "options": [
+                                {
+                                    "id": "empty_low",
+                                    "label": "ריק/נמוך מאוד"
+                                },
+                                {
+                                    "id": "normal",
+                                    "label": "יש נוזל לפי הסימון (בין MIN ל-MAX)"
+                                },
+                                {
+                                    "id": "not_found",
+                                    "label": "לא מצאתי את המיכל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "empty_low": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_coolant",
+                                    "message": "יש למלא נוזל קירור."
+                                },
+                                "normal": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "נוזל קירור תקין אך הנורה דולקת - ייתכן חיישן תקול",
+                                    "recommendation": "פנה למוסך. אפשר לנסוע בזהירות עם מעקב אחרי מד החום."
+                                },
+                                "not_found": {
+                                    "status": "needs_more_info",
+                                    "message": "חפש מיכל פלסטיק שקוף בצד המנוע. אם לא מוצא - פנה למוסך."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_coolant",
+                        "name": "מילוי נוזל קירור",
+                        "actionType": "fill",
+                        "condition": "רק כשהמנוע קר למגע!",
+                        "steps": [
+                            "וודא שהמנוע קר (אפשר לגעת במכסה בלי להיכוות)",
+                            "פתח בזהירות (עם סמרטוט) את מכסה המיכל",
+                            "מלא נוזל קירור מתאים (לפי מדבקה או ספר רכב)",
+                            "או מים רגילים בלית ברירה (פתרון זמני בלבד)",
+                            "מלא עד לקו MAX"
+                        ],
+                        "warning": "אזהרה: אל תפתח את מכסה הרדיאטור עצמו! מלא רק דרך מיכל העיבוי השקוף.",
+                        "followup_question": {
+                            "text": "האם מילאת נוזל קירור?",
+                            "options": [
+                                {
+                                    "id": "filled_coolant",
+                                    "label": "כן, מילאתי נוזל קירור"
+                                },
+                                {
+                                    "id": "filled_water",
+                                    "label": "כן, מילאתי מים (אין לי נוזל קירור)"
+                                },
+                                {
+                                    "id": "nothing_available",
+                                    "label": "אין לי נוזל ואין מים"
+                                },
+                                {
+                                    "id": "dont_know_type",
+                                    "label": "לא יודע איזה נוזל"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "filled_coolant": {
+                                    "status": "needs_verification",
+                                    "next_action": "verify_after_fill",
+                                    "message": "מצוין! הנע ובדוק אם הנורה נכבית."
+                                },
+                                "filled_water": {
+                                    "status": "needs_verification",
+                                    "next_action": "verify_after_fill",
+                                    "message": "מים זה זמני. הנע ובדוק."
+                                },
+                                "nothing_available": {
+                                    "status": "needs_tow",
+                                    "recommendation": "אל תניע! הזמן גרר או בקש נוזל."
+                                },
+                                "dont_know_type": {
+                                    "status": "needs_more_info",
+                                    "message": "מים רגילים יעבדו זמנית."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "verify_after_fill",
+                        "name": "בדיקה אחרי מילוי",
+                        "actionType": "inspect",
+                        "condition": "אחרי מילוי נוזל קירור",
+                        "steps": [
+                            "הנע את הרכב",
+                            "עקוב אחרי מד החום בזמן חימום",
+                            "בדוק שהנורה נכבית",
+                            "אם מד החום עולה מהר או הנורה לא נכבית - כבה מיד!"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי ההתנעה?",
+                            "options": [
+                                {
+                                    "id": "light_off_ok",
+                                    "label": "✅ הנורה כבתה ומד החום תקין"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "temp_rising_fast",
+                                    "label": "מד החום עולה מהר מדי"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off_ok": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: מפלס נוזל קירור היה נמוך",
+                                    "recommendation": "פנה למוסך לבדיקה. בדוק מפלס כל שבוע."
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן חיישן טמפרטורה תקול",
+                                    "recommendation": "פנה למוסך. אם מד החום תקין - אפשר לנסוע בזהירות."
+                                },
+                                "temp_rising_fast": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "בעית קירור חמורה",
+                                    "recommendation": "כבה מיד והזמן גרר!"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "tow_conditions": [
+                    "מילאת נוזל והנורה נדלקת שוב תוך דקות (נזילה גדולה)",
+                    "ראית שלולית גדולה מתחת לרכב",
+                    "המנוע הוציא עשן או השמיע קולות של בעבוע",
+                    "הנורה אדומה והמאוורר של המנוע לא עובד"
+                ],
+                "summary_for_user": "חום מנוע הוא לא המלצה. אם הנורה אדומה בזמן נסיעה - אל תמשיך לנהוג אפילו מטר אחד. כבה מנוע והזמן גרר."
+            }
+        }
+    },
+    "check_engine_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת בדוק מנוע",
+                "הברז הכתום",
+                "צ'ק אנג'ין",
+                "נורת מנוע"
+            ],
+            "en": [
+                "Check Engine",
+                "Engine Light",
+                "MIL"
+            ]
+        },
+        "symbol": "קווי מתאר של מנוע (נראה לרבים כמו ברז או מצלמה ישנה)",
+        "colors": [
+            "orange",
+            "red"
+        ],
+        "color_meaning": {
+            "orange": "תקלה במערכת ניהול המנוע או זיהום אוויר - הסטנדרט",
+            "red": "נדיר - תקלה חמורה המחייבת עצירה מיידית"
+        },
+        "importance": "נורת Check Engine היא המורכבת ביותר - יכולה להעיד על טווח עצום של תקלות, מחיישן קטן ועד תקלה משמעותית במערכת ההנעה.",
+        "first_question": {
+            "text": "האם הנורה דולקת באופן קבוע או שהיא מהבהבת (נדלקת ונכבית מהר)?",
+            "options": [
+                {
+                    "id": "steady",
+                    "label": "דולקת קבוע"
+                },
+                {
+                    "id": "flashing",
+                    "label": "מהבהבת"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ],
+            "followups": {
+                "steady": {
+                    "text": "האם אתה מרגיש שינוי בנסיעה, כמו רעידות של הרכב או אובדן כוח?",
+                    "options": [
+                        {
+                            "id": "steady_symptoms",
+                            "label": "כן, יש רעידות או אובדן כוח"
+                        },
+                        {
+                            "id": "steady_normal",
+                            "label": "לא, הרכב נוסע רגיל"
+                        },
+                        {
+                            "id": "not_sure",
+                            "label": "לא בטוח/ה"
+                        }
+                    ]
+                },
+                "not_sure": {
+                    "text": "נסה להסתכל שוב: האם הנורה מהבהבת או דולקת קבוע?",
+                    "options": [
+                        {
+                            "id": "steady",
+                            "label": "דולקת קבוע"
+                        },
+                        {
+                            "id": "flashing",
+                            "label": "מהבהבת"
+                        },
+                        {
+                            "id": "not_sure",
+                            "label": "עדיין לא בטוח/ה"
+                        }
+                    ]
+                }
+            }
+        },
+        "scenarios": {
+            "steady_normal": {
+                "description": "הנורה דולקת קבוע אך הרכב נוסע רגיל - לרוב תקלה קלה בחיישן או זיהום",
+                "severity": "low",
+                "risk": "צריכת דלק גבוהה יותר, זיהום מוגבר, אך בדרך כלל ניתן להמשיך לנסוע",
+                "causes": [
+                    {
+                        "id": "loose_gas_cap",
+                        "name": "מכסה דלק לא סגור",
+                        "probability": 0.3,
+                        "symptoms": [
+                            "הנורה נדלקה זמן קצר אחרי תדלוק"
+                        ],
+                        "key_question": {
+                            "text": "האם תדלקת את הרכב ביום-יומיים האחרונים?",
+                            "options": [
+                                {
+                                    "id": "refueled_recently",
+                                    "label": "כן, תדלקתי לאחרונה"
+                                },
+                                {
+                                    "id": "not_refueled",
+                                    "label": "לא, לא תדלקתי"
+                                },
+                                {
+                                    "id": "dont_remember",
+                                    "label": "לא זוכר"
+                                }
+                            ],
+                            "score_mapping": {
+                                "refueled_recently": "confirms",
+                                "not_refueled": "rules_out",
+                                "dont_remember": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "faulty_sensor",
+                        "name": "חיישן מזייף (חמצן/זרימת אוויר)",
+                        "probability": 0.5,
+                        "symptoms": [
+                            "צריכת דלק מעט גבוהה מהרגיל",
+                            "הרכב נוסע חלק"
+                        ],
+                        "key_question": {
+                            "id": "feels_normal",
+                            "text": "האם הרכב מרגיש תקין לחלוטין למרות הנורה?",
+                            "options": [
+                                {
+                                    "id": "yes_normal",
+                                    "label": "כן, הכל רגיל"
+                                },
+                                {
+                                    "id": "something_different",
+                                    "label": "יש משהו קצת שונה"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
+                            ],
+                            "score_mapping": {
+                                "yes_normal": "confirms",
+                                "something_different": "rules_out",
+                                "unsure": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "bad_fuel",
+                        "name": "דלק באיכות נמוכה",
+                        "probability": 0.2,
+                        "symptoms": [
+                            "הנורה נדלקה אחרי תדלוק בתחנה לא מוכרת"
+                        ],
+                        "key_question": {
+                            "text": "האם תדלקת בתחנה חדשה או זולה במיוחד לאחרונה?",
+                            "options": [
+                                "כן, תחנה חדשה/זולה",
+                                "לא, התחנה הרגילה שלי",
+                                "לא זוכר"
+                            ],
+                            "score_mapping": {
+                                "כן, תחנה חדשה/זולה": "confirms",
+                                "לא, התחנה הרגילה שלי": "rules_out",
+                                "לא זוכר": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [],
+                "recommendation": "ניתן להמשיך לנסוע אך מומלץ לגשת למוסך לקריאת קוד תקלה תוך שבוע-שבועיים"
+            },
+            "steady_symptoms": {
+                "description": "הנורה דולקת/מהבהבת + הרכב רועד וחלוש - מצב חירום מכני (תקלת הצתה - Misfire)",
+                "severity": "high",
+                "risk": "השמן/דלק לא נשרפים כראוי ועלולים להרוס את הממיר הקטליטי והמנוע",
+                "causes": [
+                    {
+                        "id": "ignition_coil_failure",
+                        "name": "סליל הצתה (קויל) תקול",
+                        "probability": 0.8,
+                        "symptoms": [
+                            "רעידות חזקות בעמידה",
+                            "קשיים משמעותיים בהאצה"
+                        ],
+                        "key_question": {
+                            "text": "האם הרכב רועד כמו טרקטור או מגמגם כשאתה לוחץ גז?",
+                            "options": [
+                                "כן, רועד כמו טרקטור",
+                                "קצת רועד",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "worn_spark_plug",
+                        "name": "פלאג (מצת) גמור",
+                        "probability": 0.15,
+                        "symptoms": [
+                            "גמגומים בעיקר תחת עומס (בעלייה)"
+                        ],
+                        "key_question": {
+                            "text": "האם הרעש של המנוע נשמע 'קטוע' ולא רציף?",
+                            "options": [
+                                "כן, קטוע ולא רציף",
+                                "לא, רציף",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "fuel_injector_issue",
+                        "name": "תקלת מזרק דלק",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "ריח חזק של דלק מהאגזוז יחד עם הרעידות"
+                        ],
+                        "key_question": {
+                            "text": "האם אתה מריח דלק חזק סביב הרכב כרגע?",
+                            "options": [
+                                "כן, ריח דלק חזק",
+                                "לא, אין ריח",
+                                "לא בטוח"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "reduce_speed_symptoms",
+                        "name": "הפחתת מהירות ותצפית",
+                        "actionType": "safety",
+                        "priority": "FIRST",
+                        "steps": [
+                            "הפחת מהירות מיד",
+                            "אל תלחץ גז חזק - נסע בעדינות",
+                            "עקוב אחרי הרעידות - האם מחמירות?",
+                            "חפש מוסך קרוב בדרך"
+                        ],
+                        "followup_question": {
+                            "text": "מה קורה כשאתה מפחית מהירות ונוסע בעדינות?",
+                            "options": [
+                                {
+                                    "id": "shaking_same",
+                                    "label": "הרעידות ממשיכות כרגיל"
+                                },
+                                {
+                                    "id": "shaking_worse",
+                                    "label": "הרעידות מחמירות"
+                                },
+                                {
+                                    "id": "shaking_better",
+                                    "label": "הרעידות פחתו"
+                                },
+                                {
+                                    "id": "smell",
+                                    "label": "יש ריח שרוף או דלק"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "shaking_same": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "תקלת הצתה (Misfire) יציבה",
+                                    "recommendation": "נסע בזהירות למוסך.",
+                                    "drive_ok": true
+                                },
+                                "shaking_worse": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "התקלה מחמירה - סכנה לממיר",
+                                    "recommendation": "עצור במקום בטוח והזמן גרר!"
+                                },
+                                "shaking_better": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן תקלה בעומס גבוה בלבד",
+                                    "recommendation": "המשך בזהירות למוסך.",
+                                    "drive_ok": true
+                                },
+                                "smell": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "⛔ ריח שרוף/דלק = סכנה!",
+                                    "recommendation": "עצור מיד והזמן גרר!"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "recommendation": "הפחת מהירות ונסע בזהירות למוסך הקרוב. אל תמשיך לנסוע לאורך זמן במצב זה."
+            },
+            "flashing": {
+                "description": "נורה מהבהבת (לא קבועה!) = הצתה לקויה גורמת נזק פעיל לממיר הקטליטי. יש לעצור מיד!",
+                "severity": "critical",
+                "immediate_action": "אם הנורה מהבהבת - עצור והזמן גרר. כל דקה של נסיעה עם נורה מהבהבת = נזק של מאות שקלים לממיר.",
+                "risk": "נורה מהבהבת = נזק יקר מאוד (אלפי שקלים) לממיר הקטליטי. מצב צליעה (Limp Mode) = הגנה של המחשב - ניתן לנסוע בזהירות למוסך.",
+                "causes": [
+                    {
+                        "id": "limp_mode",
+                        "name": "הגנת מחשב (Limp Mode)",
+                        "probability": 0.6,
+                        "symptoms": [
+                            "הדוושה לא מגיבה",
+                            "הטורים (סל\"ד) לא עולים מעבר לקו מסוים"
+                        ],
+                        "key_question": {
+                            "text": "האם הרכב מסרב להאיץ מעבר למהירות נמוכה מאוד (30-40 קמ\"ש)?",
+                            "options": [
+                                "כן, תקוע על מהירות נמוכה",
+                                "לא, נוסע כרגיל",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "transmission_fault",
+                        "name": "תקלת תיבת הילוכים",
+                        "probability": 0.3,
+                        "symptoms": [
+                            "הנורה נדלקה לאחר חבטה מהגיר",
+                            "ההילוך לא מתחלף"
+                        ],
+                        "key_question": {
+                            "text": "האם הרכב מרגיש תקוע על הילוך אחד ולא מעביר הלאה?",
+                            "options": [
+                                "כן, תקוע על הילוך אחד",
+                                "לא, ההילוכים עובדים",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "maf_sensor_failure",
+                        "name": "חיישן זרימת אוויר (MAF)",
+                        "probability": 0.1,
+                        "symptoms": [
+                            "המנוע נחנק או כבה מיד לאחר הנעה"
+                        ],
+                        "key_question": {
+                            "text": "האם המנוע כבה מעצמו כשאתה עוזב את הגז?",
+                            "options": [
+                                "כן, נכבה לבד",
+                                "לא, ממשיך לעבוד",
+                                "לא בטוח"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "assess_severity",
+                        "name": "הערכת חומרת המצב",
+                        "actionType": "safety",
+                        "priority": "FIRST",
+                        "steps": [
+                            "נסה להיזכר: האם הרכב רעד חזק לפני שעצרת?",
+                            "בדוק: האם הרגשת ריח דלק או שרוף?",
+                            "נסה להיזכר: האם הרכב סירב להאיץ?"
+                        ],
+                        "followup_question": {
+                            "text": "מה היה מצב הרכב לפני שעצרת?",
+                            "options": [
+                                {
+                                    "id": "shaking_smell",
+                                    "label": "רעד חזק או היה ריח שרוף/דלק"
+                                },
+                                {
+                                    "id": "limp_mode",
+                                    "label": "לא הצלחתי להאיץ מעל 40 קמ\"ש (Limp Mode)"
+                                },
+                                {
+                                    "id": "mostly_normal",
+                                    "label": "נסע כמעט רגיל, רק הנורה הבהבה"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "shaking_smell": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "תקלת הצתה חמורה - נזק פעיל לממיר!",
+                                    "recommendation": "הזמן גרר מיד!"
+                                },
+                                "limp_mode": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "הרכב היה במצב הגנה (Limp Mode)",
+                                    "recommendation": "ניתן לנסוע בזהירות למוסך קרוב.",
+                                    "drive_ok": true
+                                },
+                                "mostly_normal": {
+                                    "status": "needs_more_info",
+                                    "next_action": "check_gas_cap_ce",
+                                    "message": "נבדוק את מכסה הדלק."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "check_gas_cap_ce",
+                        "name": "בדיקת מכסה דלק",
+                        "actionType": "adjust",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "פתח את מכסה הדלק",
+                            "סגור אותו היטב עד לשמיעת קליקים (2-3 קליקים)",
+                            "נסע 5-10 דקות ובדוק אם הנורה כבתה"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי סגירת מכסה הדלק היטב?",
+                            "options": [
+                                {
+                                    "id": "light_off",
+                                    "label": "✅ הנורה כבתה!"
+                                },
+                                {
+                                    "id": "still_flashing",
+                                    "label": "הנורה עדיין מהבהבת"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת קבוע"
+                                },
+                                {
+                                    "id": "already_closed",
+                                    "label": "כבר היה סגור"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "light_off": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: מכסה דלק לא היה סגור",
+                                    "recommendation": "ניתן להמשיך בנסיעה."
+                                },
+                                "still_flashing": {
+                                    "status": "needs_tow",
+                                    "diagnosis": "נורה מהבהבת = תקלת הצתה (Misfire)",
+                                    "recommendation": "הזמן גרר!"
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "הבעיה לא במכסה הדלק",
+                                    "recommendation": "פנה למוסך לקריאת קודים.",
+                                    "drive_ok": true
+                                },
+                                "already_closed": {
+                                    "status": "needs_more_info",
+                                    "next_action": "electrical_reset",
+                                    "message": "נסה איפוס חשמלי."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "electrical_reset",
+                        "name": "איפוס חשמלי",
+                        "actionType": "adjust",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "עצור במקום בטוח",
+                            "כבה את המנוע לחלוטין",
+                            "הוצא את המפתח מהסוויץ'",
+                            "המתן דקה שלמה",
+                            "הנע שוב ובדוק אם הרכב מגיב טוב יותר"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי האיפוס?",
+                            "options": [
+                                {
+                                    "id": "normal_light_off",
+                                    "label": "✅ הרכב מגיב רגיל והנורה כבתה"
+                                },
+                                {
+                                    "id": "normal_light_on",
+                                    "label": "הרכב מגיב רגיל אבל הנורה דולקת"
+                                },
+                                {
+                                    "id": "still_limp",
+                                    "label": "עדיין Limp Mode / רועד"
+                                },
+                                {
+                                    "id": "worse",
+                                    "label": "המצב החמיר"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "normal_light_off": {
+                                    "status": "resolved_temp",
+                                    "diagnosis": "✅ נפתר זמנית - ייתכן תקלה חד פעמית",
+                                    "recommendation": "פנה למוסך לקריאת קודים."
+                                },
+                                "normal_light_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "יש תקלה שמורה במחשב",
+                                    "recommendation": "פנה למוסך. ניתן לנסוע אם הרכב רגיל.",
+                                    "drive_ok": true
+                                },
+                                "still_limp": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "התקלה לא התאפסה - בעיה קבועה",
+                                    "recommendation": "נסע בזהירות למוסך קרוב."
+                                },
+                                "worse": {
+                                    "status": "needs_tow",
+                                    "recommendation": "עצור והזמן גרר!"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "tow_conditions": [
+                    "נורה מהבהבת = חובה גרר",
+                    "הרכב רועד חזק או יש ריח שרוף/דלק חזק",
+                    "הרכב במצב צליעה ולא מאפשר נסיעה בטוחה במהירות התנועה"
+                ],
+                "drive_to_mechanic_ok": "אם הנורה קבועה והרכב נוסע רגיל - קבע תור למוסך בהקדם לבדיקת מחשב",
+                "go_to_mechanic": {
+                    "reason": "מומלץ להזמין גרר למוסך לקריאת קודי תקלה. המשך נסיעה עלול לגרום נזק לממיר הקטליטי.",
+                    "urgency": "now"
+                }
+            }
+        }
+    },
+    "tpms_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת לחץ אוויר",
+                "נורת TPMS",
+                "הפרסה הצהובה",
+                "נורת צמיגים"
+            ],
+            "en": [
+                "TPMS",
+                "Tire Pressure Light",
+                "Low Tire Pressure"
+            ]
+        },
+        "symbol": "צורת פרסה (צמיג בחתך רוחב) עם סימן קריאה (!) במרכז",
+        "colors": [
+            "orange",
+            "yellow"
+        ],
+        "importance": "נורת TPMS היא אחת הנפוצות ביותר. לרוב אינה מעידה על תקלה מכנית אלא על צורך בתחזוקה פשוטה. דורשת אבחנה מהירה כדי לא להיתקע עם פנצ'ר בכביש מהיר.",
+        "first_question": {
+            "text": "איך הנורה נראית כרגע? האם היא דולקת קבוע, או שהיא מהבהבת כדקה ואז נשארת דולקת? והאם אתה מרגיש שהרכב 'מושך' הצידה בזמן נסיעה?",
+            "options": [
+                {
+                    "id": "steady",
+                    "label": "דולקת קבוע, הרכב נוסע ישר"
+                },
+                {
+                    "id": "flashing_then_steady",
+                    "label": "מהבהבת כדקה ואז נשארת דולקת, הרכב נוסע ישר"
+                },
+                {
+                    "id": "steady_pulling",
+                    "label": "דולקת קבוע + הרכב מושך לצד"
+                }
+            ]
+        },
+        "scenarios": {
+            "steady": {
+                "description": "המערכת מזהה שאחד הצמיגים איבד אוויר מעבר לסף המותר - המצב הנפוץ ביותר",
+                "severity": "low",
+                "causes": [
+                    {
+                        "id": "temperature_change",
+                        "name": "שינויי טמפרטורה / זמן",
+                        "probability": 0.6,
+                        "symptoms": [
+                            "הנורה נדלקת בבוקר קר במיוחד",
+                            "כל הצמיגים נראים תקינים ויזואלית"
+                        ],
+                        "key_question": {
+                            "text": "האם מזג האוויר בחוץ התקרר משמעותית הלילה?",
+                            "options": [
+                                "כן, קר מאוד בחוץ",
+                                "לא, טמפרטורה רגילה",
+                                "לא בטוח"
+                            ],
+                            "score_mapping": {
+                                "כן, קר מאוד בחוץ": "confirms",
+                                "לא, טמפרטורה רגילה": "unknown",
+                                "לא בטוח": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "slow_puncture",
+                        "name": "תקר (פנצ'ר) איטי",
+                        "probability": 0.35,
+                        "symptoms": [
+                            "הנורה חוזרת יום-יומיים אחרי שמילאת אוויר"
+                        ],
+                        "key_question": {
+                            "text": "האם מילאת אוויר לאחרונה והנורה חזרה שוב?",
+                            "options": [
+                                "כן, חזרה אחרי מילוי",
+                                "לא מילאתי אוויר",
+                                "זו הפעם הראשונה"
+                            ],
+                            "score_mapping": {
+                                "כן, חזרה אחרי מילוי": "confirms",
+                                "לא מילאתי אוויר": "unknown",
+                                "זו הפעם הראשונה": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "immediate_puncture",
+                        "name": "תקר (פנצ'ר) מיידי",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "הרכב מושך הצידה",
+                            "נשמע רעש של חבטות או פלאפ-פלאפ מהגלגלים"
+                        ],
+                        "key_question": {
+                            "text": "האם הרכב מושך לאחד הצדדים או שההגה רועד?",
+                            "options": [
+                                "כן, מושך לצד",
+                                "כן, הגה רועד",
+                                "לא, נוסע ישר"
+                            ],
+                            "score_mapping": {
+                                "כן, מושך לצד": "confirms",
+                                "כן, הגה רועד": "confirms",
+                                "לא, נוסע ישר": "rules_out"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "visual_check_tires",
+                        "name": "בדיקה ויזואלית של הצמיגים",
+                        "actionType": "inspect",
+                        "priority": "FIRST",
+                        "steps": [
+                            "עצור במקום בטוח",
+                            "הסתכל על כל 4 הצמיגים מסביב לרכב",
+                            "חפש צמיג שנראה שטוח או רך יותר מהאחרים",
+                            "בדוק אם יש בורג/מסמר תקוע"
+                        ],
+                        "followup_question": {
+                            "text": "האם אחד הצמיגים נראה שטוח או רך יותר?",
+                            "options": [
+                                {
+                                    "id": "flat_tire",
+                                    "label": "כן, יש צמיג שטוח"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "לא, כולם נראים אותו דבר"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "flat_tire": {
+                                    "status": "needs_attention",
+                                    "diagnosis": "צמיג שטוח - פנצ'ר או אובדן אוויר משמעותי",
+                                    "next_steps": [
+                                        "אם הצמיג שטוח לגמרי - החלף לגלגל רזרבי או הזמן שירותי דרך",
+                                        "אם רק רך - נסה למלא אוויר בתחנת דלק קרובה",
+                                        "אם מצאת בורג/מסמר - אפשר למלא ולנסוע לפנצ'ריה קרובה"
+                                    ]
+                                },
+                                "all_ok": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_air",
+                                    "message": "ייתכן שההבדל קטן מכדי להבחין בעין. גש לתחנת דלק למילוי אוויר."
+                                },
+                                "unsure": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_air",
+                                    "message": "גש לתחנת דלק ובדוק לחץ אוויר בכל הצמיגים."
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_air",
+                        "name": "מילוי אוויר",
+                        "actionType": "fill",
+                        "steps": [
+                            "גש לתחנת דלק עם מדחס אוויר",
+                            "בדוק את הלחץ המומלץ במדבקה על דלת הנהג",
+                            "מלא את כל הצמיגים ללחץ המומלץ",
+                            "נסע 5-10 דקות - הנורה אמורה להיכבות"
+                        ],
+                        "followup_question": {
+                            "text": "האם מילאת אוויר בצמיגים?",
+                            "options": [
+                                {
+                                    "id": "filled",
+                                    "label": "כן, מילאתי"
+                                },
+                                {
+                                    "id": "no_compressor",
+                                    "label": "לא, אין לי מדחס"
+                                },
+                                {
+                                    "id": "dont_know_pressure",
+                                    "label": "לא יודע מה הלחץ"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "filled": {
+                                    "status": "needs_verification",
+                                    "next_question": {
+                                        "text": "אחרי מילוי לפי המדבקה ונסיעה של 5-10 דקות, האם הנורה כבתה?",
+                                        "options": [
+                                            {
+                                                "id": "resolved_ok",
+                                                "label": "✅ כן, הנורה כבתה!"
+                                            },
+                                            {
+                                                "id": "still_on",
+                                                "label": "לא, מילאתי אבל הנורה עדיין דולקת"
+                                            },
+                                            {
+                                                "id": "not_driven",
+                                                "label": "עדיין לא נסעתי"
+                                            }
+                                        ],
+                                        "resolution_paths": {
+                                            "resolved_ok": {
+                                                "status": "resolved",
+                                                "diagnosis": "✅ נפתר: לחץ אוויר נמוך",
+                                                "recommendation": "בדוק שוב למחרת. אם הנורה חוזרת תוך יום-יומיים (או אפילו באותו יום) - יש חשד לפנצ'ר איטי. פנה לפנצ'ריה לבדיקה.",
+                                                "if_returns": "אם הנורה חזרה תוך שעות או יום - יש פנצ'ר איטי. פנה לפנצ'ריה לבדיקה ותיקון."
+                                            },
+                                            "still_on": {
+                                                "status": "needs_more_info",
+                                                "next_steps": [
+                                                    "וודא שמילאת את כל 4 הצמיגים",
+                                                    "נסע עוד 5-10 דקות",
+                                                    "אם עדיין דולקת - ייתכן שיש תקלת חיישן TPMS, פנה למוסך"
+                                                ]
+                                            },
+                                            "not_driven": {
+                                                "status": "pending",
+                                                "message": "נסע 5-10 דקות ובדוק שוב אם הנורה נכבתה."
+                                            }
+                                        }
+                                    }
+                                },
+                                "no_compressor": {
+                                    "status": "needs_more_info",
+                                    "next_steps": [
+                                        "גש לתחנת דלק הקרובה",
+                                        "השתמש במדחס החינמי (לרוב חינם)",
+                                        "בקש עזרה מהעובד בתחנה אם צריך"
+                                    ]
+                                },
+                                "dont_know_pressure": {
+                                    "status": "needs_more_info",
+                                    "next_steps": [
+                                        "הלחץ המומלץ מופיע במדבקה על דלת הנהג או במכסה הדלק",
+                                        "ברכבים רבים הלחץ הוא בין 30-35 PSI",
+                                        "אם לא מוצא - בקש עזרה מעובד בתחנה"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ],
+                "recommendation": "ניתן להמשיך לנסוע בזהירות לתחנת דלק למילוי אוויר. אם הנורה חוזרת תוך יום-יומיים - יש תקר ויש לתקן"
+            },
+            "steady_pulling": {
+                "description": "הנורה דולקת קבוע + הרכב מושך לצד - סימן ברור לכך שאחד הצמיגים נמוך בלחץ או פנוץ",
+                "severity": "moderate",
+                "risk": "צמיג נמוך בלחץ בצד אחד גורם לרכב למשוך לצד. נסיעה ממושכת עלולה להרוס את הצמיג ואת הג'אנט.",
+                "causes": [
+                    {
+                        "id": "low_tire_puncture",
+                        "name": "צמיג נמוך / פנצ'ר",
+                        "probability": 0.8,
+                        "symptoms": [
+                            "הרכב מושך לצד",
+                            "צמיג אחד נראה שטוח או רך יותר"
+                        ],
+                        "key_question": {
+                            "text": "האם אחד הצמיגים נראה שטוח או רך יותר מהאחרים?",
+                            "options": [
+                                "כן, יש צמיג שטוח",
+                                "לא, כולם נראים אותו דבר",
+                                "לא בדקתי עדיין"
+                            ],
+                            "score_mapping": {
+                                "כן, יש צמיג שטוח": "confirms",
+                                "לא, כולם נראים אותו דבר": "uncertain_probable",
+                                "לא בדקתי עדיין": "uncertain_probable"
+                            }
+                        }
+                    },
+                    {
+                        "id": "slow_leak",
+                        "name": "נזילה איטית (תקר קטן)",
+                        "probability": 0.15,
+                        "symptoms": [
+                            "הנורה חוזרת יום-יומיים אחרי מילוי אוויר",
+                            "לא נראה צמיג שטוח לגמרי"
+                        ],
+                        "key_question": {
+                            "text": "האם מילאת אוויר לאחרונה והנורה חזרה?",
+                            "options": [
+                                "כן, חזרה אחרי מילוי",
+                                "לא מילאתי אוויר לאחרונה",
+                                "זו הפעם הראשונה שזה קורה"
+                            ],
+                            "score_mapping": {
+                                "כן, חזרה אחרי מילוי": "confirms",
+                                "לא מילאתי אוויר לאחרונה": "unknown",
+                                "זו הפעם הראשונה שזה קורה": "unknown"
+                            }
+                        }
+                    },
+                    {
+                        "id": "spare_wheel_no_sensor",
+                        "name": "גלגל רזרבי ללא חיישן",
+                        "probability": 0.05,
+                        "symptoms": [
+                            "הנורה נדלקה אחרי החלפת גלגל"
+                        ],
+                        "key_question": {
+                            "text": "האם החלפת לאחרונה לגלגל רזרבי?",
+                            "options": [
+                                "כן, נוסע על רזרבי",
+                                "לא, כל הגלגלים רגילים",
+                                "לא זוכר"
+                            ],
+                            "score_mapping": {
+                                "כן, נוסע על רזרבי": "confirms",
+                                "לא, כל הגלגלים רגילים": "rules_out",
+                                "לא זוכר": "unknown"
+                            }
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "visual_check_tires",
+                        "name": "בדיקה ויזואלית של הצמיגים",
+                        "actionType": "inspect",
+                        "priority": "FIRST",
+                        "steps": [
+                            "עצור במקום בטוח בצד הדרך",
+                            "הסתכל על כל 4 הצמיגים",
+                            "חפש צמיג שנראה שטוח או רך יותר מהאחרים",
+                            "בדוק אם יש בורג/מסמר תקוע בצמיג"
+                        ],
+                        "followup_question": {
+                            "text": "מה מצאת בבדיקה?",
+                            "options": [
+                                {
+                                    "id": "flat_tire",
+                                    "label": "יש צמיג שטוח לגמרי"
+                                },
+                                {
+                                    "id": "soft_tire",
+                                    "label": "יש צמיג רך אבל לא שטוח"
+                                },
+                                {
+                                    "id": "all_ok",
+                                    "label": "כל הצמיגים נראים תקינים"
+                                },
+                                {
+                                    "id": "found_nail",
+                                    "label": "מצאתי בורג/מסמר בצמיג"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "flat_tire": {
+                                    "status": "needs_attention",
+                                    "diagnosis": "פנצ'ר או אובדן אוויר מלא",
+                                    "recommendation": "החלף לגלגל רזרבי או הזמן שירותי דרך."
+                                },
+                                "soft_tire": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_air",
+                                    "message": "ניתן לנסוע בזהירות לתחנת דלק למילוי."
+                                },
+                                "all_ok": {
+                                    "status": "needs_more_info",
+                                    "next_action": "fill_air",
+                                    "message": "גש לתחנת דלק לבדיקה ומילוי."
+                                },
+                                "found_nail": {
+                                    "status": "needs_attention",
+                                    "diagnosis": "פנצ'ר איטי - הבורג אוטם את החור",
+                                    "recommendation": "אל תוציא את הבורג! מלא אוויר ונסע לפנצ'ריה.",
+                                    "drive_ok": true
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "fill_air",
+                        "name": "מילוי אוויר בצמיגים",
+                        "actionType": "fill",
+                        "priority": "STANDARD",
+                        "steps": [
+                            "גש לתחנת דלק קרובה עם מדחס אוויר",
+                            "בדוק את הלחץ המומלץ במדבקה שעל דלת הנהג",
+                            "מלא אוויר בכל 4 הצמיגים ללחץ המומלץ",
+                            "נסע 5-10 דקות - הנורה אמורה להיכבות"
+                        ],
+                        "followup_question": {
+                            "text": "מה קרה אחרי מילוי אוויר ונסיעה קצרה?",
+                            "options": [
+                                {
+                                    "id": "resolved_ok",
+                                    "label": "✅ הנורה כבתה - הכל תקין!"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "מילאתי אבל הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "cant_fill",
+                                    "label": "לא הצלחתי למלא אוויר"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "resolved_ok": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: לחץ אוויר נמוך",
+                                    "recommendation": "בדוק שוב למחרת. אם הנורה חוזרת תוך יום-יומיים (או אפילו באותו יום) - יש חשד לפנצ'ר איטי. פנה לפנצ'ריה לבדיקה.",
+                                    "if_returns": "אם הנורה חזרה תוך שעות או יום - יש פנצ'ר איטי. פנה לפנצ'ריה לבדיקה ותיקון."
+                                },
+                                "still_on": {
+                                    "status": "needs_more_info",
+                                    "next_steps": [
+                                        "וודא שמילאת את כל 4 הצמיגים (כולל ספייר אם מנוטר)",
+                                        "נסע עוד 5-10 דקות",
+                                        "אם עדיין דולקת - ייתכן שיש תקלת חיישן TPMS, פנה למוסך"
+                                    ]
+                                },
+                                "cant_fill": {
+                                    "status": "needs_more_info",
+                                    "next_steps": [
+                                        "גש לתחנת דלק הקרובה",
+                                        "השתמש במדחס החינמי",
+                                        "בקש עזרה מעובד בתחנה אם צריך"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ],
+                "go_to_mechanic": {
+                    "reason": "אם הצמיג שטוח לגמרי, מצאת בורג/מסמר, או שהנורה חוזרת תוך יום-יומיים",
+                    "urgency": "soon"
+                }
+            },
+            "flashing_then_steady": {
+                "description": "הנורה מהבהבת למשך כדקה ואז נשארת דולקת – לעיתים מצביע על תקלה במערכת החיישנים (TPMS) ולא בהכרח על לחץ אוויר נמוך.",
+                "severity": "moderate",
+                "risk": "בדרך כלל לא מצב חירום, אבל ייתכן שלחץ האוויר לא מנוטר כראוי ולכן יש לבדוק ידנית.",
+                "causes": [
+                    {
+                        "id": "tpms_sensor_fault",
+                        "name": "חיישן TPMS תקול / סוללת חיישן חלשה",
+                        "probability": 0.7,
+                        "symptoms": [
+                            "הנורה מהבהבת בתחילת נסיעה ואז נשארת דולקת",
+                            "אין שינוי מורגש בהתנהגות הרכב"
+                        ],
+                        "key_question": {
+                            "text": "האם הוחלף צמיג/חישוק לאחרונה או שבוצעה החלפת גלגלים?",
+                            "options": [
+                                "כן, לאחרונה",
+                                "לא",
+                                "לא בטוח"
+                            ]
+                        }
+                    },
+                    {
+                        "id": "low_pressure_unconfirmed",
+                        "name": "לחץ אוויר נמוך (לא זוהה כהלכה)",
+                        "probability": 0.3,
+                        "symptoms": [
+                            "לא נבדק לחץ אוויר זמן רב"
+                        ],
+                        "key_question": {
+                            "text": "מתי בפעם האחרונה בדקת לחץ אוויר בכל הצמיגים (כולל רזרבי אם יש חיישן)?",
+                            "options": [
+                                "בשבוע האחרון",
+                                "לפני יותר מחודש",
+                                "לא זוכר/ת"
+                            ]
+                        }
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "manual_pressure_check",
+                        "name": "בדיקת לחץ אוויר ידנית",
+                        "actionType": "inspect",
+                        "steps": [
+                            "גש לתחנת דלק/מד לחץ ובדוק את לחץ האוויר בכל 4 הצמיגים",
+                            "השווה לערך המומלץ במדבקה בדלת הנהג/מכסה הדלק",
+                            "נפח/שחרר אוויר לפי הצורך"
+                        ],
+                        "followup_question": {
+                            "text": "האם היה צמיג אחד או יותר עם לחץ נמוך משמעותית?",
+                            "options": [
+                                {
+                                    "id": "low_and_pulling",
+                                    "label": "כן, וצמיג אחד נראה נמוך/הרכב מושך לצד"
+                                },
+                                {
+                                    "id": "low_no_pulling",
+                                    "label": "כן, אבל אחרי תיקון לחץ הרכב נוסע ישר"
+                                },
+                                {
+                                    "id": "unsure",
+                                    "label": "לא בטוח/ה"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "low_and_pulling": {
+                                    "status": "needs_attention",
+                                    "route_to_scenario": "steady_pulling",
+                                    "message": "יש לטפל בצמיג הנמוך - המשך להנחיות למקרה שבה הרכב מושך לצד."
+                                },
+                                "low_no_pulling": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: לחץ אוויר תוקן",
+                                    "recommendation": "בדוק שוב למחרת. אם הנורה ממשיכה להבהב - ייתכן שיש תקלת חיישן."
+                                },
+                                "unsure": {
+                                    "status": "needs_more_info",
+                                    "next_steps": [
+                                        "בקש עזרה מעובד בתחנת הדלק לבדיקת לחץ",
+                                        "אם הנורה ממשיכה - פנה למוסך לסריקת TPMS"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ],
+                "go_to_mechanic": {
+                    "reason": "אם לאחר תיקון לחצים הנורה ממשיכה להבהב/להישאר דולקת בנסיעות הבאות – מומלץ להגיע למוסך לסריקת TPMS/חיישנים.",
+                    "urgency": "soon"
+                }
+            }
+        }
+    },
+    "fuel_level_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת דלק",
+                "דלק נמוך",
+                "נורת משאבת דלק",
+                "אייקון משאבת דלק"
+            ],
+            "en": [
+                "Fuel",
+                "Fuel Level",
+                "Low Fuel",
+                "Fuel Pump Light"
+            ]
+        },
+        "symbol": "fuel_pump",
+        "colors": [
+            "yellow",
+            "orange"
+        ],
+        "color_meaning": {
+            "yellow": "דלק נמוך - בדרך כלל ניתן להמשיך בזהירות ולתדלק בהקדם.",
+            "orange": "דלק נמוך/אזהרה - מומלץ לתדלק בהקדם."
+        },
+        "importance": "בדרך כלל זו לא תקלה מכנית. אם הנורה נדלקת למרות שיש דלק לפי המד, ייתכן חיישן/מצוף או תקלה חשמלית.",
+        "first_question": {
+            "text": "האם מד הדלק באמת קרוב לריק (או שהנורה נדלקה למרות שיש דלק)?",
+            "options": [
+                {
+                    "id": "yes_low",
+                    "label": "כן, המד על ריק/קרוב לריק"
+                },
+                {
+                    "id": "no_has_fuel",
+                    "label": "לא, יש דלק לפי המד"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "yes_low": {
+                "severity": "low",
+                "description": "סביר שמדובר בדלק נמוך. מומלץ לתדלק בהקדם במקום בטוח.",
+                "risk": "נסיעה עד ריק עלולה להשבית את הרכב במקום לא נוח/מסוכן.",
+                "causes": [
+                    {
+                        "id": "low_fuel",
+                        "name": "דלק נמוך",
+                        "probability": 0.9
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "refuel",
+                        "name": "תדלוק",
+                        "steps": [
+                            "תדלק במקום בטוח",
+                            "כבה/הדלק את הרכב לאחר התדלוק",
+                            "ודא שהנורה כבתה תוך זמן קצר"
+                        ],
+                        "followup_question": {
+                            "text": "מה המצב אחרי תדלוק?",
+                            "options": [
+                                {
+                                    "id": "resolved",
+                                    "label": "הנורה כבתה"
+                                },
+                                {
+                                    "id": "still_on",
+                                    "label": "הנורה עדיין דולקת"
+                                },
+                                {
+                                    "id": "cant_refuel",
+                                    "label": "לא הצלחתי לתדלק עכשיו"
+                                }
+                            ],
+                            "resolution_paths": {
+                                "resolved": {
+                                    "status": "resolved",
+                                    "diagnosis": "✅ נפתר: דלק נמוך",
+                                    "recommendation": "המשך לנסוע כרגיל."
+                                },
+                                "still_on": {
+                                    "status": "needs_mechanic",
+                                    "diagnosis": "ייתכן חיישן/מצוף דלק תקול",
+                                    "recommendation": "תדלק שוב ובדוק. אם עדיין דולקת - פנה למוסך."
+                                },
+                                "cant_refuel": {
+                                    "status": "pending",
+                                    "message": "תדלק בהקדם - הימנע מנסיעה ממושכת."
+                                }
+                            }
+                        }
+                    }
+                ],
+                "recommendation": "לתדלק בהקדם. אם הנורה נשארת דולקת אחרי תדלוק, ייתכן חיישן/מצוף וצריך בדיקה."
+            },
+            "no_has_fuel": {
+                "severity": "low",
+                "description": "אם הנורה נדלקת למרות שיש דלק לפי המד, ייתכן חיישן/מצוף דלק או תקלה חשמלית.",
+                "risk": "ייתכן שהמד/הנורה לא משקפים את כמות הדלק האמיתית.",
+                "causes": [
+                    {
+                        "id": "fuel_sender_fault",
+                        "name": "חיישן/מצוף דלק תקול",
+                        "probability": 0.6
+                    },
+                    {
+                        "id": "cluster_or_wiring",
+                        "name": "תקלה בלוח מחוונים/חיווט",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אבל מומלץ לתדלק מוקדם ולא להסתמך על המד עד בדיקה במוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח מה מצב הדלק, עדיף להתייחס לזה כדלק נמוך ולתדלק בהקדם במקום בטוח.",
+                "risk": "אם הדלק באמת נמוך מאוד, הרכב עלול להיתקע.",
+                "causes": [
+                    {
+                        "id": "unknown_fuel_level",
+                        "name": "מצב דלק לא ברור",
+                        "probability": 0.7
+                    }
+                ],
+                "recommendation": "תדלוק בהקדם הוא הפתרון הבטוח."
+            }
+        }
+    },
+    "abs_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת ABS",
+                "ABS"
+            ],
+            "en": [
+                "ABS",
+                "Anti-lock Braking System"
+            ]
+        },
+        "symbol": "abs",
+        "colors": [
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "orange": "תקלה במערכת ABS - הבלימה הבסיסית לרוב עדיין עובדת, אך ללא ABS.",
+            "yellow": "אזהרת ABS - מומלץ לבדוק."
+        },
+        "importance": "ABS מסייע למנוע נעילת גלגלים בבלימה חזקה. לרוב אפשר להמשיך בזהירות.",
+        "first_question": {
+            "text": "האם יש גם נורת בלם אדומה/BRAKE או הודעת תקלה חמורה בבלמים?",
+            "options": [
+                {
+                    "id": "abs_only",
+                    "label": "רק נורת ABS דולקת"
+                },
+                {
+                    "id": "brake_together",
+                    "label": "יש גם נורת בלם אדומה/BRAKE"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "abs_only": {
+                "severity": "low",
+                "description": "סביר שיש תקלה במערכת ABS/חיישן מהירות גלגל. הבלמים בדרך כלל עובדים.",
+                "risk": "בבלימה חזקה עלול להיות קל יותר להגיע לנעילת גלגלים.",
+                "causes": [
+                    {
+                        "id": "wheel_speed_sensor",
+                        "name": "חיישן מהירות גלגל תקול",
+                        "probability": 0.55
+                    },
+                    {
+                        "id": "abs_ring_or_wiring",
+                        "name": "טבעת/חיווט ABS פגומים",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אך מומלץ בדיקת מחשב ABS במוסך."
+            },
+            "brake_together": {
+                "severity": "critical",
+                "description": "שילוב של ABS עם נורת בלם אדומה עלול להעיד על בעיית בלמים.",
+                "risk": "תקלה במערכת הבלמים היא סכנת חיים.",
+                "immediate_action": "עצור במקום בטוח בהקדם. בדוק נוזל בלמים אם זה בטוח.",
+                "causes": [
+                    {
+                        "id": "brake_fluid_low",
+                        "name": "נוזל בלמים נמוך/נזילה",
+                        "probability": 0.5
+                    },
+                    {
+                        "id": "hydraulic_or_module",
+                        "name": "תקלה במודול ABS/הידראוליקה",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "להימנע מהמשך נסיעה עד בדיקת מערכת הבלמים."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח אם יש גם נורת בלמים אדומה, עדיף לנהוג בזהירות ולעצור לבדיקה.",
+                "risk": "אם אכן יש תקלה בבלמים, המשך נסיעה עלול להיות מסוכן.",
+                "causes": [
+                    {
+                        "id": "uncertain_brake_status",
+                        "name": "סטטוס בלמים לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם יש נורת בלמים אדומה — להתייחס כקריטי. אם רק ABS — ניתן להמשיך בזהירות."
+            }
+        }
+    },
+    "airbag_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת כרית אוויר",
+                "נורת AIRBAG",
+                "נורת SRS"
+            ],
+            "en": [
+                "Airbag",
+                "SRS",
+                "Airbag Warning"
+            ]
+        },
+        "symbol": "airbag",
+        "colors": [
+            "red",
+            "orange"
+        ],
+        "color_meaning": {
+            "red": "תקלה אפשרית במערכת כריות האוויר/מותחנים.",
+            "orange": "אזהרת SRS/מערכת בטיחות - מומלץ בדיקה."
+        },
+        "importance": "מערכת כריות האוויר ומותחני חגורות היא מערכת בטיחות.",
+        "first_question": {
+            "text": "האם הנורה נשארת דולקת קבוע בזמן נסיעה, או שהיא נכבית אחרי כמה שניות מההתנעה?",
+            "options": [
+                {
+                    "id": "stays_on",
+                    "label": "נשארת דולקת בזמן נסיעה"
+                },
+                {
+                    "id": "goes_off",
+                    "label": "נכבית אחרי ההתנעה"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "stays_on": {
+                "severity": "moderate",
+                "description": "סביר שיש תקלה במערכת SRS (חיישן, חיבור מתחת למושב, מותחן חגורה).",
+                "risk": "ייתכן שמערכת כריות האוויר לא תפעל כראוי בעת תאונה.",
+                "causes": [
+                    {
+                        "id": "seat_connector",
+                        "name": "חיבור/שקע מתחת למושב רופף",
+                        "probability": 0.35
+                    },
+                    {
+                        "id": "srs_sensor_or_module",
+                        "name": "חיישן/מודול SRS תקול",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "מומלץ בדיקת מחשב במוסך."
+            },
+            "goes_off": {
+                "severity": "low",
+                "description": "אם הנורה נכבית כמה שניות אחרי התנעה — לרוב זה תקין (בדיקת מערכת).",
+                "risk": "אם הנורה חוזרת במהלך נסיעה, יש להתייחס לכך כתקלה.",
+                "causes": [
+                    {
+                        "id": "normal_self_check",
+                        "name": "בדיקת מערכת תקינה בהתנעה",
+                        "probability": 0.8
+                    }
+                ],
+                "recommendation": "אם הנורה לא חוזרת — אין פעולה דחופה."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, מומלץ להסתכל שוב בעת התנעה.",
+                "risk": "אם הנורה נשארת דולקת, ייתכן שהמערכת לא תפעל כראוי.",
+                "causes": [
+                    {
+                        "id": "uncertain_airbag_status",
+                        "name": "סטטוס SRS לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם היא נשארת דולקת — בדיקה במוסך מומלצת."
+            }
+        }
+    },
+    "power_steering_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת הגה",
+                "נורת הגה כוח",
+                "Power Steering",
+                "נורת EPS"
+            ],
+            "en": [
+                "Power Steering",
+                "EPS",
+                "Steering Warning"
+            ]
+        },
+        "symbol": "steering_wheel",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "תקלה אפשרית בהגה כוח - ייתכן שההגה יהיה כבד מאוד.",
+            "orange": "אזהרת הגה כוח/מערכת היגוי - מומלץ בדיקה.",
+            "yellow": "אזהרת EPS - ייתכן ירידה בסיוע ההיגוי."
+        },
+        "importance": "אובדן סיוע היגוי יכול להפתיע ולהקשות על שליטה ברכב.",
+        "first_question": {
+            "text": "האם ההגה נהיה כבד/קשה לסיבוב באופן פתאומי בזמן נסיעה?",
+            "options": [
+                {
+                    "id": "heavy_now",
+                    "label": "כן, ההגה כבד עכשיו"
+                },
+                {
+                    "id": "light_normal",
+                    "label": "לא, ההגה מרגיש רגיל"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "heavy_now": {
+                "severity": "moderate",
+                "description": "ייתכן שיש תקלה במערכת הגה כוח (הידראולית/חשמלית).",
+                "risk": "היגוי כבד עלול להקשות על תמרונים.",
+                "immediate_action": "אם זה בטוח, האט ועצור במקום בטוח.",
+                "causes": [
+                    {
+                        "id": "eps_fault",
+                        "name": "תקלה במערכת EPS",
+                        "probability": 0.45
+                    },
+                    {
+                        "id": "belt_or_pump",
+                        "name": "רצועה/משאבת הגה כוח",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "בדיקת מוסך מומלצת. אם ההיגוי כבד מאוד — הזמנת גרר."
+            },
+            "light_normal": {
+                "severity": "low",
+                "description": "אם ההגה מרגיש רגיל למרות הנורה, ייתכן חיישן/תקלה חשמלית.",
+                "risk": "הסיוע יכול להיפגע פתאום.",
+                "causes": [
+                    {
+                        "id": "intermittent_sensor",
+                        "name": "חיישן/תקלה רגעית",
+                        "probability": 0.4
+                    }
+                ],
+                "recommendation": "להמשיך בזהירות ולבדוק בהקדם."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, נסה להרגיש אם יש שינוי בסיוע ההיגוי במהירות נמוכה.",
+                "risk": "אם יש אובדן סיוע, היגוי יכול להיות כבד.",
+                "causes": [
+                    {
+                        "id": "uncertain_steering",
+                        "name": "סטטוס היגוי לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם ההגה כבד — לעצור במקום בטוח ולבדוק."
+            }
+        }
+    },
+    "transmission_temperature_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת טמפרטורת גיר",
+                "גיר חם",
+                "AT OIL TEMP",
+                "Transmission Temp"
+            ],
+            "en": [
+                "Transmission Temp",
+                "AT OIL TEMP",
+                "Transmission Overheat"
+            ]
+        },
+        "symbol": "transmission_temp",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "טמפרטורת גיר גבוהה מאוד - עלול לגרום לנזק.",
+            "orange": "טמפרטורת גיר גבוהה - מומלץ לקרר ולהיבדק.",
+            "yellow": "אזהרת טמפרטורת גיר/שמן גיר - תשומת לב."
+        },
+        "importance": "התחממות גיר (במיוחד אוטומטי) עלולה לגרום להחלקות ולנזק.",
+        "first_question": {
+            "text": "האם אתה מרגיש החלקות/ריח שרוף/העברות הילוך לא תקינות יחד עם הנורה?",
+            "options": [
+                {
+                    "id": "hot_with_symptoms",
+                    "label": "כן, יש החלקות/ריח שרוף"
+                },
+                {
+                    "id": "hot_no_symptoms",
+                    "label": "לא, אין שינוי מורגש בהילוכים"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "hot_with_symptoms": {
+                "severity": "moderate",
+                "description": "סביר שהגיר התחמם ויש גם סימפטומים תפעוליים.",
+                "risk": "המשך נסיעה תחת עומס עלול להחמיר נזק.",
+                "immediate_action": "עצור במקום בטוח, העבר ל-P, אפשר למנוע לעבוד בסרק.",
+                "causes": [
+                    {
+                        "id": "overheat_load",
+                        "name": "עומס/טמפרטורה גבוהה",
+                        "probability": 0.45
+                    },
+                    {
+                        "id": "low_or_old_atf",
+                        "name": "שמן גיר נמוך/ישן",
+                        "probability": 0.3
+                    }
+                ],
+                "recommendation": "אם הנורה חוזרת או יש החלקות — בדיקת מוסך בהקדם."
+            },
+            "hot_no_symptoms": {
+                "severity": "low",
+                "description": "ייתכן שהגיר התחמם זמנית ללא סימפטומים בולטים.",
+                "risk": "התחממות חוזרת עלולה להפוך לתקלה תפעולית.",
+                "causes": [
+                    {
+                        "id": "temporary_overheat",
+                        "name": "התחממות זמנית עקב תנאים",
+                        "probability": 0.5
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "cool_down",
+                        "name": "קירור והפחתת עומס",
+                        "steps": [
+                            "עצור במקום בטוח אם אפשר",
+                            "הפחת עומס (כבה מזגן אם צריך)",
+                            "המשך בנסיעה רגועה לאחר שהנורה נכבית"
+                        ]
+                    }
+                ],
+                "recommendation": "אם הנורה חוזרת לעיתים קרובות — בדיקת שמן גיר במוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, מומלץ להתייחס בזהירות: להפחית עומס.",
+                "risk": "אם יש התחממות אמיתית, המשך עומס עלול להחמיר.",
+                "causes": [
+                    {
+                        "id": "uncertain_transmission",
+                        "name": "סטטוס גיר לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם מופיעים סימפטומים — עצור ובדוק."
+            }
+        }
+    },
+    "esp_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת בקרת יציבות",
+                "ESP",
+                "ESC",
+                "Traction Control"
+            ],
+            "en": [
+                "ESP",
+                "ESC",
+                "Traction Control",
+                "Stability Control"
+            ]
+        },
+        "symbol": "slip",
+        "colors": [
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "orange": "בקרת יציבות/אחיזה פעילה או תקלה במערכת.",
+            "yellow": "אזהרת בקרת יציבות/אחיזה - מומלץ בדיקה אם קבוע."
+        },
+        "importance": "כאשר המערכת פעילה (מהבהב) זה יכול להיות תקין בתנאי אחיזה נמוכים.",
+        "first_question": {
+            "text": "האם הנורה מהבהבת בזמן נסיעה, או דולקת קבוע?",
+            "options": [
+                {
+                    "id": "flashing",
+                    "label": "מהבהבת בזמן נסיעה"
+                },
+                {
+                    "id": "steady",
+                    "label": "דולקת קבוע"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "flashing": {
+                "severity": "low",
+                "description": "מהבהב בדרך כלל אומר שהמערכת פועלת כדי למנוע החלקה (תקין).",
+                "risk": "תנאי אחיזה נמוכים יכולים להיות מסוכנים.",
+                "causes": [
+                    {
+                        "id": "low_traction",
+                        "name": "אחיזה נמוכה",
+                        "probability": 0.7
+                    }
+                ],
+                "recommendation": "נהג בעדינות. אם הנורה נהיית קבועה — בדיקה במוסך."
+            },
+            "steady": {
+                "severity": "low",
+                "description": "נורה קבועה יכולה להעיד שהמערכת כבויה או שיש תקלה.",
+                "risk": "ייתכן שלא תהיה בקרת יציבות בעת החלקה.",
+                "causes": [
+                    {
+                        "id": "disabled_by_button",
+                        "name": "המערכת כבויה ידנית",
+                        "probability": 0.35
+                    },
+                    {
+                        "id": "sensor_related",
+                        "name": "תקלה בחיישן/ABS",
+                        "probability": 0.25
+                    }
+                ],
+                "recommendation": "אם לא כיבית ידנית — מומלץ בדיקת מוסך."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, נסה לשים לב האם זה מהבהב רק בפעולות מסוימות או דולק תמיד.",
+                "risk": "אם דולק קבוע — ייתכן שהמערכת לא פעילה.",
+                "causes": [
+                    {
+                        "id": "uncertain_esp",
+                        "name": "סטטוס ESP לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם מתברר שזה קבוע — בדיקה במוסך מומלצת."
+            }
+        }
+    },
+    "immobilizer_light": {
+        "severity": "moderate",
+        "names": {
+            "he": [
+                "נורת אימובילייזר",
+                "נורת מפתח",
+                "רכב לא מזהה מפתח"
+            ],
+            "en": [
+                "Immobilizer",
+                "Key",
+                "Security Light"
+            ]
+        },
+        "symbol": "key",
+        "colors": [
+            "red",
+            "orange",
+            "yellow"
+        ],
+        "color_meaning": {
+            "red": "בעיה בזיהוי מפתח/מערכת אבטחה - הרכב עלול לא להניע.",
+            "orange": "אזהרת אבטחה/אימובילייזר - מומלץ בדיקה.",
+            "yellow": "אזהרת מפתח/אבטחה - לעיתים קשור לסוללת מפתח."
+        },
+        "importance": "אם האימובילייזר לא מזהה את המפתח, הרכב לא יניע.",
+        "first_question": {
+            "text": "האם הרכב מניע כרגיל, או שהוא לא מניע/נכבה מיד אחרי התנעה?",
+            "options": [
+                {
+                    "id": "wont_start",
+                    "label": "לא מניע / נכבה מיד"
+                },
+                {
+                    "id": "starts_but_light_on",
+                    "label": "מניע אבל הנורה דולקת"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "wont_start": {
+                "severity": "moderate",
+                "description": "סביר שהרכב לא מזהה את המפתח/שלט.",
+                "risk": "הרכב עלול להיתקע ולא להניע.",
+                "causes": [
+                    {
+                        "id": "key_battery_low",
+                        "name": "סוללת שלט חלשה",
+                        "probability": 0.4
+                    },
+                    {
+                        "id": "key_not_detected",
+                        "name": "מפתח לא מזוהה",
+                        "probability": 0.3
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "try_spare_or_close",
+                        "name": "נסיונות בסיסיים",
+                        "steps": [
+                            "נסה מפתח רזרבי אם יש",
+                            "נסה להצמיד את השלט למקום הזיהוי ברכב",
+                            "כבה/הדלק מחדש"
+                        ]
+                    }
+                ],
+                "recommendation": "אם לא מניע — פנה לשירותי דרך/מוסך."
+            },
+            "starts_but_light_on": {
+                "severity": "low",
+                "description": "אם הרכב מניע והנורה דולקת, ייתכן אזהרה או תקלה רגעית.",
+                "risk": "ייתכן שהתקלה תחזור ותמנע התנעה בעתיד.",
+                "causes": [
+                    {
+                        "id": "intermittent_security",
+                        "name": "תקלה רגעית/חיישן",
+                        "probability": 0.35
+                    }
+                ],
+                "recommendation": "אפשר להמשיך בזהירות, אך מומלץ בדיקה אם הנורה נשארת קבועה."
+            },
+            "not_sure": {
+                "severity": "moderate",
+                "description": "אם לא בטוח, נסה לבדוק האם הרכב מניע.",
+                "risk": "אם זו בעיית זיהוי מפתח, הרכב עלול לא להניע.",
+                "causes": [
+                    {
+                        "id": "uncertain_immobilizer",
+                        "name": "סטטוס אימובילייזר לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "אם יש קושי התנעה — שירותי דרך/מוסך."
+            }
+        }
+    },
+    "washer_fluid_light": {
+        "severity": "low",
+        "names": {
+            "he": [
+                "נורת נוזל שמשות",
+                "מים לשמשות",
+                "נוזל שפריצר"
+            ],
+            "en": [
+                "Washer Fluid",
+                "Low Washer Fluid"
+            ]
+        },
+        "symbol": "washer",
+        "colors": [
+            "yellow",
+            "orange"
+        ],
+        "color_meaning": {
+            "yellow": "נוזל שמשות נמוך - מומלץ למלא.",
+            "orange": "אזהרת נוזל שמשות נמוך - למלא בהקדם."
+        },
+        "importance": "זה לא מסוכן בפני עצמו, אבל שמשות מלוכלכות יכולות לפגוע בראות.",
+        "first_question": {
+            "text": "האם יש לך אפשרות למלא נוזל שמשות עכשיו?",
+            "options": [
+                {
+                    "id": "can_fill",
+                    "label": "כן, אני יכול/ה למלא עכשיו"
+                },
+                {
+                    "id": "cannot_now",
+                    "label": "לא, לא יכול/ה עכשיו"
+                },
+                {
+                    "id": "not_sure",
+                    "label": "לא בטוח/ה"
+                }
+            ]
+        },
+        "scenarios": {
+            "can_fill": {
+                "severity": "low",
+                "description": "כנראה חסר נוזל שמשות. מילוי בדרך כלל פותר את הנורה.",
+                "risk": "ראות יכולה להיפגע אם השמשה מתלכלכת.",
+                "causes": [
+                    {
+                        "id": "low_washer_fluid",
+                        "name": "נוזל שמשות נמוך",
+                        "probability": 0.85
+                    }
+                ],
+                "self_fix_actions": [
+                    {
+                        "id": "fill_washer",
+                        "name": "מילוי נוזל שמשות",
+                        "steps": [
+                            "מצא את מיכל נוזל השמשות",
+                            "מלא מים/נוזל מתאים עד לקו המומלץ",
+                            "הפעל שפריצר ובדוק שהנורה כבתה"
+                        ]
+                    }
+                ],
+                "recommendation": "אם הנורה נשארת דולקת למרות שמילאת, ייתכן חיישן/נזילה."
+            },
+            "cannot_now": {
+                "severity": "low",
+                "description": "אפשר להמשיך בנסיעה, אך מומלץ למלא בהזדמנות הקרובה.",
+                "risk": "במזג אוויר רע, הראות עלולה להיפגע.",
+                "causes": [
+                    {
+                        "id": "needs_refill",
+                        "name": "נדרש מילוי נוזל שמשות",
+                        "probability": 0.8
+                    }
+                ],
+                "recommendation": "מלא נוזל שמשות בהקדם האפשרי."
+            },
+            "not_sure": {
+                "severity": "low",
+                "description": "אם לא בטוח, אפשר לבדוק אם השפריצר עובד.",
+                "risk": "חוסר נוזל יכול לפגוע בראות.",
+                "causes": [
+                    {
+                        "id": "uncertain_washer",
+                        "name": "מצב נוזל שמשות לא ברור",
+                        "probability": 0.6
+                    }
+                ],
+                "recommendation": "מומלץ למלא בכל מקרה אם יש ספק."
+            }
+        }
+    }
+}
