@@ -63,7 +63,7 @@ export interface ChatMessage {
   id: string;
   sender: "ai" | "user" | "system";
   text: string;
-  type?: string;
+  type?: AIQuestionType | string;
   meta?: any;
   images?: string[];
   timestamp?: number;
@@ -73,10 +73,14 @@ export interface ChatMessage {
 export type AIQuestionType =
   | "question"
   | "scenario_step"
+  | "scenario_start"
   | "safety_alert"
+  | "safety_instruction"
   | "instruction"
+  | "mechanic_report"
   | "diagnosis_report"
   | "ai_response"
+  | "option_map"
   | "yesno"
   | "multi"
   | "text";

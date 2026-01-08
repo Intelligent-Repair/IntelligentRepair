@@ -3,10 +3,10 @@ import { createServerSupabase } from "@/lib/supabaseServer";
 
 export async function GET(
     req: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ request_id: string }> }
 ) {
     try {
-        const { id: requestId } = await params;
+        const { request_id: requestId } = await params;
 
         if (!requestId) {
             return NextResponse.json(
@@ -24,7 +24,6 @@ export async function GET(
         } = await supabase.auth.getUser();
 
         if (authError || !user) {
-            console.error("[garage/requests/id] Auth error:", authError);
             return NextResponse.json(
                 { error: "Unauthorized" },
                 { status: 401 }
@@ -32,20 +31,34 @@ export async function GET(
         }
 
         // Find the garage owned by this user
+        // Note: garages table only has owner_user_id (no user_id field)
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
             .eq("owner_user_id", user.id)
-            .single();
+            .maybeSingle();
 
-        if (garageError || !garage) {
+        if (garageError) {
+            console.error("[garage/requests/request_id] Garage lookup error:", garageError);
+            console.error("[garage/requests/request_id] User ID:", user.id);
+            return NextResponse.json(
+                { error: "Failed to find garage", details: garageError.message },
+                { status: 500 }
+            );
+        }
+
+        if (!garage) {
+            console.error("[garage/requests/request_id] No garage found for user:", user.id);
+            console.error("[garage/requests/request_id] User email:", user.email);
             return NextResponse.json(
                 { error: "No garage found for this user" },
                 { status: 404 }
             );
         }
 
-        // Fetch the specific request (ensure it belongs to this garage)
+        console.log("[garage/requests/request_id] Found garage:", garage.id, "for user:", user.id);
+
+        // Fetch garage_request and verify it belongs to this garage
         const { data: garageRequest, error: requestError } = await supabase
             .from("garage_requests")
             .select("*")
@@ -54,7 +67,6 @@ export async function GET(
             .single();
 
         if (requestError || !garageRequest) {
-            console.error("[garage/requests/id] Request not found:", requestError);
             return NextResponse.json(
                 { error: "Request not found" },
                 { status: 404 }
@@ -62,7 +74,23 @@ export async function GET(
         }
 
         // Format vehicle info for display
-        const vehicleInfo = garageRequest.vehicle_info || {};
+        // Handle JSONB - it might be a string or already parsed object
+        let vehicleInfo: any = {};
+        if (garageRequest.vehicle_info) {
+            if (typeof garageRequest.vehicle_info === 'string') {
+                try {
+                    vehicleInfo = JSON.parse(garageRequest.vehicle_info);
+                } catch (e) {
+                    console.error("[garage/requests/request_id] Failed to parse vehicle_info:", e);
+                    vehicleInfo = {};
+                }
+            } else {
+                vehicleInfo = garageRequest.vehicle_info;
+            }
+        }
+
+        console.log("[garage/requests/request_id] Vehicle info:", JSON.stringify(vehicleInfo));
+
         const carDisplay = [
             vehicleInfo.manufacturer,
             vehicleInfo.model,
@@ -97,36 +125,36 @@ export async function GET(
             request_id: garageRequest.request_id,
         };
 
-        console.log(`[garage/requests/id] Fetched request ${requestId}`);
+        console.log(`[garage/requests/request_id] Fetched request ${requestId}`, {
+            vehicleInfo,
+            hasVehicleInfo: !!garageRequest.vehicle_info,
+        });
 
         return NextResponse.json({
             request: formattedRequest,
         });
 
     } catch (err) {
-        console.error("[garage/requests/id] Unhandled error:", err);
+        console.error("[garage/requests/request_id] Error:", err);
         return NextResponse.json(
-            { error: "Server error", details: err instanceof Error ? err.message : String(err) },
+            { error: "Server error", details: String(err) },
             { status: 500 }
         );
     }
 }
 
-// Update request status (e.g., mark as viewed, answered)
 export async function PATCH(
     req: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ request_id: string }> }
 ) {
     try {
-        const { id: requestId } = await params;
+        const { request_id: requestId } = await params;
         const body = await req.json();
         const { status } = body;
 
-        console.log("[garage/requests/id PATCH] Updating:", { requestId, status });
-
-        if (!requestId || !status) {
+        if (!requestId) {
             return NextResponse.json(
-                { error: "Request ID and status are required" },
+                { error: "Request ID is required" },
                 { status: 400 }
             );
         }
@@ -140,45 +168,70 @@ export async function PATCH(
         } = await supabase.auth.getUser();
 
         if (authError || !user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
         }
 
         // Find the garage owned by this user
-        const { data: garage } = await supabase
+        // Note: garages table only has owner_user_id (no user_id field)
+        const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
             .eq("owner_user_id", user.id)
-            .single();
+            .maybeSingle();
 
-        if (!garage) {
-            return NextResponse.json({ error: "No garage found" }, { status: 404 });
-        }
-
-        // Update the request status
-        const { error: updateError } = await supabase
-            .from("garage_requests")
-            .update({ status })
-            .eq("id", requestId)
-            .eq("garage_id", garage.id);
-
-        if (updateError) {
-            console.error("[garage/requests/id PATCH] Update error:", updateError);
+        if (garageError) {
+            console.error("[garage/requests/request_id] Garage lookup error:", garageError);
+            console.error("[garage/requests/request_id] User ID:", user.id);
             return NextResponse.json(
-                { error: "Failed to update status", details: updateError.message },
+                { error: "Failed to find garage", details: garageError.message },
                 { status: 500 }
             );
         }
 
-        console.log("[garage/requests/id PATCH] Success");
-        return NextResponse.json({ success: true });
+        if (!garage) {
+            console.error("[garage/requests/request_id] No garage found for user:", user.id);
+            console.error("[garage/requests/request_id] User email:", user.email);
+            return NextResponse.json(
+                { error: "No garage found for this user" },
+                { status: 404 }
+            );
+        }
 
+        console.log("[garage/requests/request_id] Found garage:", garage.id, "for user:", user.id);
+
+        // Update garage_request status
+        const updateData: any = {};
+        if (status) {
+            updateData.status = status;
+        }
+
+        const { error: updateError } = await supabase
+            .from("garage_requests")
+            .update(updateData)
+            .eq("id", requestId)
+            .eq("garage_id", garage.id);
+
+        if (updateError) {
+            console.error("[garage/requests/request_id] Update error:", updateError);
+            return NextResponse.json(
+                { error: "Failed to update request", details: updateError.message },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: "Request updated successfully",
+        });
     } catch (err) {
-        console.error("[garage/requests/id PATCH] Unhandled error:", err);
+        console.error("[garage/requests/request_id] Error:", err);
         return NextResponse.json(
-            { error: "Server error", details: err instanceof Error ? err.message : String(err) },
+            { error: "Server error", details: String(err) },
             { status: 500 }
         );
     }
 }
-
 

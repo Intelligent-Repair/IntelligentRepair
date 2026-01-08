@@ -1,13 +1,32 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
+// Issue type labels in Hebrew
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  engine: 'מנוע',
+  brakes: 'בלמים',
+  electrical: 'חשמל',
+  ac: 'מיזוג אוויר',
+  starting: 'מערכת התנעה',
+  gearbox: 'תיבת הילוכים',
+  noise: 'רעש/רטט',
+  suspension: 'מתלים',
+  transmission: 'הנעה',
+  fuel_system: 'מערכת דלק',
+  cooling_system: 'מערכת קירור',
+  exhaust: 'פליטה',
+  tires: 'צמיגים',
+  steering: 'היגוי',
+  other: 'אחר',
+};
+
 // Helper function to apply date range filter
-function applyDateRangeFilter(query: any, dateRange: string | null) {
+function applyDateRangeFilter(query: any, dateRange: string | null, column: string = "created_at") {
   if (!dateRange || dateRange === "all") return query;
-  
+
   const now = new Date();
   let startDate: Date;
-  
+
   switch (dateRange) {
     case "today":
       startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -24,26 +43,8 @@ function applyDateRangeFilter(query: any, dateRange: string | null) {
     default:
       return query;
   }
-  
-  return query.gte("created_at", startDate.toISOString());
-}
 
-// Helper function to check if description matches issue type
-function matchesIssueType(description: string | null, issueType: string | null): boolean {
-  if (!issueType || issueType === "all" || !description) return true;
-  
-  const desc = description.toLowerCase();
-  const type = issueType.toLowerCase();
-  
-  if (type === "engine") return desc.includes("מנוע") || desc.includes("engine") || desc.includes("חום") || desc.includes("שמן");
-  if (type === "brakes") return desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה");
-  if (type === "electrical") return desc.includes("חשמל") || desc.includes("electrical") || desc.includes("חשמלי");
-  if (type === "ac") return desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור");
-  if (type === "starting") return desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר");
-  if (type === "gearbox") return desc.includes("תיבת") || desc.includes("gearbox") || desc.includes("הילוכים");
-  if (type === "noise") return desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט");
-  
-  return true;
+  return query.gte(column, startDate.toISOString());
 }
 
 export async function GET(request: Request) {
@@ -52,13 +53,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "local";
     const offset = parseInt(searchParams.get("offset") || "0", 10);
-    const limit = 5; // 5 records per page
-    const manufacturers = searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
-    const models = searchParams.get("models")?.split(",").filter(Boolean) || [];
+    const limit = 10; // Increased to 10 for card view
     const dateRange = searchParams.get("dateRange");
     const issueType = searchParams.get("issueType");
 
-    // Authenticate the user (required for both modes)
+    // Authenticate the user
     const {
       data: { user },
       error: authError,
@@ -71,11 +70,10 @@ export async function GET(request: Request) {
       );
     }
 
-    let garageId: number | null = null;
+    let garageId: string | null = null;
 
     // If mode is not "global", get the garage_id for this user
     if (mode !== "global") {
-      // Try owner_user_id first (from registration), then user_id as fallback
       const { data: garage, error: garageError } = await supabase
         .from("garages")
         .select("id")
@@ -92,105 +90,86 @@ export async function GET(request: Request) {
       garageId = garage.id;
     }
 
-    // Build query for repairs with all required fields
+    // Build query for repairs with new schema
     let query = supabase
       .from("repairs")
       .select(`
         id,
+        garage_request_id,
+        final_issue_type,
         mechanic_notes,
+        mechanic_description_ai,
+        ai_summary,
+        labor_hours,
+        status,
+        vehicle_info,
         created_at,
-        request:requests (
-          id,
-          problem_description,
-          description,
-          created_at,
-          car:people_cars (
-            license_plate,
-            vehicle_catalog:vehicle_catalog_id (
-              manufacturer,
-              model
-            )
-          )
-        )
-      `)
+        completed_at
+      `, { count: 'exact' })
+      .order("completed_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
-    // Apply date range filter on repairs.created_at
-    query = applyDateRangeFilter(query, dateRange);
+    // Apply date range filter
+    query = applyDateRangeFilter(query, dateRange, "completed_at");
 
     // Filter by garage_id if in local mode
     if (garageId !== null) {
       query = query.eq("garage_id", garageId);
     }
 
-    // Get all repairs first (we'll filter in memory for complex filters)
-    const { data: repairs, error: repairsError } = await query;
+    // Filter by issue type
+    if (issueType && issueType !== "all") {
+      query = query.eq("final_issue_type", issueType);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: repairs, error: repairsError, count } = await query;
 
     if (repairsError) {
+      console.error('[Dashboard repairs] Error:', repairsError);
       return NextResponse.json(
         { error: "Failed to fetch repairs", details: repairsError.message },
         { status: 500 }
       );
     }
 
-    // Apply filters in memory
-    let filteredRepairs = repairs?.filter((repair: any) => {
-      const request = repair.request;
-      const car = request?.car;
-      const catalog = car?.vehicle_catalog;
-
-      // Manufacturer filter
-      if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) {
-        return false;
-      }
-
-      // Model filter
-      if (models.length > 0 && catalog && !models.includes(catalog.model)) {
-        return false;
-      }
-
-      // Issue type filter
-      const description = request?.problem_description || request?.description || "";
-      if (!matchesIssueType(description, issueType)) {
-        return false;
-      }
-
-      return true;
-    }) || [];
-
-    // Get total count before pagination
-    const totalCount = filteredRepairs.length;
-
-    // Apply pagination
-    const paginatedRepairs = filteredRepairs.slice(offset, offset + limit);
-
-    // Transform the data to match the expected structure
-    const transformedRepairs = paginatedRepairs.map((repair: any) => {
-      const request = repair.request;
-      const car = request?.car;
-      const catalog = car?.vehicle_catalog;
+    // Transform the data for frontend
+    const transformedRepairs = (repairs || []).map((repair: any) => {
+      const vehicleInfo = repair.vehicle_info || {};
 
       return {
-        repair_id: repair.id,
-        request_id: request?.id || null,
-        license_plate: car?.license_plate || null,
-        manufacturer: catalog?.manufacturer || null,
-        model: catalog?.model || null,
-        problem_description: request?.problem_description || request?.description || null,
-        mechanic_notes: repair.mechanic_notes || null,
+        id: repair.id,
+        garage_request_id: repair.garage_request_id,
+        final_issue_type: repair.final_issue_type,
+        final_issue_type_label: ISSUE_TYPE_LABELS[repair.final_issue_type] || repair.final_issue_type || 'לא צוין',
+        mechanic_notes: repair.mechanic_notes,
+        mechanic_description_ai: repair.mechanic_description_ai,
+        ai_summary: repair.ai_summary,
+        labor_hours: repair.labor_hours,
+        status: repair.status,
         created_at: repair.created_at,
+        completed_at: repair.completed_at,
+        vehicle_info: {
+          manufacturer: vehicleInfo.manufacturer || null,
+          model: vehicleInfo.model || null,
+          year: vehicleInfo.year || null,
+          license_plate: vehicleInfo.license_plate || null,
+          current_mileage: vehicleInfo.current_mileage || null,
+        },
       };
     });
 
     return NextResponse.json({
       repairs: transformedRepairs,
-      totalCount,
+      totalCount: count || 0,
     });
   } catch (err) {
+    console.error('[Dashboard repairs] Server error:', err);
     return NextResponse.json(
       { error: "Server error", details: String(err) },
       { status: 500 }
     );
   }
 }
-

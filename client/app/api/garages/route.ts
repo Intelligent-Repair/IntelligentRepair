@@ -11,7 +11,7 @@ export async function GET(req: Request) {
         // Fetch all garages
         let query = supabase
             .from("garages")
-            .select("id, garage_name, phone, City, Street, Number, owner_user_id")
+            .select("id, garage_name, phone, City, Street, Number, owner_user_id, operating_hours")
             .order("garage_name", { ascending: true });
 
         // Filter by city if provided
@@ -41,10 +41,13 @@ export async function GET(req: Request) {
 
         // hasOwner = TRUE only if owner_user_id is NOT NULL
         // (We already updated fictitious garages to have NULL)
+        // Only include operating_hours for garages with owners
         const processedGarages = (garages || [])
             .map(g => ({
                 ...g,
-                hasOwner: g.owner_user_id !== null
+                hasOwner: g.owner_user_id !== null,
+                // Only include operating_hours if garage has an owner
+                operating_hours: g.owner_user_id !== null ? g.operating_hours : null
             }))
             .sort((a, b) => {
                 // Garages with real owners come first

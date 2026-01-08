@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench } from 'lucide-react';
 
 interface GarageRequest {
     id: string;
@@ -74,7 +74,14 @@ export default function GarageInquiriesPage() {
 
         // Filter by status
         if (activeFilter !== 'all') {
-            result = result.filter(r => r.status === activeFilter);
+            if (activeFilter === 'answered') {
+                // Show both answered, closed_no, and closed_yes as "נקראו ונענו"
+                result = result.filter(r => 
+                    r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
+                );
+            } else {
+                result = result.filter(r => r.status === activeFilter);
+            }
         }
 
         // Filter by search term
@@ -147,6 +154,10 @@ export default function GarageInquiriesPage() {
                 return { label: 'נצפה', className: 'bg-yellow-900/50 text-yellow-300' };
             case 'answered':
                 return { label: 'נענה', className: 'bg-green-900/50 text-green-300' };
+            case 'closed_no':
+                return { label: 'נסגר ללא דיווח', className: 'bg-gray-900/50 text-gray-300' };
+            case 'closed_yes':
+                return { label: 'נסגר עם דיווח', className: 'bg-green-900/50 text-green-300' };
             default:
                 return { label: 'חדש', className: 'bg-red-900/50 text-red-300' };
         }
@@ -183,19 +194,44 @@ export default function GarageInquiriesPage() {
             return '⚠️ פנייה זו נוצרה לפני הוספת סיכום AI.\nאנא בדוק את תיאור הלקוח ופנה אליו ישירות לפרטים.';
         }
 
-        // Handle formattedText (best case)
+        // Handle formattedText (best case - new format)
         if (summary.formattedText) {
             return summary.formattedText;
         }
 
+        // Handle schema v1 with structured fields
+        const s = summary as any;
         let result = '';
 
-        // Handle shortDescription
-        if (summary.shortDescription) {
-            result += `📋 תיאור: ${summary.shortDescription}\n\n`;
+        // Title
+        if (s.shortTitle) {
+            result += `📋 ${s.shortTitle}\n\n`;
         }
 
-        // Handle topDiagnosis array
+        // User complaint
+        if (s.userComplaint && s.userComplaint !== 'לא ידוע') {
+            result += `🚗 תלונת הלקוח:\n${s.userComplaint}\n\n`;
+        }
+
+        // Warning lights
+        if (Array.isArray(s.warningLightsReported) && s.warningLightsReported.length > 0) {
+            result += `💡 נורות אזהרה:\n`;
+            s.warningLightsReported.forEach((light: string) => {
+                result += `   • ${light}\n`;
+            });
+            result += '\n';
+        }
+
+        // Findings
+        if (Array.isArray(s.findings) && s.findings.length > 0) {
+            result += `🔍 ממצאים:\n`;
+            s.findings.forEach((finding: string) => {
+                result += `   • ${finding}\n`;
+            });
+            result += '\n';
+        }
+
+        // Handle topDiagnosis array (legacy format)
         if (summary.topDiagnosis && summary.topDiagnosis.length > 0) {
             result += '🔍 אבחון:\n';
             summary.topDiagnosis.forEach((d, i) => {
@@ -205,11 +241,41 @@ export default function GarageInquiriesPage() {
                 }
                 result += '\n';
             });
+            result += '\n';
+        }
+
+        // Recommendations
+        if (Array.isArray(s.recommendations) && s.recommendations.length > 0) {
+            result += `💡 המלצות:\n`;
+            s.recommendations.forEach((rec: string) => {
+                result += `   • ${rec}\n`;
+            });
+            result += '\n';
+        }
+
+        // Actions requested
+        if (Array.isArray(s.actionsRequested) && s.actionsRequested.length > 0) {
+            result += `✅ פעולות שנדרשו:\n`;
+            s.actionsRequested.forEach((action: any) => {
+                let actionLine = `   • ${action.instruction || action}`;
+                if (action.userResult) {
+                    actionLine += ` → ${action.userResult}`;
+                }
+                result += actionLine + '\n';
+            });
+            result += '\n';
         }
 
         // Handle needsTow field
-        if (typeof (summary as any).needsTow === 'boolean') {
-            result += `\n🚗 צריך גרירה: ${(summary as any).needsTow ? 'כן' : 'לא'}\n`;
+        if (typeof s.needsTow === 'boolean') {
+            result += `🚗 צריך גרירה: ${s.needsTow ? 'כן' : 'לא'}\n`;
+        }
+
+        // Confidence
+        if (s.confidence) {
+            const confMap: Record<string, string> = { high: 'גבוהה ✓', medium: 'בינונית', low: 'נמוכה ⚠' };
+            const confText = confMap[s.confidence] || s.confidence;
+            result += `📊 רמת ביטחון: ${confText}\n`;
         }
 
         // If we found something, return it
@@ -217,13 +283,12 @@ export default function GarageInquiriesPage() {
             return result;
         }
 
-        // Fallback: show raw data
-        try {
-            const rawJson = JSON.stringify(summary, null, 2);
-            return `📄 נתוני אבחון:\n${rawJson}`;
-        } catch {
-            return 'אין סיכום זמין';
+        // Last fallback: shortDescription
+        if (summary.shortDescription) {
+            return `📋 ${summary.shortDescription}`;
         }
+
+        return 'אין סיכום זמין';
     };
 
     return (
@@ -247,6 +312,10 @@ export default function GarageInquiriesPage() {
                         const isActive = activeFilter === filter.key;
                         const count = filter.key === 'all'
                             ? requests.length
+                            : filter.key === 'answered'
+                            ? requests.filter(r => 
+                                r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
+                            ).length
                             : requests.filter(r => r.status === filter.key).length;
 
                         return (
@@ -421,13 +490,36 @@ export default function GarageInquiriesPage() {
                             >
                                 סגור
                             </button>
-                            <button
-                                onClick={() => router.push(`/garage/chats/${selectedRequest.id}`)}
-                                className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
-                            >
-                                <MessageSquare className="w-4 h-4" />
-                                פתח צ'אט
-                            </button>
+                            
+                            {/* Show action buttons only for pending or viewed status */}
+                            {(selectedRequest.status === 'pending' || selectedRequest.status === 'viewed') && (
+                                <>
+                                    <button
+                                        onClick={async () => {
+                                            await updateStatus(selectedRequest.id, 'closed_no');
+                                            setSelectedRequest(null);
+                                        }}
+                                        disabled={updatingStatus}
+                                        className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {updatingStatus ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <X className="w-4 h-4" />
+                                        )}
+                                        סגור ללא דיווח
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            router.push(`/garage/requests/${selectedRequest.id}/report`);
+                                        }}
+                                        className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
+                                    >
+                                        <Wrench className="w-4 h-4" />
+                                        דווח על סיום טיפול
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

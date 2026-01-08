@@ -9,6 +9,8 @@ interface FreeTextInputProps {
   placeholder?: string;
 }
 
+const MAX_LENGTH = 800;
+
 /**
  * Modern, attractive free text input component for users to provide custom answers
  * Premium design with smooth animations and proper RTL support
@@ -51,9 +53,12 @@ export default function FreeTextInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 🔧 FIX: Guard against Enter when disabled
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      if (!disabled && text.trim()) {
+        handleSubmit();
+      }
     }
   };
 
@@ -81,9 +86,10 @@ export default function FreeTextInput({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className={`w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-[24px] pl-4 pr-12 py-3.5 text-white placeholder:text-white/50 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/50 focus:border-[#4A90E2]/60 shadow-lg transition-all duration-300 text-base leading-relaxed ${
-            disabled ? "opacity-50 cursor-not-allowed" : "hover:border-white/30 hover:bg-white/12"
-          }`}
+          maxLength={MAX_LENGTH}
+          enterKeyHint="send"
+          className={`w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-[24px] pl-4 pr-12 py-3.5 text-white placeholder:text-white/50 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/50 focus:border-[#4A90E2]/60 shadow-lg transition-all duration-300 text-base leading-relaxed ${disabled ? "opacity-50 cursor-not-allowed" : "hover:border-white/30 hover:bg-white/12"
+            }`}
           style={{
             minHeight: "48px",
             maxHeight: "120px",
@@ -95,11 +101,10 @@ export default function FreeTextInput({
           disabled={disabled || !text.trim()}
           whileHover={!disabled && text.trim() ? { scale: 1.1 } : {}}
           whileTap={!disabled && text.trim() ? { scale: 0.9 } : {}}
-          className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-            disabled || !text.trim()
+          className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${disabled || !text.trim()
               ? "bg-white/5 text-white/30 cursor-not-allowed"
               : "bg-gradient-to-r from-[#4A90E2] to-[#6A9CF2] text-white shadow-[0_4px_12px_rgba(74,144,226,0.4)] hover:shadow-[0_6px_16px_rgba(74,144,226,0.6)]"
-          }`}
+            }`}
         >
           <svg
             className="w-4 h-4"

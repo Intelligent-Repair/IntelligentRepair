@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Wrench } from "lucide-react"; // אייקונים חדשים
+import { AlertTriangle, Wrench } from "lucide-react";
 
 
 interface ChatBubbleProps {
@@ -12,7 +12,7 @@ interface ChatBubbleProps {
   delay?: number;
   typewriter?: boolean; // Enable typewriter effect for AI messages
   typewriterSpeed?: number; // Speed in ms per character
-  type?: "text" | "safety_alert" | "safety_instruction" | "mechanic_report" | "instruction"; // תמיכה בסוגים החדשים
+  type?: string;
   meta?: any; // מידע נוסף (כותרת אזהרה, דוח מוסך וכו')
 }
 
@@ -23,24 +23,18 @@ export default function ChatBubble({
   delay = 0,
   typewriter = false,
   typewriterSpeed = 20,
-
   type = "text",
   meta
-
 }: ChatBubbleProps) {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const safeMessage = message ?? "";
-
   const hasImages = Array.isArray(images) && images.length > 0;
-
 
   // Typewriter effect for AI messages (only for regular text messages)
   useEffect(() => {
-
     if (!typewriter || isUser || type !== "text") {
-
       setDisplayedText(safeMessage);
       setIsTyping(false);
       return;
@@ -78,16 +72,10 @@ export default function ChatBubble({
       }
       setIsTyping(false);
     };
-
-
-  
-  
-
   }, [safeMessage, typewriter, isUser, typewriterSpeed, type]);
 
   // For user messages or non-typewriter, show full message immediately
   const displayText = typewriter && !isUser && type === "text" ? displayedText : safeMessage;
-
 
   // --- עיצוב מיוחד לאזהרת בטיחות ---
   if (type === "safety_alert") {
@@ -237,13 +225,12 @@ export default function ChatBubble({
           </div>
         )}
 
-
-        {isUser && hasImages && (
+        {/* 🔧 FIX: Show images for any sender, not just user */}
+        {hasImages && (
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {images!.slice(0, 3).map((url) => (
-              <div key={url} className="overflow-hidden rounded-xl border border-white/15 bg-black/10">
-
-                <img src={url} alt="תמונה שנשלחה" className="w-full h-24 object-cover" />
+            {images!.slice(0, 3).map((url, idx) => (
+              <div key={`${url}-${idx}`} className="overflow-hidden rounded-xl border border-white/15 bg-black/10">
+                <img src={url} alt="תמונה" className="w-full h-24 object-cover" />
               </div>
             ))}
           </div>

@@ -2,41 +2,84 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 // ייבוא כל האייקונים הדרושים (כדי למנוע ReferenceError)
 import { User, Mail, Phone, MapPin, Loader2, Save, Clock } from 'lucide-react'; 
 
-// --- נתוני דמה להתחלה ---
-const mockGarageProfile = {
-    name: 'מוסך רואי - IntelligentRepair',
-    email: 'garage.roee@example.com',
-    phone: '03-1234567',
-    address: 'דרך מנחם בגין 144, תל אביב',
-    is_loading: false,
-};
-
-// --- מבנה נתוני שעות הפעילות ההתחלתיות ---
-const initialOperatingHours = [
-    { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
-    { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
-    { day: 'שלישי', open: '08:00', close: '17:00', isClosed: false },
-    { day: 'רביעי', open: '08:00', close: '17:00', isClosed: false },
-    { day: 'חמישי', open: '08:00', close: '17:00', isClosed: false },
-    { day: 'שישי', open: '08:00', close: '13:00', isClosed: false },
-    { day: 'שבת', open: '00:00', close: '00:00', isClosed: true },
-];
-
 // *** שם הפונקציה שונה ל-GarageProfilePage כדי להתאים לשם התיקייה ***
 export default function GarageProfilePage() {
-    const [profile, setProfile] = useState(mockGarageProfile); 
-    const [operatingHours, setOperatingHours] = useState(initialOperatingHours);
+    const router = useRouter();
+    const [profile, setProfile] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        street: '',
+        number: '',
+        is_loading: true,
+    }); 
+    const [operatingHours, setOperatingHours] = useState<Array<{ day: string; open: string; close: string; isClosed: boolean }>>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const loadProfile = async () => {
         setProfile(prev => ({ ...prev, is_loading: true }));
         setStatusMessage(null);
-        await new Promise(resolve => setTimeout(resolve, 800)); 
-        setProfile({ ...mockGarageProfile, is_loading: false });
+        setError(null);
+        
+        try {
+            const res = await fetch('/api/garage/profile');
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                const errorMessage = data.error || `שגיאה בטעינת הפרופיל (${res.status})`;
+                setError(errorMessage);
+                setProfile(prev => ({ ...prev, is_loading: false }));
+                // Set default operating hours even on error so user can still see the form
+                setOperatingHours([
+                    { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
+                    { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
+                    { day: 'שלישי', open: '08:00', close: '17:00', isClosed: false },
+                    { day: 'רביעי', open: '08:00', close: '17:00', isClosed: false },
+                    { day: 'חמישי', open: '08:00', close: '17:00', isClosed: false },
+                    { day: 'שישי', open: '08:00', close: '13:00', isClosed: false },
+                    { day: 'שבת', open: '00:00', close: '00:00', isClosed: true },
+                ]);
+            } else {
+                const addressParts = [data.profile.city, data.profile.street, data.profile.number].filter(Boolean);
+                setProfile({
+                    name: data.profile.name || '',
+                    email: data.profile.email || '',
+                    phone: data.profile.phone || '',
+                    address: data.profile.address || addressParts.join(", ") || '',
+                    city: data.profile.city || '',
+                    street: data.profile.street || '',
+                    number: data.profile.number || '',
+                    is_loading: false,
+                });
+                // Set operating hours - if empty, use default values
+                if (data.operatingHours && data.operatingHours.length > 0) {
+                    setOperatingHours(data.operatingHours);
+                } else {
+                    // Default operating hours
+                    setOperatingHours([
+                        { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
+                        { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
+                        { day: 'שלישי', open: '08:00', close: '17:00', isClosed: false },
+                        { day: 'רביעי', open: '08:00', close: '17:00', isClosed: false },
+                        { day: 'חמישי', open: '08:00', close: '17:00', isClosed: false },
+                        { day: 'שישי', open: '08:00', close: '13:00', isClosed: false },
+                        { day: 'שבת', open: '00:00', close: '00:00', isClosed: true },
+                    ]);
+                }
+            }
+        } catch (err) {
+            console.error('Error loading profile:', err);
+            setError('שגיאה בטעינת הפרופיל');
+            setProfile(prev => ({ ...prev, is_loading: false }));
+        }
     };
 
     useEffect(() => {
@@ -44,7 +87,8 @@ export default function GarageProfilePage() {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setProfile({ ...profile, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setProfile({ ...profile, [name]: value });
     };
 
     const handleHoursChange = (index: number, field: 'open' | 'close', value: string) => {
@@ -63,16 +107,57 @@ export default function GarageProfilePage() {
         e.preventDefault();
         setIsSaving(true);
         setStatusMessage(null);
+        setError(null);
 
-        // --- לוגיקת שמירה ל-Supabase כאן (profile + operatingHours) ---
-        console.log("Saving Profile:", profile);
-        console.log("Saving Hours:", operatingHours); 
-        await new Promise(resolve => setTimeout(resolve, 1500)); 
-        
-        setIsSaving(false);
-        setStatusMessage('הפרטים נשמרו בהצלחה! 💪');
-        setTimeout(() => setStatusMessage(null), 3000);
+        try {
+            const res = await fetch('/api/garage/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profile: {
+                        name: profile.name,
+                        phone: profile.phone,
+                        city: profile.city,
+                        street: profile.street,
+                        number: profile.number,
+                    },
+                    operatingHours: operatingHours,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                setError(data.error);
+            } else {
+                setStatusMessage('הפרטים נשמרו בהצלחה! 💪');
+                // חזרה למסך הראשי אחרי 1.5 שניות
+                setTimeout(() => {
+                    router.push('/garage');
+                }, 1500);
+            }
+        } catch (err) {
+            console.error('Error saving profile:', err);
+            setError('שגיאה בשמירת הפרופיל');
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    // Initialize operating hours if empty
+    useEffect(() => {
+        if (operatingHours.length === 0 && !profile.is_loading) {
+            setOperatingHours([
+                { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
+                { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
+                { day: 'שלישי', open: '08:00', close: '17:00', isClosed: false },
+                { day: 'רביעי', open: '08:00', close: '17:00', isClosed: false },
+                { day: 'חמישי', open: '08:00', close: '17:00', isClosed: false },
+                { day: 'שישי', open: '08:00', close: '13:00', isClosed: false },
+                { day: 'שבת', open: '00:00', close: '00:00', isClosed: true },
+            ]);
+        }
+    }, [operatingHours.length, profile.is_loading]);
 
     if (profile.is_loading) {
         return (
@@ -100,6 +185,12 @@ export default function GarageProfilePage() {
                 {statusMessage && (
                     <div className="p-4 mb-4 rounded-xl bg-green-900/40 text-green-300 text-center font-medium">
                         {statusMessage}
+                    </div>
+                )}
+
+                {error && (
+                    <div className="p-4 mb-4 rounded-xl bg-red-900/40 text-red-300 text-center font-medium">
+                        {error}
                     </div>
                 )}
                 
@@ -134,10 +225,22 @@ export default function GarageProfilePage() {
                         />
                     </div>
 
-                    {/* כתובת */}
+                    {/* עיר */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> כתובת מלאה</label>
-                        <input type="text" name="address" value={profile.address} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> עיר</label>
+                        <input type="text" name="city" value={profile.city} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                    </div>
+
+                    {/* רחוב */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> רחוב</label>
+                        <input type="text" name="street" value={profile.street} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                    </div>
+
+                    {/* מספר */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> מספר</label>
+                        <input type="text" name="number" value={profile.number} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
                     
                     {/* --- סעיף 2: שעות פעילות (החדש) --- */}

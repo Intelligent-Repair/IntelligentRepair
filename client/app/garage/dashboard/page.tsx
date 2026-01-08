@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Filter, Car, Wrench, ChevronLeft, ChevronRight, Loader2, FileText, AlertCircle, PieChart } from 'lucide-react'; 
+import { Filter, Car, Wrench, ChevronLeft, ChevronRight, Loader2, FileText, AlertCircle, PieChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Pie } from 'react-chartjs-2';
 import {
@@ -32,15 +32,27 @@ type PieData = {
   value: number;
 };
 
+type VehicleInfo = {
+  manufacturer?: string | null;
+  model?: string | null;
+  year?: number | null;
+  license_plate?: string | null;
+  current_mileage?: number | null;
+};
+
 type Repair = {
-  repair_id: number;
-  request_id: number | null;
-  license_plate: string | null;
-  manufacturer: string | null;
-  model: string | null;
-  problem_description: string | null;
+  id: string;
+  garage_request_id: string | null;
+  final_issue_type: string | null;
+  final_issue_type_label: string;
   mechanic_notes: string | null;
+  mechanic_description_ai: string | null;
+  ai_summary: string | null;
+  labor_hours: number | null;
+  status: string;
   created_at: string;
+  completed_at: string | null;
+  vehicle_info: VehicleInfo | null;
 };
 
 type FilterData = {
@@ -50,7 +62,7 @@ type FilterData = {
 
 export default function GarageDashboardPage() {
   const router = useRouter();
-  
+
   // Filter states
   const [mode, setMode] = useState<"local" | "global">("local");
   const [selectedManufacturers, setSelectedManufacturers] = useState<string[]>([]);
@@ -58,24 +70,24 @@ export default function GarageDashboardPage() {
   const [dateRange, setDateRange] = useState<string>("monthly");
   const [issueType, setIssueType] = useState<string>("all");
   const [chartMode, setChartMode] = useState<string>("totalIssues");
-  
+
   // Filter options data
   const [filterData, setFilterData] = useState<FilterData | null>(null);
   const [filterDataLoading, setFilterDataLoading] = useState(true);
-  
+
   // Analytics data
   const [topModelsLoading, setTopModelsLoading] = useState(true);
   const [topModelsError, setTopModelsError] = useState<string | null>(null);
   const [topModels, setTopModels] = useState<TopVehicle[]>([]);
-  
+
   const [topIssuesLoading, setTopIssuesLoading] = useState(true);
   const [topIssuesError, setTopIssuesError] = useState<string | null>(null);
   const [topIssues, setTopIssues] = useState<TopIssue[]>([]);
-  
+
   const [pieLoading, setPieLoading] = useState(true);
   const [pieError, setPieError] = useState<string | null>(null);
   const [pieData, setPieData] = useState<PieData[]>([]);
-  
+
   // Repairs data
   const [repairsLoading, setRepairsLoading] = useState(true);
   const [repairsError, setRepairsError] = useState<string | null>(null);
@@ -127,11 +139,11 @@ export default function GarageDashboardPage() {
       const queryString = buildQueryString();
       const response = await fetch(`/api/garage/dashboard/top-models?${queryString}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch top models');
       }
-      
+
       setTopModels(data.top5 || []);
     } catch (err) {
       console.error('Error fetching top models:', err);
@@ -149,11 +161,11 @@ export default function GarageDashboardPage() {
       const queryString = buildQueryString();
       const response = await fetch(`/api/garage/dashboard/top-issues?${queryString}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch top issues');
       }
-      
+
       setTopIssues(data.top5 || []);
     } catch (err) {
       console.error('Error fetching top issues:', err);
@@ -171,11 +183,11 @@ export default function GarageDashboardPage() {
       const queryString = buildQueryString();
       const response = await fetch(`/api/garage/dashboard/pie?${queryString}&chartMode=${chartMode}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch pie data');
       }
-      
+
       setPieData(data.data || []);
     } catch (err) {
       console.error('Error fetching pie data:', err);
@@ -193,11 +205,11 @@ export default function GarageDashboardPage() {
       const queryString = buildQueryString();
       const response = await fetch(`/api/garage/dashboard/repairs?${queryString}&offset=${offset}`);
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch repairs');
       }
-      
+
       setRepairs(data.repairs || []);
       setTotalCount(data.totalCount || 0);
     } catch (err) {
@@ -295,17 +307,17 @@ export default function GarageDashboardPage() {
       </div>
 
       <main dir="rtl" className="relative mx-auto w-full max-w-7xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
-        
+
         <h1 className="text-4xl font-extrabold text-white mb-8 border-b border-white/10 pb-4 flex items-center gap-3">
-          <PieChart className="w-8 h-8 text-cyan-300"/> דשבורד מוסך
+          <PieChart className="w-8 h-8 text-cyan-300" /> דשבורד מוסך
         </h1>
 
         {/* --- 1. Comprehensive Filter Bar --- */}
         <section className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md mb-10">
           <h2 className="text-xl font-semibold text-cyan-300 flex items-center gap-2 mb-6">
-            <Filter className="w-5 h-5"/> סינון נתונים
+            <Filter className="w-5 h-5" /> סינון נתונים
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* View Mode */}
             <div>
@@ -313,21 +325,19 @@ export default function GarageDashboardPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setMode('local')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${
-                    mode === 'local'
-                      ? 'bg-cyan-500 text-white border-2 border-cyan-400'
-                      : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
-                  }`}
+                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${mode === 'local'
+                    ? 'bg-cyan-500 text-white border-2 border-cyan-400'
+                    : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
+                    }`}
                 >
                   תצוגת מוסך שלי
                 </button>
                 <button
                   onClick={() => setMode('global')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${
-                    mode === 'global'
-                      ? 'bg-cyan-500 text-white border-2 border-cyan-400'
-                      : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
-                  }`}
+                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${mode === 'global'
+                    ? 'bg-cyan-500 text-white border-2 border-cyan-400'
+                    : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
+                    }`}
                 >
                   תצוגת כלל המוסכים
                 </button>
@@ -392,13 +402,13 @@ export default function GarageDashboardPage() {
 
             {/* Issue Type */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">סוג בעיה</label>
+              <label className="text-sm text-slate-400 block mb-2">סוג תקלה</label>
               <select
                 value={issueType}
                 onChange={(e) => setIssueType(e.target.value)}
                 className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm"
               >
-                <option value="all">כל הבעיות</option>
+                <option value="all">כל הסוגים</option>
                 <option value="engine">מנוע</option>
                 <option value="brakes">בלמים</option>
                 <option value="electrical">חשמל</option>
@@ -406,6 +416,14 @@ export default function GarageDashboardPage() {
                 <option value="starting">מערכת התנעה</option>
                 <option value="gearbox">תיבת הילוכים</option>
                 <option value="noise">רעש/רטט</option>
+                <option value="suspension">מתלים</option>
+                <option value="transmission">הנעה</option>
+                <option value="fuel_system">מערכת דלק</option>
+                <option value="cooling_system">מערכת קירור</option>
+                <option value="exhaust">פליטה</option>
+                <option value="tires">צמיגים</option>
+                <option value="steering">היגוי</option>
+                <option value="other">אחר</option>
               </select>
             </div>
           </div>
@@ -415,7 +433,7 @@ export default function GarageDashboardPage() {
         <section className="mb-10">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
-              <PieChart className="w-6 h-6 text-cyan-300"/> תרשים עוגה
+              <PieChart className="w-6 h-6 text-cyan-300" /> תרשים עוגה
             </h2>
             <select
               value={chartMode}
@@ -433,12 +451,12 @@ export default function GarageDashboardPage() {
           <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
             {pieLoading && (
               <div className="text-center py-20 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin mr-3"/> טוען תרשים...
+                <Loader2 className="w-8 h-8 animate-spin mr-3" /> טוען תרשים...
               </div>
             )}
             {pieError && (
               <div className="text-center py-20 text-red-300">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2"/>
+                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
                 <p>{pieError}</p>
               </div>
             )}
@@ -455,12 +473,12 @@ export default function GarageDashboardPage() {
           {/* Box A: Top 5 Problematic Vehicle Models */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
             <h2 className="text-xl font-extrabold text-white mb-6 flex items-center gap-3">
-              <Car className="w-6 h-6 text-cyan-300"/> 5 דגמי הרכבים הבעייתיים ביותר
+              <Car className="w-6 h-6 text-cyan-300" /> 5 דגמי הרכבים הבעייתיים ביותר
             </h2>
 
             {topModelsLoading && (
               <div className="text-center py-10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin mr-3"/> טוען נתונים...
+                <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען נתונים...
               </div>
             )}
 
@@ -507,12 +525,12 @@ export default function GarageDashboardPage() {
           {/* Box B: Top 5 Most Common Issues */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
             <h2 className="text-xl font-extrabold text-white mb-6 flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-cyan-300"/> 5 הבעיות הנפוצות ביותר
+              <AlertCircle className="w-6 h-6 text-cyan-300" /> 5 הבעיות הנפוצות ביותר
             </h2>
 
             {topIssuesLoading && (
               <div className="text-center py-10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin mr-3"/> טוען נתונים...
+                <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען נתונים...
               </div>
             )}
 
@@ -558,7 +576,7 @@ export default function GarageDashboardPage() {
         <section className="mt-10">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
-              <Wrench className="w-6 h-6 text-cyan-300"/> רשימת תיקונים אחרונים
+              <Wrench className="w-6 h-6 text-cyan-300" /> רשימת תיקונים אחרונים
             </h2>
             {totalCount > 0 && (
               <span className="text-slate-400 text-sm">סה״כ: {totalCount} תיקונים</span>
@@ -567,7 +585,7 @@ export default function GarageDashboardPage() {
 
           {repairsLoading && (
             <div className="text-center py-10 text-xl text-slate-400 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin mr-3"/> טוען תיקונים...
+              <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען תיקונים...
             </div>
           )}
 
@@ -580,56 +598,82 @@ export default function GarageDashboardPage() {
 
           {!repairsLoading && !repairsError && repairs.length === 0 && (
             <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-slate-400">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50"/>
+              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>אין תיקונים להצגה</p>
             </div>
           )}
 
           {!repairsLoading && !repairsError && repairs.length > 0 && (
             <>
-              <div className="rounded-xl border border-white/10 bg-white/5 shadow-xl backdrop-blur-md overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-right text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-700 text-slate-400 bg-zinc-800/50">
-                        <th className="py-3 px-4 font-normal">מספר פנייה</th>
-                        <th className="py-3 px-4 font-normal">מספר רכב</th>
-                        <th className="py-3 px-4 font-normal">יצרן</th>
-                        <th className="py-3 px-4 font-normal">דגם</th>
-                        <th className="py-3 px-4 font-normal">בעיה</th>
-                        <th className="py-3 px-4 font-normal">מה תוקן</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {repairs.map((repair) => (
-                        <tr
-                          key={repair.repair_id}
-                          onClick={() => handleRowClick(repair.request_id)}
-                          className="border-b border-white/5 hover:bg-white/10 transition cursor-pointer"
-                        >
-                          <td className="py-3 px-4 text-slate-200">
-                            {repair.request_id || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-200">
-                            {repair.license_plate || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-200">
-                            {repair.manufacturer || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-200">
-                            {repair.model || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-200 max-w-xs truncate">
-                            {repair.problem_description || '—'}
-                          </td>
-                          <td className="py-3 px-4 text-slate-200 max-w-xs truncate">
-                            {repair.mechanic_notes || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {/* Repair Cards Grid */}
+              <div className="space-y-4">
+                {repairs.map((repair) => (
+                  <div
+                    key={repair.id}
+                    className="rounded-xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-md hover:border-cyan-500/50 transition"
+                  >
+                    {/* Header Row */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <Car className="w-6 h-6 text-cyan-400" />
+                        <div>
+                          <h3 className="text-white font-semibold text-lg">
+                            {repair.vehicle_info?.manufacturer || 'לא ידוע'} {repair.vehicle_info?.model || ''}
+                            {repair.vehicle_info?.year && ` (${repair.vehicle_info.year})`}
+                          </h3>
+                          {repair.vehicle_info?.license_plate && (
+                            <span className="text-cyan-300 text-sm">{repair.vehicle_info.license_plate}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 font-medium">
+                          {repair.final_issue_type_label}
+                        </span>
+                        {repair.labor_hours && (
+                          <span className="text-slate-400">
+                            ⏱️ {repair.labor_hours} שעות
+                          </span>
+                        )}
+                        {repair.completed_at && (
+                          <span className="text-slate-500 text-xs">
+                            {new Date(repair.completed_at).toLocaleDateString('he-IL')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* AI Summary */}
+                    {repair.ai_summary && (
+                      <div className="mb-3 p-3 rounded-lg bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
+                        <div className="flex items-center gap-2 text-cyan-300 text-sm font-medium mb-1">
+                          <span>🤖</span> סיכום AI
+                        </div>
+                        <p className="text-white text-sm">{repair.ai_summary}</p>
+                      </div>
+                    )}
+
+                    {/* Technical Description */}
+                    {repair.mechanic_description_ai && (
+                      <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-sm font-medium mb-1">
+                          <Wrench className="w-4 h-4" /> תיאור טכני
+                        </div>
+                        <p className="text-slate-200 text-sm leading-relaxed">{repair.mechanic_description_ai}</p>
+                      </div>
+                    )}
+
+                    {/* Fallback: Show raw notes if no AI description */}
+                    {!repair.mechanic_description_ai && repair.mechanic_notes && (
+                      <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-sm font-medium mb-1">
+                          <FileText className="w-4 h-4" /> הערות מכונאי
+                        </div>
+                        <p className="text-slate-200 text-sm leading-relaxed">{repair.mechanic_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* Pagination Controls */}
@@ -637,27 +681,25 @@ export default function GarageDashboardPage() {
                 <button
                   onClick={handlePreviousPage}
                   disabled={offset === 0}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${
-                    offset === 0
-                      ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
-                      : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset === 0
+                    ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
+                    : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
+                    }`}
                 >
-                  <ChevronRight className="w-5 h-5"/> קודם
+                  <ChevronRight className="w-5 h-5" /> קודם
                 </button>
                 <span className="text-slate-400">
-                  עמוד {currentPage + 1} • {repairs.length} תיקונים בעמוד זה
+                  עמוד {currentPage + 1} • {repairs.length} תיקונים בעמוד
                 </span>
                 <button
                   onClick={handleNextPage}
-                  disabled={repairs.length < 5 || offset + 5 >= totalCount}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${
-                    repairs.length < 5 || offset + 5 >= totalCount
-                      ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
-                      : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
-                  }`}
+                  disabled={repairs.length < 10 || offset + 10 >= totalCount}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${repairs.length < 10 || offset + 10 >= totalCount
+                    ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
+                    : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
+                    }`}
                 >
-                  הבא <ChevronLeft className="w-5 h-5"/>
+                  הבא <ChevronLeft className="w-5 h-5" />
                 </button>
               </div>
             </>
