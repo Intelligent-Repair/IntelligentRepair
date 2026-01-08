@@ -18,7 +18,11 @@
             "Check Engine",
             "MIL",
             "מנוע מהבהב",
-            "נורת מנוע מהבהבת"
+            "נורת מנוע מהבהבת",
+            "נדלקה נורת מנוע",
+            "נדלקה לי נורת מנוע",
+            "אזהרת מנוע",
+            "חיווי מנוע"
           ],
           "targetId": "check_engine_light",
           "type": "light"
@@ -29,7 +33,9 @@
             "נורית לחץ אוויר",
             "TPMS",
             "נורית TPMS",
-            "מילאתי אוויר והנורה לא כבתה"
+            "מילאתי אוויר והנורה לא כבתה",
+            "נדלקה נורת לחץ אוויר",
+            "אזהרת לחץ אוויר"
           ],
           "targetId": "tpms_light",
           "type": "light"
@@ -41,7 +47,9 @@
             "נורית שמן",
             "מנורת שמן",
             "מנורת אלדין",
-            "נורת אלדין"
+            "נורת אלדין",
+            "נדלקה נורת שמן",
+            "אזהרת שמן"
           ],
           "targetId": "oil_pressure_light",
           "type": "light"
@@ -51,8 +59,9 @@
             "נורת דלק",
             "סמל משאבת דלק",
             "אייקון משאבת דלק",
-            "Fuel",
-            "Low Fuel"
+            "Low Fuel",
+            "נדלקה נורת דלק",
+            "אזהרת דלק"
           ],
           "targetId": "fuel_level_light",
           "type": "light"
@@ -61,9 +70,9 @@
           "keywords": [
             "נורת ABS",
             "נורית ABS",
-            "ABS",
             "סמל ABS",
-            "Anti-lock"
+            "Anti-lock",
+            "נדלקה נורת ABS"
           ],
           "targetId": "abs_light",
           "type": "light"
@@ -72,9 +81,9 @@
           "keywords": [
             "נורת כרית אוויר",
             "AIRBAG",
-            "SRS",
             "נורית SRS",
-            "סמל כרית אוויר"
+            "סמל כרית אוויר",
+            "נדלקה נורת כרית אוויר"
           ],
           "targetId": "airbag_light",
           "type": "light"
@@ -84,8 +93,8 @@
             "נורת הגה",
             "נורת הגה כוח",
             "Power Steering",
-            "EPS",
-            "נורית EPS"
+            "נורית EPS",
+            "נדלקה נורת הגה"
           ],
           "targetId": "power_steering_light",
           "type": "light"
@@ -95,7 +104,9 @@
             "נורת גיר",
             "AT OIL TEMP",
             "Transmission Temp",
-            "Transmission Overheat"
+            "Transmission Overheat",
+            "אזהרת גיר",
+            "נדלקה נורת גיר"
           ],
           "targetId": "transmission_temperature_light",
           "type": "light"
@@ -106,8 +117,8 @@
             "ESC",
             "ESP OFF",
             "TC OFF",
-            "Traction",
-            "Stability Control"
+            "נורת ESP",
+            "נורית ESP"
           ],
           "targetId": "esp_light",
           "type": "light"
@@ -118,7 +129,7 @@
             "נורת מפתח",
             "סמל מפתח",
             "Immobilizer",
-            "Security Light"
+            "נדלקה נורת מפתח"
           ],
           "targetId": "immobilizer_light",
           "type": "light"
@@ -128,8 +139,9 @@
             "נוזל שמשות",
             "נוזל שפריצר",
             "נורת שפריצר",
-            "washer fluid",
-            "Low Washer Fluid"
+            "Low Washer Fluid",
+            "אזהרת נוזל שמשות",
+            "נדלקה נורת שפריצר"
           ],
           "targetId": "washer_fluid_light",
           "type": "light"

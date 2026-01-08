@@ -152,7 +152,7 @@
                                     "recommendation": "הזמן גרר."
                                 },
                                 "still_driving": {
-                                    "status": "pending",
+                                    "status": "needs_more_info",
                                     "message": "המשך למוסך. אם אורות נחלשים — עצור והזמן גרר."
                                 },
                                 "cant_reach_mechanic": {
@@ -952,7 +952,6 @@
     },
     "oil_pressure_light": {
         "severity": "critical",
-        "safetyRuleId": "oil_pressure",
         "names": {
             "he": [
                 "נורת לחץ שמן",
@@ -1486,7 +1485,6 @@
     },
     "coolant_temperature_light": {
         "severity": "critical",
-        "safetyRuleId": "overheating_severe",
         "names": {
             "he": [
                 "נורת חום מנוע",

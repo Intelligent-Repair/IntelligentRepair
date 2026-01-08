@@ -33,7 +33,7 @@ const DRAFT_IMAGES_KEY = "draft_images";
 function normalizeMsgType(type?: string) {
   if (!type) return type;
   if (type === "final_diagnosis") return "diagnosis_report";
-  if (type === "mechanic_report") return "diagnosis_report";
+  // DON'T normalize mechanic_report to diagnosis_report - they are different
   return type;
 }
 
@@ -231,26 +231,42 @@ export default function QuestionsPage() {
               const t = normalizeMsgType(msg.type);
 
               // 🔴 FIX APPLIED: Data Transformation for Diagnosis Report
-              if (t === "diagnosis_report") {
+              // Handle BOTH diagnosis_report and mechanic_report (hook sends mechanic_report)
+              if (t === "diagnosis_report" || t === "mechanic_report") {
                 const diagnosisData = msg.meta?.diagnosis || {};
                 const rawDiagnosis = diagnosisData.results || msg.meta?.diagnosis?.diagnosis || [];
                 const safetyNotice = diagnosisData.disclaimer || msg.meta?.diagnosis?.safety_notice;
 
-                // Transform string[] or result objects to DiagnosisResult[]
-                const structuredResults = Array.isArray(rawDiagnosis)
-                  ? rawDiagnosis.map((item: any, idx: number) => {
+                // Pass results as-is without fabricating probability/explanation
+                // If items are strings, convert to minimal structure without fake data
+                let structuredResults = Array.isArray(rawDiagnosis)
+                  ? rawDiagnosis.map((item: any) => {
                     if (typeof item === 'string') {
                       return {
                         issue: item,
-                        probability: idx === 0 ? 0.9 : 0.7,
-                        explanation: idx === 0
-                          ? "זוהה כתרחיש הסביר ביותר ע\"פ הבדיקות שביצענו."
-                          : "אפשרות נוספת שיש לקחת בחשבון."
+                        probability: undefined, // Don't fabricate probability
+                        explanation: undefined  // Don't fabricate explanation
                       };
                     }
-                    return item; // Already structured
+                    return item; // Already structured - use as-is
                   })
                   : [];
+
+                // FALLBACK: If results are empty, create a result from diagnosis/recommendation/title
+                if (structuredResults.length === 0) {
+                  const fallbackIssue = diagnosisData.diagnosis
+                    || diagnosisData.recommendation
+                    || diagnosisData.title
+                    || msg.text
+                    || "אבחון הושלם";
+                  if (fallbackIssue && typeof fallbackIssue === 'string') {
+                    structuredResults = [{
+                      issue: fallbackIssue,
+                      probability: diagnosisData.confidence,
+                      explanation: diagnosisData.reasoning || diagnosisData.recommendation
+                    }];
+                  }
+                }
 
                 return (
                   <FinalDiagnosisCard

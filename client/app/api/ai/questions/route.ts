@@ -119,10 +119,11 @@ export async function POST(req: Request) {
       decisionTrace.push(['CONTINUE_SCENARIO', 'Not handled']);
     }
 
-    // Step 3: Image analysis
+    // Step 3: Image analysis - use IMAGE mode, NOT symptom flow
     if (hasImage) {
-      decisionTrace.push(['IMAGE', 'Processing with AI']);
-      const aiContext = safeMergeContext(context, { isSymptomFlow: true, activeFlow: 'AI' }) as any;
+      decisionTrace.push(['IMAGE', 'Processing with AI (IMAGE mode)']);
+      // CRITICAL: Do NOT set isSymptomFlow=true for images! This prevents IMAGE_IDENTIFICATION mode.
+      const aiContext = safeMergeContext(context, { isImageFlow: true, activeFlow: 'AI' }) as any;
       if (debug) aiContext.decisionTrace = decisionTrace;
       return await callExpertAI({ ...body, message: userText, context: aiContext });
     }

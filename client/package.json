@@ -9,9 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.88.0",
     "chart.js": "^4.5.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.561.0",
@@ -20,7 +23,10 @@
     "openai": "^6.14.0",
     "react": "^19.2.3",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "react-hook-form": "^7.70.0",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

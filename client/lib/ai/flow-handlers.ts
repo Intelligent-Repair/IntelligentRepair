@@ -631,15 +631,28 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
         };
     }
 
-    // No more steps: generate diagnosis
+    // ⚠️ ANTI-PREMATURE-DIAGNOSIS: If we haven't asked enough questions, don't jump to diagnosis!
+    const MIN_QUESTIONS_FOR_DIAGNOSIS = 3;
+    const questionCount = askedIds.length;
+
+    if (questionCount < MIN_QUESTIONS_FOR_DIAGNOSIS) {
+        console.log(`[KBFlow] Only ${questionCount} questions asked (min: ${MIN_QUESTIONS_FOR_DIAGNOSIS}). Using AI to continue conversation.`);
+        // Route to AI to ask more clarifying questions before diagnosis
+        return {
+            response: null,
+            handled: false  // Will fallback to callExpertAI in route.ts
+        };
+    }
+
+    // No more steps AND enough questions asked: generate diagnosis
     // For HYBRID_LIGHTS, use AI diagnosis instead of KB scoring
     if (HYBRID_LIGHTS.includes(lightType as any)) {
-        console.log(`[KBFlow] Hybrid diagnosis for ${lightType}`);
-        const aiDiagnosis = await generateAIDiagnosis(lightType, scenarioId, answers, context.vehicleInfo, context);
+        console.log(`[KBFlow] Hybrid diagnosis for ${lightType} (${questionCount} questions asked)`);
+        const aiDiagnosis = await generateAIDiagnosis(lightType, scenarioId ?? '', answers, context?.vehicleInfo, context);
         return { handled: true, response: aiDiagnosis };
     }
 
-    return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds)) };
+    return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId ?? '', updatedScores, answers, context?.vehicleInfo, context?.shownInstructionIds)) };
 }
 
 // Scenario flow - DISABLED (scenarios.ts removed, all symptoms now go to AI)
@@ -699,8 +712,16 @@ export async function callExpertAI(body: any): Promise<any> {
         const parsed = extractJSON(raw);
         const result: any = parsed ?? {};
 
-        // Check both top-level and candidate.warning_light from AI response
-        let lightType = result.warning_light || result.light_type || result.detected_light || result.light_id || result.detectedLightType || result.candidate?.warning_light || detectedLight;
+        // Check both top-level and candidate.warning_light from AI response (extended extraction)
+        let lightType = result.warning_light
+            || result.light_type
+            || result.detected_light
+            || result.light_id
+            || result.detectedLightType
+            || result.candidate?.warning_light
+            || result.candidate?.light_id
+            || result.candidate?.detected_light
+            || detectedLight;
         if (typeof lightType === 'string') lightType = lightType.trim();
 
         // Get confidence from candidate if available
@@ -744,8 +765,31 @@ export async function callExpertAI(body: any): Promise<any> {
             });
         }
 
-        if (result.type === 'diagnosis_report' || result.type === 'ai_response') {
-            return NextResponse.json({ ...result, type: result.type === 'ai_response' ? 'diagnosis_report' : result.type, endConversation: true, context: mergeContext(context, result?.context) });
+        // Handle diagnosis_report - this is a valid final state
+        if (result.type === 'diagnosis_report') {
+            return NextResponse.json({ ...result, endConversation: true, context: mergeContext(context, result?.context) });
+        }
+
+        // Handle ai_response - NEVER end conversation prematurely!
+        // Either route to KB if light detected, or convert to question
+        if (result.type === 'ai_response') {
+            console.log(`[Expert AI] NON-FINAL ai_response received - converting to question or KB route`);
+
+            // If we detected a valid light, route to KB
+            if (lightType && (warningLightsKB as any)[lightType]) {
+                const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : 'caution';
+                console.log(`[Expert AI] ai_response -> routing to KB for light: ${lightType}`);
+                return handleWarningLightDetection(lightType, severity, context);
+            }
+
+            // Otherwise, convert to a question to continue conversation
+            console.log(`[Expert AI] ai_response -> converting to question (no valid light detected)`);
+            return NextResponse.json({
+                type: 'question',
+                text: result.text ?? 'כדי לדייק, תוכל לתאר מה אתה רואה?',
+                options: result.options ?? buildLightPickerOptions(),
+                context: mergeContext(context, { activeFlow: null, ...(result.context ?? {}) })
+            });
         }
 
         // Normalize options for all AI responses (AI may return {id, label} objects)
@@ -754,16 +798,37 @@ export async function callExpertAI(body: any): Promise<any> {
             normalizedResult.options = result.options.map((o: any) => typeof o === 'string' ? o : o?.label || String(o)).filter(Boolean);
         }
 
+        // FIRST IMAGE PROTECTION: Never end conversation on first image without questions
+        if (hasImages && answers.length === 0) {
+            console.log(`[Expert AI] First image received - ensuring conversation continues`);
+
+            // If we have a light, route to KB
+            if (lightType && (warningLightsKB as any)[lightType]) {
+                const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : 'caution';
+                console.log(`[Expert AI] First image -> detected light ${lightType}, routing to KB`);
+                return handleWarningLightDetection(lightType, severity, context);
+            }
+
+            // Otherwise, ask clarifying question
+            console.log(`[Expert AI] First image -> no light detected, asking for clarification`);
+            return NextResponse.json({
+                type: 'question',
+                text: result.text ?? 'קיבלתי את התמונה. האם יש נורת אזהרה דולקת בלוח המחוונים?',
+                options: result.options ?? buildLightPickerOptions(),
+                context: mergeContext(context, { activeFlow: null, firstImageProcessed: true })
+            });
+        }
+
         // DEAD-END DETECTION: Check for empty/stuck responses or too many questions
-        const questionCount = answers.length;
+        const questionCount2 = answers.length;
         const MAX_QUESTIONS = 8;
         const emptyPhrases = ['המשך', 'המשך...', 'continue', 'ok', 'אוקיי'];
         const isEmptyResponse = !result.text || emptyPhrases.some(p => (result.text || '').trim().toLowerCase() === p.toLowerCase());
         const hasNoOptions = !normalizedResult.options || normalizedResult.options.length === 0;
         const isStuck = isEmptyResponse || (hasNoOptions && result.type === 'question');
 
-        if (isStuck || questionCount >= MAX_QUESTIONS) {
-            console.log(`[Expert AI] Dead-end detected: isStuck=${isStuck}, questionCount=${questionCount} - using unified diagnosis`);
+        if (isStuck || questionCount2 >= MAX_QUESTIONS) {
+            console.log(`[Expert AI] Dead-end detected: isStuck=${isStuck}, questionCount=${questionCount2} - using unified diagnosis`);
 
             // Use unified diagnosis generator for consistent quality
             const conversationHistory = answers.map((a: UserAnswer) => ({
