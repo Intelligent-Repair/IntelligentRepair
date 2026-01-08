@@ -1,53 +1,91 @@
 import { NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabaseServer";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+
+type VehiclePayload = {
+  id?: string | number | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  year?: string | number | null;
+};
+
+type BodyPayload = {
+  user_id?: string;
+  vehicle?: VehiclePayload | null;
+  description?: string | null;
+  images?: string[] | { url: string }[];
+  ai_diagnosis?: unknown;
+  ai_confidence?: number;
+};
+
+function normalizeImages(images: BodyPayload["images"]) {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (item && typeof item === "object" && "url" in item && typeof item.url === "string") {
+        return item.url.trim();
+      }
+      return "";
+    })
+    .filter((url) => url.length > 0)
+    .slice(0, 3);
+}
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { car_id, description, media_urls, user_id } = body;
+    const body: BodyPayload = await req.json();
+    const { user_id, vehicle, description, ai_diagnosis, ai_confidence } = body;
+    const images = normalizeImages(body.images);
 
-    if (!car_id || !description || !user_id) {
+    if (!user_id || typeof user_id !== "string" || !user_id.trim()) {
       return NextResponse.json(
-        { error: "Missing required fields: car_id, description, and user_id" },
+        { error: "Missing required field: user_id" },
         { status: 400 }
       );
     }
 
-    const supabase = await createServerSupabase();
+    if (!description || typeof description !== "string" || !description.trim()) {
+      return NextResponse.json(
+        { error: "Missing required field: description" },
+        { status: 400 }
+      );
+    }
 
-    // Create the request
+    const supabase = createAdminClient();
+
     const { data: requestData, error: requestError } = await supabase
       .from("requests")
       .insert({
-        user_id,
-        vehicle_id: car_id, // vehicle_id refers to people_cars.id
-        description,
-        media_urls: media_urls || [],
-        status: "pending",
+        user_id: user_id.trim(),
+        car_id: vehicle?.id ?? null, // keep car link if provided
+        description: description.trim(),
+        status: "open",
+        image_urls: images,
+        ai_diagnosis: ai_diagnosis ?? null,
+        ai_confidence:
+          typeof ai_confidence === "number" && Number.isFinite(ai_confidence)
+            ? ai_confidence
+            : null,
       })
-      .select()
+      .select("id")
       .single();
 
-    if (requestError) {
+    if (requestError || !requestData) {
+      console.error("[requests/start] insert error:", requestError);
       return NextResponse.json(
-        { error: "Failed to create request", details: requestError.message },
+        { error: "Failed to create request", details: requestError?.message },
         { status: 500 }
       );
     }
 
-    // For now, return mock questions. In a real implementation,
-    // this would call an AI service to generate questions
-    const questions = [
-      "מהו סוג התקלה שאתה חווה?",
-      "מתי התחילה התקלה?",
-      "האם הרכב עדיין נוהג?",
-    ];
-
-    return NextResponse.json({
-      request_id: requestData.id,
-      questions,
-    });
+    return NextResponse.json(
+      {
+        request_id: requestData.id,
+      },
+      { status: 200 }
+    );
   } catch (err) {
+    console.error("[requests/start] unhandled error:", err);
     return NextResponse.json(
       { error: "Server error", details: String(err) },
       { status: 500 }

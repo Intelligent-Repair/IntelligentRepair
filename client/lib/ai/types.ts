@@ -2,6 +2,13 @@
  * Core TypeScript types for AI consultation flow
  */
 
+export interface InlineDataPart {
+  inlineData: {
+    mimeType: string;
+    data: string; // base64 encoded
+  };
+}
+
 export interface VehicleInfo {
   manufacturer: string;
   model: string;
@@ -17,6 +24,8 @@ export interface ResearchData {
   top_causes: string[];
   differentiating_factors: string[];
   reasoning: string;
+  severity: "low" | "medium" | "high" | "critical";
+  keywords: string[];
 }
 
 export interface DiagnosisData {
@@ -26,6 +35,20 @@ export interface DiagnosisData {
   disclaimer: string;
   safety_notice?: string | null;
   recommendations?: string[] | null;
+}
+
+/**
+ * Structured diagnosis result with probabilities and optional guidance
+ * (used for ranked final diagnoses).
+ */
+export interface DiagnosisResult {
+  issue: string;
+  probability: number; // keep existing scale (0–1 or 0–100 depending on usage)
+  explanation?: string;
+
+  // Only expected to be populated for the top (most probable) diagnosis
+  self_checks?: string[]; // simple actions user can safely perform
+  do_not?: string[]; // safety warnings / when NOT to continue
 }
 
 export interface AIQuestionResponse {
@@ -38,21 +61,43 @@ export interface AIQuestionResponse {
 
 export interface ChatMessage {
   id: string;
-  sender: "ai" | "user";
+  sender: "ai" | "user" | "system";
   text: string;
-  timestamp: number;
+  type?: AIQuestionType | string;
+  meta?: any;
+  images?: string[];
+  timestamp?: number;
+  isInstruction?: boolean;
 }
 
+export type AIQuestionType =
+  | "question"
+  | "scenario_step"
+  | "scenario_start"
+  | "safety_alert"
+  | "safety_instruction"
+  | "instruction"
+  | "mechanic_report"
+  | "diagnosis_report"
+  | "ai_response"
+  | "option_map"
+  | "yesno"
+  | "multi"
+  | "text";
+
 export interface AIQuestion {
-  type: "yesno" | "multi";
-  text: string;
+  type: AIQuestionType;
+  text?: string;
+  question?: string;
   options?: string[];
+  shouldStop?: boolean;
+  [k: string]: any;
 }
 
 /**
  * State machine states
  */
-export type AIStateStatus = 
+export type AIStateStatus =
   | "IDLE"
   | "ASKING"
   | "WAITING_FOR_ANSWER"
@@ -82,5 +127,7 @@ export type AIAction =
   | { type: "PROCESSING" }
   | { type: "FINISH"; payload: DiagnosisData }
   | { type: "ERROR"; payload: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "ADD_MESSAGE"; payload: Partial<ChatMessage> & { sender: "ai" | "user" } }
+  | { type: "REMOVE_LAST_ANSWER" }; // Remove last answer (e.g., when user says "not sure" and we re-ask)
 

@@ -1,6 +1,6 @@
 /**
  * Retry logic with exponential backoff
- * Used for Gemini API calls and other async operations
+ * Used for OpenAI API calls and other async operations
  */
 
 export interface RetryOptions {
@@ -15,6 +15,15 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   retryableStatuses: [429, 500, 503],
 };
 
+export class TimeoutError extends Error {
+  timeoutMs: number;
+  constructor(timeoutMs: number) {
+    super(`Operation timed out after ${timeoutMs}ms`);
+    this.name = "TimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 /**
  * Sleep utility
  */
@@ -26,19 +35,27 @@ function sleep(ms: number): Promise<void> {
  * Check if error is retryable
  */
 function isRetryableError(error: any, retryableStatuses: number[]): boolean {
+  // TimeoutError is always retryable
+  if (error?.name === "TimeoutError") return true;
+
+  // Timeout errors - these are retryable
+  if (error?.message?.includes("timed out") || error?.message?.includes("timeout") || error?.message?.includes("Operation timed out")) {
+    return true;
+  }
+
   // Network errors
-  if (error?.message?.includes("network") || error?.message?.includes("fetch")) {
+  if (error?.message?.includes("network") || error?.message?.includes("fetch") || error?.message?.includes("ECONNRESET") || error?.message?.includes("ETIMEDOUT")) {
     return true;
   }
 
   // HTTP status codes
-  const status = error?.status || error?.response?.status || error?.code;
+  const status = error?.status || error?.response?.status || error?.cause?.status || error?.code;
   if (status && retryableStatuses.includes(status)) {
     return true;
   }
 
-  // Google AI SDK specific errors
-  if (error?.message?.includes("429") || error?.message?.includes("500") || error?.message?.includes("503")) {
+  // HTTP status codes in error messages
+  if (error?.message?.includes("429") || error?.message?.includes("500") || error?.message?.includes("503") || error?.message?.includes("502") || error?.message?.includes("504")) {
     return true;
   }
 
@@ -76,11 +93,12 @@ export async function withRetry<T>(
         throw error; // Non-retryable error, throw immediately
       }
 
-      // Wait with exponential backoff
+      // Wait with exponential backoff (+ small jitter)
       const backoff = opts.backoffMs[attempt] || opts.backoffMs[opts.backoffMs.length - 1];
-      await sleep(backoff);
+      const jitter = Math.floor(Math.random() * 125); // 0-124ms
+      await sleep(backoff + jitter);
 
-      console.log(`Retry attempt ${attempt + 1}/${opts.maxRetries} after ${backoff}ms`);
+      console.warn(`Retry attempt ${attempt + 1}/${opts.maxRetries} after ${backoff + jitter}ms`);
     }
   }
 
@@ -93,15 +111,22 @@ export async function withRetry<T>(
  */
 export async function withTimeout<T>(
   promise: Promise<T>,
-  timeoutMs: number = 12000
+  timeoutMs: number = 30000
 ): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Operation timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-    }),
-  ]);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new TimeoutError(timeoutMs));
+    }, timeoutMs);
+
+    promise
+      .then((val) => {
+        clearTimeout(timer);
+        resolve(val);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
 }
 

@@ -1,302 +1,173 @@
-import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/ai/questions/route.ts
+import { NextResponse } from 'next/server';
+import { analyzeUserContext, analyzeSafetyOnly } from '@/lib/ai/context-analyzer';
+import {
+  handleKBFlow,
+  handleScenarioStep,
+  callExpertAI,
+  handleWarningLightDetection,
+  handleScenarioStart,
+  handleSafetyStop,
+  type RequestContext
+} from '@/lib/ai/flow-handlers';
 
-interface VehicleInfo {
-  manufacturer: string;
-  model: string;
-  year?: number | null;
-}
+type IncomingBody = {
+  message?: string;
+  description?: string;
+  answers?: any[];
+  image_urls?: string[];
+  context?: any;
+};
 
-interface UserAnswer {
-  question: string;
-  answer: string;
-}
+type DecisionTrace = Array<[string, string]>;
 
-interface ResearchData {
-  top_causes?: string[];
-  differentiating_factors?: string[];
-  reasoning?: string;
-}
-
-interface RequestBody {
-  research: ResearchData;
-  description: string;
-  vehicle: VehicleInfo;
-  answers: UserAnswer[];
-}
-
-interface QuestionResponse {
-  should_finish: false;
-  next_question: string;
-  options?: string[];
-}
-
-interface DiagnosisResponse {
-  should_finish: true;
-  final_diagnosis: {
-    diagnosis: string[];
-    self_checks: string[];
-    warnings: string[];
-    disclaimer: string;
-  };
-  recommendations?: string[];
-  safety_notice?: string;
-}
-
-type AIResponse = QuestionResponse | DiagnosisResponse;
-
-function extractJSON(text: string): any | null {
-  if (!text || typeof text !== "string") return null;
-
-  let cleaned = text.trim().replace(/^```(?:json)?/gm, "").replace(/```$/gm, "").trim();
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch {
-        return null;
-      }
-    }
+// Sanitize context: clear conflicting flow fields, remove unidentified_light sentinel
+function sanitizeIncomingContext(ctx: any): any {
+  const c = { ...(ctx ?? {}) };
+  if (c.activeFlow === 'KB') {
+    delete c.currentScenarioId; delete c.currentStepId; delete c.suspects; delete c.reportData;
   }
-
-  return null;
-}
-
-function buildPrompt(
-  vehicle: VehicleInfo,
-  description: string,
-  research: ResearchData,
-  answers: UserAnswer[]
-): string {
-  const yearStr = vehicle.year ? ` (${vehicle.year})` : "";
-  const vehicleContext = `${vehicle.manufacturer} ${vehicle.model}${yearStr}`;
-
-  const answersContext =
-    answers.length > 0
-      ? answers
-          .map((a, i) => `Q${i + 1}: ${a.question}\nA${i + 1}: ${a.answer}`)
-          .join("\n\n")
-      : "No previous answers.";
-
-  const researchContext = research.top_causes?.length
-    ? `Top potential causes: ${research.top_causes.join(", ")}`
-    : "No specific causes identified yet.";
-
-  const differentiatingFactors = research.differentiating_factors?.length
-    ? `Differentiating factors: ${research.differentiating_factors.join(", ")}`
-    : "";
-
-  const shouldFinish = answers.length >= 5;
-
-  return `You are a vehicle diagnostic expert.
-
-Vehicle: ${vehicleContext}
-
-Problem description:
-"${description}"
-
-Research insights:
-${researchContext}
-${differentiatingFactors ? `\n${differentiatingFactors}` : ""}
-
-Previous Q&A (${answers.length} questions answered):
-${answersContext}
-
-${shouldFinish ? "IMPORTANT: You have reached 5 questions. You MUST provide a final diagnosis now." : ""}
-
-Your task:
-${shouldFinish
-    ? `Provide a final diagnosis with:
-- diagnosis: array of possible diagnoses (most likely first)
-- self_checks: array of things the user can check themselves
-- warnings: array of safety warnings if any
-- disclaimer: standard disclaimer text
-
-Return JSON:
-{
-  "final_diagnosis": {
-    "diagnosis": ["..."],
-    "self_checks": ["..."],
-    "warnings": ["..."],
-    "disclaimer": "..."
+  if (c.activeFlow === 'SCENARIO') {
+    delete c.detectedLightType; delete c.currentLightScenario; delete c.currentQuestionId;
+    delete c.causeScores; delete c.askedQuestionIds; delete c.shownInstructionIds; delete c.pendingResolutionPaths;
   }
-}`
-    : `Ask ONE more diagnostic question to narrow down the issue:
-- Question must be SHORT and CLEAR
-- Question can be yes/no (options: ["כן", "לא"]) OR multi-choice with 3-5 options
-- For multi-choice, provide specific options that help differentiate between causes
-- Question should help differentiate between potential causes
-
-Return JSON:
-{
-  "next_question": "Question text",
-  "options": ["כן", "לא"] OR ["option1", "option2", "option3", ...]
-}`}`;
+  if (c.detectedLightType === 'unidentified_light') {
+    delete c.detectedLightType;
+    c.pendingLightClarification = true;
+  }
+  return c;
 }
 
-function createFallbackQuestion(): QuestionResponse {
-  return {
-    should_finish: false,
-    next_question: "האם הבעיה מתרחשת רק בזמן נסיעה?",
-    options: ["כן", "לא"],
-  };
-}
-
-function createFallbackDiagnosis(): DiagnosisResponse {
-  return {
-    should_finish: true,
-    final_diagnosis: {
-      diagnosis: ["לא ניתן לקבוע אבחון מדויק. מומלץ לבצע בדיקה מקצועית במוסך."],
-      self_checks: ["בדוק אם הבעיה מתרחשת רק בתנאים ספציפיים"],
-      warnings: ["אם יש רעש חריג, עצור נסיעה מיידית"],
-      disclaimer: "מידע זה הוא הערכה ראשונית בלבד ואינו מהווה תחליף לבדיקה מקצועית במוסך.",
-    },
-    recommendations: ["קבע תור לבדיקה במוסך מוסמך"],
-    safety_notice: null,
-  };
+// Safe merge: don't overwrite with null/undefined, union arrays
+function safeMergeContext(base: any, patch: any): any {
+  const out = { ...(base ?? {}) };
+  for (const [k, v] of Object.entries(patch ?? {})) {
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v) && Array.isArray(out[k])) out[k] = Array.from(new Set([...out[k], ...v]));
+    else out[k] = v;
+  }
+  return out;
 }
 
 export async function POST(req: Request) {
-  let answers: UserAnswer[] = [];
+  const decisionTrace: DecisionTrace = [];
+
   try {
-    const body = await req.json();
-    const { research, description, vehicle, answers: bodyAnswers = [] } = body;
-    answers = Array.isArray(bodyAnswers) ? bodyAnswers : [];
+    const body = (await req.json()) as IncomingBody;
+    const debug = req.url.includes('debug=1') || body?.context?.debug === true;
 
-    // Always return 200 with valid JSON - never break the frontend flow
-    if (!description || typeof description !== "string" || !description.trim()) {
-      console.warn("[Questions API] Invalid description, using fallback");
-      const shouldFinish = answers.length >= 5;
-      return NextResponse.json(
-        shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion(),
-        { status: 200 }
-      );
+    const userText = (body.message ?? body.description ?? '').trim();
+    const answers = body.answers ?? [];
+    const image_urls = body.image_urls ?? [];
+    const hasImage = image_urls.length > 0;
+
+    // Validation
+    if (!userText && (answers.length === 0) && !hasImage) {
+      decisionTrace.push(['VALIDATION', 'Empty input']);
+      return NextResponse.json({
+        type: 'error',
+        text: 'לא קיבלתי הודעה. אנא תאר/י את הבעיה ברכב.',
+        options: ['נסה שוב'],
+        context: debug ? { decisionTrace } : {}
+      }, { status: 400 });
     }
 
-    if (!vehicle || !vehicle.manufacturer || !vehicle.model) {
-      console.warn("[Questions API] Invalid vehicle data, using fallback");
-      const shouldFinish = answers.length >= 5;
-      return NextResponse.json(
-        shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion(),
-        { status: 200 }
-      );
+    const context = sanitizeIncomingContext(body.context);
+
+    console.log(`[Router] 📥 "${userText.slice(0, 60)}" | flow=${context.activeFlow ?? 'none'} | light=${context.detectedLightType ?? 'none'} | scenario=${context.currentScenarioId ?? 'none'} | image=${hasImage}`);
+
+    decisionTrace.push(['INIT', `flow=${context.activeFlow ?? 'none'}`]);
+
+    // Step 1: Safety check
+    const safetyRule = analyzeSafetyOnly(userText);
+    if (safetyRule) {
+      decisionTrace.push(['SAFETY_STOP', safetyRule.id]);
+      return handleSafetyStop(safetyRule);
     }
+    decisionTrace.push(['SAFETY', 'Passed']);
 
-    if (!research || typeof research !== "object") {
-      console.warn("[Questions API] Invalid research data, using fallback");
-      const shouldFinish = answers.length >= 5;
-      return NextResponse.json(
-        shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion(),
-        { status: 200 }
-      );
-    }
+    // Step 2: Continue existing KB flow
+    if (context.activeFlow === 'KB' && context.detectedLightType) {
+      decisionTrace.push(['CONTINUE_KB', context.detectedLightType]);
+      const mergedContext = safeMergeContext(context, { activeFlow: 'KB' }) as any;
+      if (debug) { mergedContext.debug = true; mergedContext.decisionTrace = decisionTrace; }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("[Questions API] Missing GEMINI_API_KEY, using fallback");
-      const shouldFinish = answers.length >= 5;
-      return NextResponse.json(
-        shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion(),
-        { status: 200 }
-      );
-    }
-
-    const shouldFinish = answers.length >= 5;
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const prompt = buildPrompt(vehicle, description, research, answers);
-    
-    console.log("[Questions API] Calling Gemini with:", {
-      vehicle: `${vehicle.manufacturer} ${vehicle.model}`,
-      descriptionLength: description.length,
-      answersCount: answers.length,
-      researchHasData: !!(research.top_causes?.length || research.differentiating_factors?.length)
-    });
-    
-    let raw: string;
-    try {
-      const result = await model.generateContent(prompt);
-      raw = result.response.text();
-      
-      console.log("[Questions API] Raw response length:", raw?.length || 0);
-      console.log("[Questions API] Raw response preview:", raw?.substring(0, 200) || "No response");
-    } catch (geminiError: any) {
-      console.error("[Questions API] Gemini API call failed:", geminiError);
-      console.error("[Questions API] Gemini error message:", geminiError?.message);
-      // Use fallback on Gemini API failure
-      const fallback = shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion();
-      return NextResponse.json(fallback, { status: 200 });
-    }
-    
-    const extracted = extractJSON(raw);
-    
-    console.log("[Questions API] Extracted JSON:", extracted ? "Success" : "Failed");
-
-    if (!extracted || typeof extracted !== "object") {
-      console.warn("[Questions API] JSON extraction failed, using fallback");
-      const fallback = shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion();
-      return NextResponse.json(fallback, { status: 200 });
-    }
-
-    if (shouldFinish) {
-      const diagnosis: DiagnosisResponse = {
-        should_finish: true,
-        final_diagnosis: {
-          diagnosis: Array.isArray(extracted?.final_diagnosis?.diagnosis)
-            ? extracted.final_diagnosis.diagnosis.filter((d: any) => typeof d === "string").slice(0, 10)
-            : ["לא ניתן לקבוע אבחון מדויק. מומלץ לבצע בדיקה מקצועית במוסך."],
-          self_checks: Array.isArray(extracted?.final_diagnosis?.self_checks)
-            ? extracted.final_diagnosis.self_checks.filter((s: any) => typeof s === "string").slice(0, 10)
-            : [],
-          warnings: Array.isArray(extracted?.final_diagnosis?.warnings)
-            ? extracted.final_diagnosis.warnings.filter((w: any) => typeof w === "string").slice(0, 10)
-            : [],
-          disclaimer:
-            typeof extracted?.final_diagnosis?.disclaimer === "string"
-              ? extracted.final_diagnosis.disclaimer
-              : "מידע זה הוא הערכה ראשונית בלבד ואינו מהווה תחליף לבדיקה מקצועית במוסך.",
-        },
-        recommendations: Array.isArray(extracted?.recommendations)
-          ? extracted.recommendations.filter((r: any) => typeof r === "string").slice(0, 10)
-          : ["קבע תור לבדיקה במוסך מוסמך"],
-        safety_notice: typeof extracted?.safety_notice === "string" ? extracted.safety_notice : undefined,
+      const reqContext: RequestContext = {
+        body: { ...body, message: userText }, userText, answers, context: mergedContext, hasImage
       };
-      return NextResponse.json(diagnosis);
+      const kbResult = await handleKBFlow(reqContext);
+      if (kbResult.handled) return kbResult.response;
+
+      // KB returned not handled (edge case fallback) - route to Expert AI
+      decisionTrace.push(['KB_FALLBACK', `${context.detectedLightType} - fallback to AI`]);
+      const aiContext = safeMergeContext(mergedContext, { activeFlow: 'AI' }) as any;
+      if (debug) aiContext.decisionTrace = decisionTrace;
+      return await callExpertAI({ ...body, message: userText, context: aiContext });
     }
 
-    const question: QuestionResponse = {
-      should_finish: false,
-      next_question:
-        typeof extracted?.next_question === "string" && extracted.next_question.trim()
-          ? extracted.next_question
-          : "האם יש תסמינים נוספים?",
-      options: Array.isArray(extracted?.options) && extracted.options.length > 0
-        ? extracted.options.filter((o: any) => typeof o === "string").slice(0, 5)
-        : ["כן", "לא"],
-    };
+    // Step 2b: Continue existing SCENARIO flow
+    if (context.activeFlow === 'SCENARIO' && context.currentScenarioId) {
+      decisionTrace.push(['CONTINUE_SCENARIO', context.currentScenarioId]);
+      const mergedContext = safeMergeContext(context, { activeFlow: 'SCENARIO' }) as any;
+      if (debug) { mergedContext.debug = true; mergedContext.decisionTrace = decisionTrace; }
 
-    return NextResponse.json(question);
-  } catch (error: any) {
-    console.error("[Questions API] Error:", error);
-    console.error("[Questions API] Error message:", error?.message);
-    console.error("[Questions API] Error stack:", error?.stack);
-    // Always return 200 with valid JSON - never break the frontend flow
-    const shouldFinish = answers.length >= 5;
-    return NextResponse.json(
-      shouldFinish ? createFallbackDiagnosis() : createFallbackQuestion(),
-      { status: 200 }
-    );
+      const reqContext: RequestContext = {
+        body: { ...body, message: userText }, userText, answers, context: mergedContext, hasImage
+      };
+      const scenarioResult = await handleScenarioStep(reqContext);
+      if (scenarioResult.handled) return scenarioResult.response;
+      decisionTrace.push(['CONTINUE_SCENARIO', 'Not handled']);
+    }
+
+    // Step 3: Image analysis
+    if (hasImage) {
+      decisionTrace.push(['IMAGE', 'Processing with AI']);
+      const aiContext = safeMergeContext(context, { isSymptomFlow: true, activeFlow: 'AI' }) as any;
+      if (debug) aiContext.decisionTrace = decisionTrace;
+      return await callExpertAI({ ...body, message: userText, context: aiContext });
+    }
+
+    // Step 4: Fresh analysis
+    const analysis = analyzeUserContext(userText);
+    decisionTrace.push(['ANALYZE', analysis.type]);
+
+    if (analysis.type === 'SAFETY_STOP') {
+      decisionTrace.push(['SAFETY_STOP', analysis.rule.id]);
+      return handleSafetyStop(analysis.rule);
+    }
+
+    if (analysis.type === 'WARNING_LIGHT') {
+      decisionTrace.push(['START_KB', `${analysis.lightId} (${analysis.severity})`]);
+      const kbStart = handleWarningLightDetection(analysis.lightId, analysis.severity, context);
+      if (kbStart) return kbStart;
+
+      decisionTrace.push(['START_KB', 'No KB entry, falling to AI']);
+      const aiContext = safeMergeContext(context, { isLightContext: true, pendingLightClarification: true, activeFlow: 'AI' }) as any;
+      if (debug) aiContext.decisionTrace = decisionTrace;
+      return await callExpertAI({ ...body, message: userText, context: aiContext });
+    }
+
+    if (analysis.type === 'START_SCENARIO') {
+      decisionTrace.push(['START_SCENARIO', analysis.scenarioId]);
+      const scenarioStart = handleScenarioStart(analysis.scenarioId);
+      if (scenarioStart) return scenarioStart;
+      decisionTrace.push(['START_SCENARIO', 'No definition, falling to AI']);
+    }
+
+    // Step 5: AI fallback
+    decisionTrace.push(['AI_FALLBACK', 'No match']);
+    const aiContext = safeMergeContext(context, { isSymptomFlow: true, activeFlow: 'AI' }) as any;
+    if (debug) aiContext.decisionTrace = decisionTrace;
+    return await callExpertAI({ ...body, message: userText, context: aiContext });
+
+  } catch (error) {
+    console.error('[Router] Error:', error);
+    decisionTrace.push(['ERROR', error instanceof Error ? error.message : 'Unknown']);
+    return NextResponse.json({
+      type: 'question',
+      text: 'נתקלתי בשגיאה. תוכל לתאר שוב את הבעיה?',
+      options: ['אנסה שוב', 'אעדיף לגשת למוסך'],
+      context: { lastError: 'ROUTE_ERROR', decisionTrace }
+    });
   }
 }
-

@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 2,
+  "symptoms": [
+    {
+      "category": "visuals",
+      "description": "ממצאים ויזואליים",
+      "mappings": [
+        {
+          "keywords": [
+            "גלגל שטוח",
+            "צמיג ריק",
+            "פנצר",
+            "פנצ'ר",
+            "גלגל תקוע"
+          ],
+          "targetId": "flat_tire",
+          "type": "scenario"
+        }
+      ]
+    },
+    {
+      "category": "starting_issues",
+      "description": "בעיות התנעה",
+      "mappings": [
+        {
+          "keywords": [
+            "לא מניע",
+            "לא מתניע",
+            "הרכב לא נדלק",
+            "משתעל",
+            "מנסה להניע ולא מצליח",
+            "סטרטר לא עובד",
+            "אין סטרטר",
+            "שקט בהתנעה",
+            "רק קליק",
+            "קליק אחד",
+            "תקתוקים בהתנעה"
+          ],
+          "targetId": "car_wont_start",
+          "type": "scenario"
+        }
+      ]
+    },
+    {
+      "category": "temperature",
+      "description": "בעיות טמפרטורה",
+      "mappings": [
+        {
+          "keywords": [
+            "המנוע מתחמם",
+            "רכב מתחמם",
+            "מד חום גבוה",
+            "מחוג חום באדום",
+            "התחממות יתר"
+          ],
+          "targetId": "overheating",
+          "type": "scenario"
+        }
+      ]
+    },
+    {
+      "category": "warning_lights",
+      "description": "דיווח מפורש על נורות אזהרה בלוח השעונים",
+      "mappings": [
+        {
+          "keywords": [
+            "נורת מנוע",
+            "נורית מנוע",
+            "סמל מנוע",
+            "מנוע כתום",
+            "מנוע צהוב",
+            "צ׳ק אנג׳ין",
+            "צק אנגין",
+            "Check Engine",
+            "MIL",
+            "מנוע מהבהב",
+            "נורת מנוע מהבהבת"
+          ],
+          "targetId": "check_engine_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת לחץ אוויר",
+            "נורית לחץ אוויר",
+            "TPMS",
+            "נורית TPMS",
+            "מילאתי אוויר והנורה לא כבתה",
+            "מילאתי אוויר אבל הנורה דולקת",
+            "מילאתי אוויר והנורה עדיין דולקת"
+          ],
+          "targetId": "tpms_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת שמן",
+            "נורת שמן אדומה",
+            "נורית שמן",
+            "מנורת שמן",
+            "מנורת אלדין",
+            "נורת אלדין"
+          ],
+          "targetId": "oil_pressure_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת דלק",
+            "סמל משאבת דלק",
+            "אייקון משאבת דלק",
+            "Fuel",
+            "Low Fuel"
+          ],
+          "targetId": "fuel_level_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת ABS",
+            "נורית ABS",
+            "ABS",
+            "סמל ABS",
+            "Anti-lock",
+            "Anti lock"
+          ],
+          "targetId": "abs_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת כרית אוויר",
+            "AIRBAG",
+            "SRS",
+            "נורית SRS",
+            "סמל כרית אוויר"
+          ],
+          "targetId": "airbag_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת הגה",
+            "נורת הגה כוח",
+            "Power Steering",
+            "EPS",
+            "נורית EPS"
+          ],
+          "targetId": "power_steering_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נורת גיר",
+            "AT OIL TEMP",
+            "Transmission Temp",
+            "Transmission Overheat"
+          ],
+          "targetId": "transmission_temperature_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "ESP",
+            "ESC",
+            "ESP OFF",
+            "TC OFF",
+            "Traction",
+            "Stability Control"
+          ],
+          "targetId": "esp_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "אימובילייזר",
+            "נורת מפתח",
+            "סמל מפתח",
+            "Immobilizer",
+            "Security Light",
+            "Key Not Detected"
+          ],
+          "targetId": "immobilizer_light",
+          "type": "light"
+        },
+        {
+          "keywords": [
+            "נוזל שמשות",
+            "נוזל שפריצר",
+            "נורת שפריצר",
+            "washer fluid",
+            "Low Washer Fluid"
+          ],
+          "targetId": "washer_fluid_light",
+          "type": "light"
+        }
+      ]
+    }
+  ]
+}
