@@ -95,7 +95,10 @@ export function analyzeSafetyOnly(text: string): SafetyRule | null {
 
   for (const rule of SAFETY_RULES) {
     for (const kw of rule.keywords) {
-      if (containsNonNegated(tokens, kw)) return rule;
+      if (containsNonNegated(tokens, kw)) {
+        console.log(`[Safety] 🚨 Rule triggered: ${rule.id} by keyword: "${kw}" | Level: ${rule.level}`);
+        return rule;
+      }
     }
   }
   return null;

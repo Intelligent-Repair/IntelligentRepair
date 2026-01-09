@@ -20,6 +20,7 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -28,7 +29,10 @@ export default function RegisterPage() {
   const [garageName, setGarageName] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [garagePhone, setGaragePhone] = useState("");
-  const [garageAddress, setGarageAddress] = useState("");
+  const [garageCity, setGarageCity] = useState("");
+  const [garageStreet, setGarageStreet] = useState("");
+  const [garageNumber, setGarageNumber] = useState("");
+  const [garageOwnerNationalId, setGarageOwnerNationalId] = useState("");
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
@@ -74,11 +78,15 @@ export default function RegisterPage() {
         payload.first_name = firstName;
         payload.last_name = lastName;
         payload.phone = phone;
+        payload.city = city;
       } else {
         payload.garage_name = garageName;
         payload.license_number = licenseNumber;
         payload.phone = garagePhone;
-        payload.address = garageAddress;
+        payload.city = garageCity;
+        payload.street = garageStreet;
+        payload.number = garageNumber;
+        payload.national_id = garageOwnerNationalId;
       }
 
       const response = await fetch("/api/auth/register", {
@@ -169,24 +177,6 @@ export default function RegisterPage() {
           <>
             <div>
               <label
-                htmlFor="idNumber"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
-                תעודת זהות
-              </label>
-              <input
-                id="idNumber"
-                type="text"
-                value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value)}
-                required
-                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס תעודת זהות"
-              />
-            </div>
-
-            <div>
-              <label
                 htmlFor="firstName"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
@@ -223,6 +213,24 @@ export default function RegisterPage() {
 
             <div>
               <label
+                htmlFor="idNumber"
+                className="block text-sm font-medium text-slate-300 mb-2"
+              >
+                תעודת זהות
+              </label>
+              <input
+                id="idNumber"
+                type="text"
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                required
+                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                placeholder="הכנס תעודת זהות"
+              />
+            </div>
+
+            <div>
+              <label
                 htmlFor="phone"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
@@ -236,6 +244,24 @@ export default function RegisterPage() {
                 required
                 className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
                 placeholder="הכנס מספר טלפון"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="city"
+                className="block text-sm font-medium text-slate-300 mb-2"
+              >
+                עיר מגורים
+              </label>
+              <input
+                id="city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                required
+                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                placeholder="הכנס עיר מגורים"
               />
             </div>
 
@@ -271,11 +297,10 @@ export default function RegisterPage() {
                 onChange={(e) => handlePasswordChange(e.target.value)}
                 required
                 minLength={6}
-                className={`input-glow w-full rounded-xl bg-white/10 border ${
-                  passwordMismatch
-                    ? "border-red-500/50 animate-shake"
-                    : "border-white/20"
-                } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${passwordMismatch
+                  ? "border-red-500/50 animate-shake"
+                  : "border-white/20"
+                  } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
                 placeholder="הכנס סיסמה (לפחות 6 תווים)"
               />
             </div>
@@ -293,11 +318,10 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                 required
-                className={`input-glow w-full rounded-xl bg-white/10 border ${
-                  passwordMismatch
-                    ? "border-red-500/50 animate-shake"
-                    : "border-white/20"
-                } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${passwordMismatch
+                  ? "border-red-500/50 animate-shake"
+                  : "border-white/20"
+                  } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
                 placeholder="אשר סיסמה"
               />
               {passwordMismatch && (
@@ -365,19 +389,81 @@ export default function RegisterPage() {
 
             <div>
               <label
-                htmlFor="garageAddress"
+                htmlFor="garageOwnerNationalId"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
-                כתובת
+                תעודת זהות בעל המוסך <span className="text-red-400">*</span>
               </label>
               <input
-                id="garageAddress"
+                id="garageOwnerNationalId"
                 type="text"
-                value={garageAddress}
-                onChange={(e) => setGarageAddress(e.target.value)}
+                value={garageOwnerNationalId}
+                onChange={(e) => setGarageOwnerNationalId(e.target.value)}
+                required
                 className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס כתובת מוסך (אופציונלי)"
+                placeholder="הכנס תעודת זהות"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-3">
+                כתובת המוסך
+              </label>
+              
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="garageCity"
+                    className="block text-sm font-medium text-slate-300 mb-2"
+                  >
+                    עיר <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="garageCity"
+                    type="text"
+                    value={garageCity}
+                    onChange={(e) => setGarageCity(e.target.value)}
+                    required
+                    className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                    placeholder="הכנס עיר"
+                  />
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label
+                      htmlFor="garageStreet"
+                      className="block text-sm font-medium text-slate-300 mb-2"
+                    >
+                      רחוב
+                    </label>
+                    <input
+                      id="garageStreet"
+                      type="text"
+                      value={garageStreet}
+                      onChange={(e) => setGarageStreet(e.target.value)}
+                      className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                      placeholder="הכנס רחוב (אופציונלי)"
+                    />
+                  </div>
+                  <div className="w-32">
+                    <label
+                      htmlFor="garageNumber"
+                      className="block text-sm font-medium text-slate-300 mb-2"
+                    >
+                      מספר בית
+                    </label>
+                    <input
+                      id="garageNumber"
+                      type="text"
+                      value={garageNumber}
+                      onChange={(e) => setGarageNumber(e.target.value)}
+                      className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
+                      placeholder="מס'"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div>
@@ -412,11 +498,10 @@ export default function RegisterPage() {
                 onChange={(e) => handlePasswordChange(e.target.value)}
                 required
                 minLength={6}
-                className={`input-glow w-full rounded-xl bg-white/10 border ${
-                  passwordMismatch
-                    ? "border-red-500/50 animate-shake"
-                    : "border-white/20"
-                } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${passwordMismatch
+                  ? "border-red-500/50 animate-shake"
+                  : "border-white/20"
+                  } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
                 placeholder="הכנס סיסמה (לפחות 6 תווים)"
               />
             </div>
@@ -434,11 +519,10 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => handleConfirmPasswordChange(e.target.value)}
                 required
-                className={`input-glow w-full rounded-xl bg-white/10 border ${
-                  passwordMismatch
-                    ? "border-red-500/50 animate-shake"
-                    : "border-white/20"
-                } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${passwordMismatch
+                  ? "border-red-500/50 animate-shake"
+                  : "border-white/20"
+                  } text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
                 placeholder="אשר סיסמה"
               />
               {passwordMismatch && (

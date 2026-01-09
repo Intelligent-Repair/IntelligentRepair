@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { generateMechanicSummary, type ConversationEvent, type MechanicSummary } from "@/lib/ai/mechanic-summary";
+import { generateMechanicSummaryFromUnified, type MechanicSummary } from "@/lib/ai/unified-diagnosis-v2";
 
 type GarageRequestBody = {
     garage_id: string;
     request_id: string;
 };
 
+// Internal type for conversation events (compatible with unified-diagnosis-v2)
+type LocalConversationEvent = {
+    kind: "user" | "assistant";
+    type?: string;
+    text: string;
+    selectedOption?: string;
+    ts?: string;
+};
+
 // Build conversation events from stored request data
-function buildConversationEventsFromRequest(req: any): ConversationEvent[] {
-    const events: ConversationEvent[] = [];
+function buildConversationEventsFromRequest(req: any): LocalConversationEvent[] {
+    const events: LocalConversationEvent[] = [];
 
     // description as opening user message
     if (req?.description) {
@@ -152,11 +161,17 @@ export async function POST(req: Request) {
         // Build or use existing mechanic_summary
         let mechanicSummary: MechanicSummary | Record<string, any> | null = reqRow.ai_mechanic_summary ?? null;
 
-        if (!mechanicSummary) {
-            // Generate new summary
-            const conversationEvents = buildConversationEventsFromRequest(reqRow);
+        console.log('[garage-requests] ai_mechanic_summary from DB:', mechanicSummary ? 'EXISTS' : 'NULL');
 
-            mechanicSummary = await generateMechanicSummary({
+        if (!mechanicSummary) {
+            console.log('[garage-requests] Generating fallback mechanic summary via AI');
+            // Generate new summary using unified AI diagnosis
+            const conversationEvents = buildConversationEventsFromRequest(reqRow);
+            console.log('[garage-requests] conversationEvents count:', conversationEvents.length);
+            console.log('[garage-requests] conversationEvents sample:', JSON.stringify(conversationEvents.slice(0, 3)));
+
+
+            mechanicSummary = await generateMechanicSummaryFromUnified({
                 conversationEvents,
                 finalReport: {
                     ai_diagnosis: reqRow.ai_diagnosis,

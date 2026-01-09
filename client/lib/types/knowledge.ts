@@ -107,6 +107,10 @@ export interface DiagnosticState {
   // 🔧 NEW: Bridge flow tracking
   bridgeQuestionCount?: number;
   lightPickerShown?: boolean;
+
+  // 🔧 NEW: Q&A history for mechanic summary
+  answeredQuestions?: Array<{ question: string; answer: string }>;
+  lastUserAnswer?: string;
 }
 
 // --- עדכון 3: שדות שליטה בחוקי בטיחות ---

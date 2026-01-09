@@ -21,7 +21,7 @@ import {
     matchOption
 } from '@/lib/ai/diagnostic-utils';
 import { generateAIDiagnosis, HYBRID_LIGHTS } from '@/lib/ai/hybrid-diagnosis';
-import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis';
+import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis-v2';
 import type { KBNextStep, KBInstruction } from '@/lib/ai/diagnostic-utils';
 
 export interface FlowResult {
@@ -102,7 +102,7 @@ function getResolvedIssueDescription(lightType: string, context: any): string {
         'coolant_temperature_light': 'התחממות זמנית',
         'check_engine_light': 'מכסה דלק לא היה סגור',
         'oil_pressure_light': 'מפלס שמן נמוך'
-    };
+    }
     return names[lightType] || 'הבעיה נפתרה';
 }
 
@@ -119,6 +119,68 @@ function applyScenarioBoost(lightType: string, scenarioId: string, scores: Recor
         newScores[causeId] = (newScores[causeId] || 0) + boost;
     }
     return newScores;
+}
+
+// Build conversation narrative from context for mechanic summary
+function buildConversationNarrative(lightType: string, context: any, diagnosisText: string): string {
+    const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
+    const parts: string[] = [];
+
+    // Start with what was reported
+    parts.push(`הלקוח דיווח על ${lightName}.`);
+
+    // Add scenario info if available
+    if (context.currentLightScenario) {
+        const scenarioLabels: Record<string, string> = {
+            'wont_start': 'הרכב לא מניע',
+            'steady': 'הנורה דולקת קבוע',
+            'flashing': 'הנורה מהבהבת',
+            'intermittent': 'הנורה דולקת לסירוגין',
+            'after_refuel': 'לאחר תדלוק',
+            'during_drive': 'במהלך נסיעה',
+            'from_parking': 'מחניה'
+        };
+        const scenario = scenarioLabels[context.currentLightScenario];
+        if (scenario) parts.push(`מצב שדווח: ${scenario}.`);
+    }
+
+    // Add shown instructions (what checks were performed)
+    if (context.shownInstructionIds?.length > 0) {
+        const instructionNames: Record<string, string> = {
+            'check_terminals': 'בדיקת קטבי מצבר',
+            'jump_start': 'התנעה עם כבלים',
+            'check_gas_cap': 'בדיקת מכסה דלק',
+            'check_oil_level': 'בדיקת מפלס שמן',
+            'check_coolant': 'בדיקת נוזל קירור',
+            'check_tire_pressure': 'בדיקת לחץ אוויר'
+        };
+        const checks = context.shownInstructionIds
+            .map((id: string) => instructionNames[id] || id)
+            .join(', ');
+        parts.push(`בדיקות שבוצעו: ${checks}.`);
+    }
+
+    // Add Q&A history from answeredQuestions if available
+    if (context.answeredQuestions?.length > 0) {
+        const qaStrings = context.answeredQuestions
+            .map((qa: any) => `נשאל "${qa.question}" - השיב "${qa.answer}"`)
+            .slice(-3) // Last 3 questions
+            .join('. ');
+        parts.push(qaStrings + '.');
+    } else if (context.askedQuestionIds?.length > 0) {
+        // Fallback to just showing what was asked
+        parts.push(`נשאלו ${context.askedQuestionIds.length} שאלות.`);
+    }
+
+    // Add last question and answer if available
+    if (context.currentQuestionText && context.lastUserAnswer) {
+        parts.push(`שאלה אחרונה: "${context.currentQuestionText}" - תשובה: "${context.lastUserAnswer}".`);
+    }
+
+    // Add diagnosis result
+    parts.push(`אבחון: ${diagnosisText}.`);
+
+    return parts.join(' ');
 }
 
 interface ResolutionPath {
@@ -183,6 +245,8 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
 
     // RESOLVED
     if (resolution.status === 'resolved' || resolution.status === 'resolved_temp') {
+        const resolvedDescription = resolution.diagnosis || getResolvedIssueDescription(lightType, context);
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -190,10 +254,29 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
                 title: resolution.diagnosis || 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [{ issue: resolution.diagnosis || getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: resolution.recommendation || 'הבעיה נפתרה' }],
+                results: [{ issue: resolvedDescription, probability: 0.8, explanation: resolution.recommendation || 'הבעיה נפתרה' }],
                 status: { color: 'green', text: resolution.status === 'resolved_temp' ? 'נפתר זמנית' : 'הבעיה נפתרה', instruction: resolution.recommendation || 'ניתן להמשיך כרגיל' },
                 recommendations: [resolution.recommendation, resolution.if_returns].filter(Boolean),
                 endConversation: true,
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${context.vehicleInfo.manufacturer || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, resolvedDescription),
+                        diagnoses: [{ issue: resolvedDescription, probability: 0.8 }],
+                        recommendations: [resolution.recommendation, resolution.if_returns].filter(Boolean) as string[],
+                        needsTow: false,
+                        urgency: 'low' as const,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: resolvedDescription,
+                        topIssue: resolvedDescription,
+                        nextAction: resolution.recommendation || 'ניתן להמשיך כרגיל'
+                    }
+                },
                 context: mergedContext
             })
         };
@@ -243,6 +326,9 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
     // NEEDS_MECHANIC / NEEDS_TOW
     if (resolution.status === 'needs_mechanic' || resolution.status === 'needs_mechanic_urgent' || resolution.status === 'needs_tow') {
         const severity = resolution.status === 'needs_tow' ? 'critical' : 'high';
+        const urgency = resolution.status === 'needs_tow' ? 'critical' as const : 'high' as const;
+        const diagnosisText = resolution.diagnosis || 'נדרשת בדיקה במוסך';
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -250,10 +336,30 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
                 title: resolution.diagnosis || 'נדרש טיפול מקצועי',
                 severity,
                 confidence: 0.7,
-                results: [{ issue: resolution.diagnosis || 'נדרשת בדיקה במוסך', probability: 0.7, explanation: resolution.recommendation || '' }],
+                results: [{ issue: diagnosisText, probability: 0.7, explanation: resolution.recommendation || '' }],
                 status: { color: resolution.status === 'needs_tow' ? 'red' : 'orange', text: resolution.status === 'needs_tow' ? 'הזמן גרר' : 'פנה למוסך', instruction: resolution.recommendation || 'יש לפנות למוסך בהקדם' },
                 recommendations: [resolution.recommendation].filter(Boolean),
                 endConversation: true,
+                showTowButton: resolution.status === 'needs_tow',
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${context.vehicleInfo.manufacturer || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, diagnosisText),
+                        diagnoses: [{ issue: diagnosisText, probability: 0.7 }],
+                        recommendations: [resolution.recommendation].filter(Boolean) as string[],
+                        needsTow: resolution.status === 'needs_tow',
+                        urgency,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: diagnosisText,
+                        topIssue: diagnosisText,
+                        nextAction: resolution.recommendation || 'יש לפנות למוסך בהקדם'
+                    }
+                },
                 context: mergedContext
             })
         };
@@ -386,11 +492,12 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 effectiveText = positiveOption;
             } else {
                 // No matching option - generate resolved diagnosis
+                const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
                 return {
                     handled: true,
                     response: NextResponse.json({
                         type: 'diagnosis_report',
-                        title: `נורת ${(warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType}`,
+                        title: `נורת ${lightName}`,
                         confidence: 0.8,
                         confidenceLevel: 'high',
                         results: [{ issue: 'ביצעת את ההוראות בהצלחה', probability: 0.9, explanation: 'הבעיה ככל הנראה נפתרה' }],
@@ -399,6 +506,25 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                         nextSteps: 'עקוב אחר הנורה בנסיעות הבאות',
                         recommendations: ['בדוק שהנורה אכן כבתה', 'אם הנורה חוזרת - פנה למוסך'],
                         endConversation: true,
+                        // Include conversationSummaries for garage dashboard
+                        conversationSummaries: {
+                            mechanic: {
+                                schemaVersion: 2,
+                                vehicleType: (context as any).vehicleInfo ? `${(context as any).vehicleInfo?.manufacturer || (context as any).vehicleInfo?.make || ''} ${(context as any).vehicleInfo?.model || ''} ${(context as any).vehicleInfo?.year || ''}`.trim() : 'לא ידוע',
+                                originalComplaint: `נורת ${lightName}`,
+                                conversationNarrative: buildConversationNarrative(lightType, context, 'הבעיה נפתרה'),
+                                diagnoses: [{ issue: 'הבעיה נפתרה', probability: 0.9 }],
+                                recommendations: ['בדוק שהנורה אכן כבתה', 'אם הנורה חוזרת - פנה למוסך'],
+                                needsTow: false,
+                                urgency: 'low' as const,
+                                category: lightName
+                            },
+                            user: {
+                                shortDescription: 'הבעיה נפתרה בהצלחה',
+                                topIssue: 'הבעיה נפתרה',
+                                nextAction: 'עקוב אחר הנורה בנסיעות הבאות'
+                            }
+                        },
                         context: mergeContext(context, { resolved: true })
                     })
                 };
@@ -463,7 +589,9 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                             askedQuestionIds: [...(context.askedQuestionIds || []), 'first_question'],
                             currentQuestionId: followupQ.id || `followup_${optionId}`,
                             currentQuestionText: followupQ.text,
-                            currentQuestionOptions: followupOptions
+                            currentQuestionOptions: followupOptions,
+                            lastUserAnswer: effectiveText,
+                            answeredQuestions: [...(context.answeredQuestions || []), { question: context.currentQuestionText || 'שאלה ראשונה', answer: effectiveText }]
                         })
                     })
                 };
@@ -545,6 +673,8 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
 
     // Resolved option fallback
     if (isResolvedOption(effectiveText)) {
+        const resolvedDesc = getResolvedIssueDescription(lightType, context);
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -552,10 +682,29 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 title: 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [{ issue: getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: 'המשתמש דיווח שהנורה כבתה' }],
+                results: [{ issue: resolvedDesc, probability: 0.8, explanation: 'המשתמש דיווח שהנורה כבתה' }],
                 status: { color: 'green', text: 'הבעיה נפתרה', instruction: 'ניתן להמשיך כרגיל' },
                 recommendations: ['בדוק שוב מחר בבוקר', 'אם הנורה חוזרת – פנה למוסך'],
                 endConversation: true,
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${(context.vehicleInfo as any).manufacturer || context.vehicleInfo.make || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, resolvedDesc),
+                        diagnoses: [{ issue: resolvedDesc, probability: 0.8 }],
+                        recommendations: ['בדוק שוב מחר בבוקר', 'אם הנורה חוזרת – פנה למוסך'],
+                        needsTow: false,
+                        urgency: 'low' as const,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: resolvedDesc,
+                        topIssue: resolvedDesc,
+                        nextAction: 'ניתן להמשיך כרגיל'
+                    }
+                },
                 context: mergeContext(context, { currentLightScenario: scenarioId, causeScores: updatedScores })
             })
         };
@@ -565,10 +714,67 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const askedIds = [...(context.askedQuestionIds || [])];
     if (!askedIds.includes(lastQuestionId)) askedIds.push(lastQuestionId);
 
-    // Check if should diagnose
+    // Check if should diagnose - now uses AI for ALL diagnoses
     if (shouldDiagnose(updatedScores, askedIds.length, uiSeverity)) {
-        const diagnosis = generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds);
-        return { handled: true, response: NextResponse.json(diagnosis) };
+        console.log('[KBFlow] Ready to diagnose - using AI unified diagnosis');
+
+        // Build conversation history for AI
+        const conversationHistory = answers.map(a => ({
+            role: 'user' as const,
+            content: `${(a as any).question || ''} → ${a.answer}`
+        }));
+
+        // Call unified AI diagnosis
+        const unifiedDiag = await generateUnifiedDiagnosis({
+            lightType,
+            scenarioId,
+            conversationHistory,
+            vehicleInfo: context.vehicleInfo,
+            requestDescription: answers[0]?.answer || '',
+            answers
+        });
+
+        const userDiag = unifiedDiag.userDiagnosis;
+        const mechSummary = unifiedDiag.mechanicSummary;
+
+        return {
+            handled: true,
+            response: NextResponse.json({
+                type: 'diagnosis_report',
+                title: userDiag.title,
+                confidence: userDiag.confidence,
+                confidenceLevel: userDiag.confidenceLevel,
+                results: mechSummary.diagnoses.map(d => ({
+                    issue: d.issue,
+                    probability: d.probability,
+                    explanation: userDiag.explanation
+                })),
+                status: {
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                    text: userDiag.topIssue,
+                    instruction: userDiag.nextAction
+                },
+                selfFix: [],
+                nextSteps: userDiag.nextAction,
+                recommendations: userDiag.recommendations,
+                endConversation: true,
+                showTowButton: userDiag.needsTow,
+                // Include conversationSummaries for frontend to save
+                conversationSummaries: {
+                    mechanic: mechSummary,
+                    user: {
+                        shortDescription: userDiag.explanation,
+                        topIssue: userDiag.topIssue,
+                        nextAction: userDiag.nextAction
+                    }
+                },
+                context: mergeContext(context, {
+                    currentLightScenario: scenarioId,
+                    causeScores: updatedScores,
+                    askedQuestionIds: askedIds
+                })
+            })
+        };
     }
 
     // Get next step
@@ -837,26 +1043,48 @@ export async function callExpertAI(body: any): Promise<any> {
             }));
 
             const unifiedDiag = await generateUnifiedDiagnosis({
-                description: currentInput,
+                requestDescription: currentInput,
                 conversationHistory,
                 vehicleInfo: undefined, // Not available in this context
-                detectedLightType: context?.detectedLightType
+                lightType: context?.detectedLightType
             });
+
+            // Extract user-facing diagnosis from unified result
+            const userDiag = unifiedDiag.userDiagnosis;
+            const mechSummary = unifiedDiag.mechanicSummary;
 
             return NextResponse.json({
                 type: 'diagnosis_report',
-                title: 'אבחון תקלה',
-                confidence: unifiedDiag.confidence,
-                confidenceLevel: unifiedDiag.confidenceLevel,
-                results: unifiedDiag.diagnoses,
-                status: unifiedDiag.status,
+                title: userDiag.title || 'אבחון תקלה',
+                confidence: userDiag.confidence,
+                confidenceLevel: userDiag.confidenceLevel,
+                results: mechSummary.diagnoses.map(d => ({
+                    issue: d.issue,
+                    probability: d.probability,
+                    explanation: userDiag.explanation
+                })),
+                status: {
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                    text: userDiag.topIssue,
+                    instruction: userDiag.nextAction
+                },
                 selfFix: [],
-                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
-                recommendations: unifiedDiag.recommendations,
+                nextSteps: userDiag.nextAction,
+                recommendations: userDiag.recommendations,
                 disclaimer: 'האבחון מבוסס על תיאור הבעיה. מומלץ אישור במוסך.',
                 endConversation: true,
-                showTowButton: unifiedDiag.needsTow,
-                category: unifiedDiag.category,
+                showTowButton: userDiag.needsTow,
+                category: mechSummary.category,
+                // Include conversationSummaries in expected format for frontend
+                conversationSummaries: {
+                    mechanic: mechSummary,
+                    user: {
+                        shortDescription: userDiag.explanation,
+                        topIssue: userDiag.topIssue,
+                        nextAction: userDiag.nextAction
+                    }
+                },
+                mechanicSummary: mechSummary, // Also include directly for backward compatibility
                 context: mergeContext(context, { unifiedDiagnosis: true })
             });
         }
