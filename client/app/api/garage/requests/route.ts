@@ -19,17 +19,32 @@ export async function GET(req: Request) {
             );
         }
 
-        // DEBUG: Log user info
+        // Get user's national_id from users table
+        const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("national_id")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userData?.national_id) {
+            console.error("[garage/requests] User national_id not found:", userError);
+            return NextResponse.json(
+                { error: "User profile incomplete - missing national_id" },
+                { status: 400 }
+            );
+        }
+
         console.log("[garage/requests] User authenticated:", {
             id: user.id,
-            email: user.email
+            email: user.email,
+            national_id: userData.national_id
         });
 
-        // Find the garage owned by this user
+        // Find the garage by owner_national_id
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
-            .eq("owner_user_id", user.id)
+            .eq("owner_national_id", userData.national_id)
             .single();
 
         // DEBUG: Log garage lookup result
@@ -40,7 +55,7 @@ export async function GET(req: Request) {
         });
 
         if (garageError || !garage) {
-            console.error("[garage/requests] Garage not found for user:", user.id);
+            console.error("[garage/requests] Garage not found for national_id:", userData.national_id);
             return NextResponse.json(
                 { error: "No garage found for this user" },
                 { status: 404 }

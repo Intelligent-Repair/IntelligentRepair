@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         }
 
         // Validate status
-        const validStatuses = ['pending', 'viewed', 'quoted', 'accepted', 'rejected', 'in_repair', 'completed'];
+        const validStatuses = ['pending', 'viewed', 'quoted', 'accepted', 'rejected', 'in_repair', 'completed', 'closed_no', 'closed_yes'];
         if (!validStatuses.includes(status)) {
             return NextResponse.json({
                 error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`

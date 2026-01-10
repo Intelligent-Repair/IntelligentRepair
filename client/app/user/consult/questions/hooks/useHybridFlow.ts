@@ -33,6 +33,43 @@ const INITIAL_CONTEXT: DiagnosticState = {
   }
 };
 
+/**
+ * Validates and merges context, preserving critical fields that should never be lost.
+ * This prevents issues where server returns empty/null context losing flow state.
+ */
+function validateAndMergeContext(
+  current: DiagnosticState,
+  serverContext: Partial<DiagnosticState>
+): DiagnosticState {
+  // Critical fields that should be preserved if server doesn't explicitly set them
+  const criticalFields: (keyof DiagnosticState)[] = [
+    'detectedLightType',
+    'lightSeverity',
+    'activeFlow',
+    'currentLightScenario',
+    'askedQuestionIds',
+    'causeScores',
+    'vehicleInfo',
+    'kbSource',
+    'isLightContext'
+  ];
+
+  const merged: DiagnosticState = {
+    ...INITIAL_CONTEXT,
+    ...serverContext
+  };
+
+  // Preserve critical fields if server didn't explicitly set them
+  for (const field of criticalFields) {
+    if (merged[field] === undefined && current[field] !== undefined) {
+      (merged as any)[field] = current[field];
+    }
+  }
+
+  return merged;
+}
+
+
 export function useHybridFlow() {
   const [state, setState] = useState<FlowState>({
     status: "IDLE",
@@ -98,8 +135,11 @@ export function useHybridFlow() {
       const data = await response.json();
 
       // === Server context is the source of truth ===
-      const nextContext: DiagnosticState = (data.context ?? currentContext) as DiagnosticState;
-      contextRef.current = nextContext;
+      // But we must preserve critical fields if server returns null/empty context
+      const serverContext = data.context ?? {};
+      const preservedContext = validateAndMergeContext(currentContext, serverContext);
+      contextRef.current = preservedContext;
+      const nextContext = preservedContext;
 
       // --- A. Safety Alert ---
       if (data.type === "safety_alert") {
@@ -199,12 +239,29 @@ export function useHybridFlow() {
         const options = data.options || [];
         const hasInstructionContent = isInstruction && (data.steps?.length > 0 || data.instruction);
 
+        // Build meta with self-fix info if available
+        const instructionMeta = hasInstructionContent ? {
+          actionType: data.actionType || data.meta?.actionType,
+          actionId: data.actionId || data.meta?.actionId,
+          steps: data.steps || data.meta?.steps,
+          name: data.name || data.instruction,
+          rawText: text,
+          // Self-fix metadata (NEW)
+          difficulty: data.meta?.difficulty,
+          timeEstimate: data.meta?.timeEstimate,
+          toolsNeeded: data.meta?.toolsNeeded,
+          costEstimate: data.meta?.costEstimate,
+          warning: data.meta?.warning,
+          whenToStop: data.meta?.whenToStop,
+          successIndicators: data.meta?.successIndicators
+        } : undefined;
+
         addMessage({
           sender: "ai",
           text: text,
           isInstruction: hasInstructionContent,
           type: isInstruction ? "instruction" : "text",
-          meta: hasInstructionContent ? { actionType: data.actionType, actionId: data.actionId, steps: data.steps, name: data.name, rawText: text } : undefined
+          meta: instructionMeta
         });
 
         if (isInstruction && data.question) {
@@ -216,7 +273,7 @@ export function useHybridFlow() {
           setState(prev => ({
             ...prev,
             status: "WAITING_USER",
-            currentOptions: isInstruction ? ['הצלחתי לבצע', 'לא הצלחתי', 'צריך עזרה נוספת'] : options,
+            currentOptions: isInstruction ? ['ביצעתי את הבדיקה', 'אני לא יכול לבדוק', 'מעדיף מוסך'] : options,
             context: nextContext
           }));
         }
