@@ -90,7 +90,7 @@ export async function GET(req: Request) {
             repairCount: repairs?.length || 0,
             daysSinceLastRepair,
             lastRepairDate: lastRepair?.created_at || null,
-            lastGarage: lastRepair?.garage?.name || null,
+            lastGarage: Array.isArray(lastRepair?.garage) ? lastRepair?.garage[0]?.name : (lastRepair?.garage as any)?.name || null,
             repairs: repairs || [],
             // Friendly message for chatbot
             chatMessage: isRepeatIssue
