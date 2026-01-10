@@ -19,25 +19,38 @@ async function getGarageId(
   mode: string
 ): Promise<string | null> {
   if (mode === "global") return null;
-  
-  const { data: garage, error } = await supabase
+
+  // Try to get garage by owner_user_id first
+  let { data: garage } = await supabase
     .from("garages")
     .select("id")
-    .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
+    .eq("owner_user_id", userId)
     .single();
 
-  if (error || !garage) return null;
+  // If not found, try user_id
+  if (!garage) {
+    ({ data: garage } = await supabase
+      .from("garages")
+      .select("id")
+      .eq("user_id", userId)
+      .single());
+  }
+
+  if (!garage) return null;
   const id = (garage as { id?: unknown }).id;
   return typeof id === "string" ? id : null;
 }
 
 // Helper function to apply date range filter
-function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
+function applyDateRangeFilter<T extends HasGte<T>>(
+  query: T,
+  dateRange: string | null
+): T {
   if (!dateRange || dateRange === "all") return query;
-  
+
   const now = new Date();
   let startDate: Date;
-  
+
   switch (dateRange) {
     case "today":
       startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -54,25 +67,56 @@ function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string |
     default:
       return query;
   }
-  
+
   return query.gte("created_at", startDate.toISOString());
 }
 
 // Helper function to check if description matches issue type
-function matchesIssueType(description: string | null, issueType: string | null): boolean {
+function matchesIssueType(
+  description: string | null,
+  issueType: string | null
+): boolean {
   if (!issueType || issueType === "all" || !description) return true;
-  
+
   const desc = description.toLowerCase();
   const type = issueType.toLowerCase();
-  
-  if (type === "engine") return desc.includes("מנוע") || desc.includes("engine") || desc.includes("חום") || desc.includes("שמן");
-  if (type === "brakes") return desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה");
-  if (type === "electrical") return desc.includes("חשמל") || desc.includes("electrical") || desc.includes("חשמלי");
-  if (type === "ac") return desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור");
-  if (type === "starting") return desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר");
-  if (type === "gearbox") return desc.includes("תיבת") || desc.includes("gearbox") || desc.includes("הילוכים");
-  if (type === "noise") return desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט");
-  
+
+  if (type === "engine")
+    return (
+      desc.includes("מנוע") ||
+      desc.includes("engine") ||
+      desc.includes("חום") ||
+      desc.includes("שמן")
+    );
+  if (type === "brakes")
+    return (
+      desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה")
+    );
+  if (type === "electrical")
+    return (
+      desc.includes("חשמל") ||
+      desc.includes("electrical") ||
+      desc.includes("חשמלי")
+    );
+  if (type === "ac")
+    return (
+      desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור")
+    );
+  if (type === "starting")
+    return (
+      desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר")
+    );
+  if (type === "gearbox")
+    return (
+      desc.includes("תיבת") ||
+      desc.includes("gearbox") ||
+      desc.includes("הילוכים")
+    );
+  if (type === "noise")
+    return (
+      desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט")
+    );
+
   return true;
 }
 
@@ -81,7 +125,8 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "local";
-    const manufacturers = searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
+    const manufacturers =
+      searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
     const models = searchParams.get("models")?.split(",").filter(Boolean) || [];
     const dateRange = searchParams.get("dateRange");
     const issueType = searchParams.get("issueType");
@@ -98,18 +143,35 @@ export async function GET(request: Request) {
 
     const garageId = await getGarageId(supabase, user.id, mode);
 
-    // Build query
-    let query = supabase
-      .from("requests")
-      .select(`
+    // If local mode but no garage, return empty
+    if (mode !== "global" && !garageId) {
+      return NextResponse.json({ top5: [] });
+    }
+
+    // First, get total count of ALL repairs in database (unfiltered)
+    const { count: totalRepairsCount } = await supabase
+      .from("repairs")
+      .select("id", { count: "exact" });
+
+    console.log("=== TOP-ISSUES DEBUG ===");
+    console.log("Total repairs in DB (unfiltered):", totalRepairsCount);
+    console.log("Mode:", mode, "GarageId:", garageId);
+
+    // Build query from repairs with joined request data
+    let query = supabase.from("repairs").select(`
         id,
-        description,
-        ai_mechanic_summary,
         created_at,
-        car:people_cars (
-          vehicle_catalog:vehicle_catalog_id (
-            manufacturer,
-            model
+        garage_id,
+        request:requests (
+          id,
+          description,
+          ai_mechanic_summary,
+          created_at,
+          car:people_cars (
+            vehicle_catalog:vehicle_catalog_id (
+              manufacturer,
+              model
+            )
           )
         )
       `);
@@ -119,45 +181,56 @@ export async function GET(request: Request) {
 
     // Filter by garage_id if in local mode
     if (garageId !== null) {
-      const { data: repairsData } = await supabase
-        .from("repairs")
-        .select("request_id")
-        .eq("garage_id", garageId);
-
-      const requestIds = (repairsData ?? [])
-        .map((r) => (r as { request_id?: unknown }).request_id)
-        .filter((id): id is string => typeof id === "string");
-      if (requestIds.length > 0) {
-        query = query.in("id", requestIds);
-      } else {
-        return NextResponse.json({ top5: [] });
-      }
+      console.log("Filtering by garageId:", garageId);
+      query = query.eq("garage_id", garageId);
+    } else {
+      console.log("Global mode - NOT filtering by garage_id");
     }
 
-    const { data: requestsRaw, error: requestsError } = await query;
+    const { data: repairsRaw, error: repairsError } = await query;
 
-    if (requestsError) {
+    if (repairsError) {
+      console.error("Repairs error:", repairsError);
       return NextResponse.json(
-        { error: "Failed to fetch requests", details: requestsError.message },
+        { error: "Failed to fetch repairs", details: repairsError.message },
         { status: 500 }
       );
     }
-    const requests = (requestsRaw ?? []) as RequestRow[];
+
+    // Process repairs data
+    const repairs = (repairsRaw ?? []) as any[];
+    console.log("Repairs returned after filters:", repairs.length);
+    if (repairs.length > 0) {
+      console.log("First repair garage_id:", repairs[0].garage_id);
+      console.log("First repair request:", repairs[0].request !== null);
+    }
 
     // Count issue descriptions
     const issueCounts = new Map<string, number>();
 
-    requests.forEach((req) => {
+    repairs.forEach((repair) => {
+      const req = repair.request;
+      if (!req) return;
+
       const catalog = req.car?.vehicle_catalog;
 
       // Apply manufacturer filter
-      if (manufacturers.length > 0 && (!catalog?.manufacturer || !manufacturers.includes(catalog.manufacturer))) return;
+      if (
+        manufacturers.length > 0 &&
+        (!catalog?.manufacturer ||
+          !manufacturers.includes(catalog.manufacturer))
+      )
+        return;
 
       // Apply model filter
-      if (models.length > 0 && (!catalog?.model || !models.includes(catalog.model))) return;
+      if (
+        models.length > 0 &&
+        (!catalog?.model || !models.includes(catalog.model))
+      )
+        return;
 
       const description = req.ai_mechanic_summary || req.description || "";
-      
+
       // Apply issue type filter
       if (!matchesIssueType(description, issueType)) return;
 
@@ -170,16 +243,19 @@ export async function GET(request: Request) {
 
     // Convert to array, sort by count descending, take top 5
     const top5 = Array.from(issueCounts.entries())
-      .map(([issue_description, occurrences]) => ({ issue_description, occurrences }))
+      .map(([issue_description, occurrences]) => ({
+        issue_description,
+        occurrences,
+      }))
       .sort((a, b) => b.occurrences - a.occurrences)
       .slice(0, 5);
 
     return NextResponse.json({ top5 });
   } catch (err) {
+    console.error("top-issues error:", err);
     return NextResponse.json(
       { error: "Server error", details: String(err) },
       { status: 500 }
     );
   }
 }
-

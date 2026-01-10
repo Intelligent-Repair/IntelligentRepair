@@ -5,6 +5,7 @@ import { createServerSupabase } from "@/lib/supabaseServer";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    console.log("[api/auth/register] request body:", JSON.stringify(body));
     const {
       email,
       password,
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
       });
 
     if (authError || !authUser.user) {
+      console.error("[api/auth/register] auth error:", authError);
       return NextResponse.json(
         { error: authError?.message ?? "Auth error" },
         { status: 400 }
@@ -57,6 +59,7 @@ export async function POST(req: Request) {
       });
 
     if (userInsertError) {
+      console.error("[api/auth/register] user insert error:", userInsertError);
       await admin.auth.admin.deleteUser(userId);
       return NextResponse.json(
         { error: userInsertError.message },
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
         });
 
       if (garageError) {
+        console.error("[api/auth/register] garage insert error:", garageError);
         await supabase.from("users").delete().eq("id", userId);
         await admin.auth.admin.deleteUser(userId);
 

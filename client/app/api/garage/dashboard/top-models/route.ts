@@ -19,25 +19,38 @@ async function getGarageId(
   mode: string
 ): Promise<string | null> {
   if (mode === "global") return null;
-  
-  const { data: garage, error } = await supabase
+
+  // Try to get garage by owner_user_id first
+  let { data: garage } = await supabase
     .from("garages")
     .select("id")
-    .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
+    .eq("owner_user_id", userId)
     .single();
 
-  if (error || !garage) return null;
+  // If not found, try user_id
+  if (!garage) {
+    ({ data: garage } = await supabase
+      .from("garages")
+      .select("id")
+      .eq("user_id", userId)
+      .single());
+  }
+
+  if (!garage) return null;
   const id = (garage as { id?: unknown }).id;
   return typeof id === "string" ? id : null;
 }
 
 // Helper function to apply date range filter
-function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string | null): T {
+function applyDateRangeFilter<T extends HasGte<T>>(
+  query: T,
+  dateRange: string | null
+): T {
   if (!dateRange || dateRange === "all") return query;
-  
+
   const now = new Date();
   let startDate: Date;
-  
+
   switch (dateRange) {
     case "today":
       startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -54,25 +67,56 @@ function applyDateRangeFilter<T extends HasGte<T>>(query: T, dateRange: string |
     default:
       return query;
   }
-  
+
   return query.gte("created_at", startDate.toISOString());
 }
 
 // Helper function to check if description matches issue type
-function matchesIssueType(description: string | null, issueType: string | null): boolean {
+function matchesIssueType(
+  description: string | null,
+  issueType: string | null
+): boolean {
   if (!issueType || issueType === "all" || !description) return true;
-  
+
   const desc = description.toLowerCase();
   const type = issueType.toLowerCase();
-  
-  if (type === "engine") return desc.includes("מנוע") || desc.includes("engine") || desc.includes("חום") || desc.includes("שמן");
-  if (type === "brakes") return desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה");
-  if (type === "electrical") return desc.includes("חשמל") || desc.includes("electrical") || desc.includes("חשמלי");
-  if (type === "ac") return desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור");
-  if (type === "starting") return desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר");
-  if (type === "gearbox") return desc.includes("תיבת") || desc.includes("gearbox") || desc.includes("הילוכים");
-  if (type === "noise") return desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט");
-  
+
+  if (type === "engine")
+    return (
+      desc.includes("מנוע") ||
+      desc.includes("engine") ||
+      desc.includes("חום") ||
+      desc.includes("שמן")
+    );
+  if (type === "brakes")
+    return (
+      desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה")
+    );
+  if (type === "electrical")
+    return (
+      desc.includes("חשמל") ||
+      desc.includes("electrical") ||
+      desc.includes("חשמלי")
+    );
+  if (type === "ac")
+    return (
+      desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור")
+    );
+  if (type === "starting")
+    return (
+      desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר")
+    );
+  if (type === "gearbox")
+    return (
+      desc.includes("תיבת") ||
+      desc.includes("gearbox") ||
+      desc.includes("הילוכים")
+    );
+  if (type === "noise")
+    return (
+      desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט")
+    );
+
   return true;
 }
 
@@ -81,7 +125,8 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "local";
-    const manufacturers = searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
+    const manufacturers =
+      searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
     const models = searchParams.get("models")?.split(",").filter(Boolean) || [];
     const dateRange = searchParams.get("dateRange");
     const issueType = searchParams.get("issueType");
@@ -99,9 +144,7 @@ export async function GET(request: Request) {
     const garageId = await getGarageId(supabase, user.id, mode);
 
     // Build query - we need to query requests (not repairs) to get all issues
-    let query = supabase
-      .from("requests")
-      .select(`
+    let query = supabase.from("requests").select(`
         id,
         description,
         ai_mechanic_summary,
@@ -148,17 +191,28 @@ export async function GET(request: Request) {
     const requests = (requestsRaw ?? []) as RequestRow[];
 
     // Filter and count vehicles
-    const vehicleCounts = new Map<string, { manufacturer: string; model: string; count: number }>();
+    const vehicleCounts = new Map<
+      string,
+      { manufacturer: string; model: string; count: number }
+    >();
 
     requests.forEach((req) => {
       const catalog = req.car?.vehicle_catalog;
       if (!catalog || !catalog.manufacturer || !catalog.model) return;
 
       // Apply manufacturer filter
-      if (manufacturers.length > 0 && (!catalog.manufacturer || !manufacturers.includes(catalog.manufacturer))) return;
+      if (
+        manufacturers.length > 0 &&
+        (!catalog.manufacturer || !manufacturers.includes(catalog.manufacturer))
+      )
+        return;
 
       // Apply model filter
-      if (models.length > 0 && (!catalog.model || !models.includes(catalog.model))) return;
+      if (
+        models.length > 0 &&
+        (!catalog.model || !models.includes(catalog.model))
+      )
+        return;
 
       // Apply issue type filter
       const description = req.ai_mechanic_summary || req.description || "";
@@ -190,4 +244,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
