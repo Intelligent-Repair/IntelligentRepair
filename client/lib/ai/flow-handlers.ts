@@ -6,7 +6,6 @@ import { extractJSON } from '@/lib/ai/json-utils';
 import { buildChatPrompt, buildGeneralExpertPrompt } from '@/lib/ai/prompt-builder';
 import type { UserAnswer } from '@/lib/ai/types';
 import warningLightsKB from '@/lib/knowledge/warning-lights.json';
-import { SCENARIOS } from '@/lib/knowledge/scenarios';
 import type { DiagnosticState, Scenario, StepOption, SafetyRule } from '@/lib/types/knowledge';
 import {
     CRITICAL_LIGHTS,
@@ -16,13 +15,12 @@ import {
     getNextQuestion,
     getNextStep,
     checkImmediateAction,
-    generateDiagnosis,
     updateSuspectsAndReport,
     generateScenarioReport,
     matchOption
 } from '@/lib/ai/diagnostic-utils';
-import { generateAIDiagnosis, HYBRID_LIGHTS } from '@/lib/ai/hybrid-diagnosis';
-import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis';
+// Note: hybrid-diagnosis.ts is deprecated - all lights now use unified-diagnosis-v2.ts
+import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis-v2';
 import type { KBNextStep, KBInstruction } from '@/lib/ai/diagnostic-utils';
 
 export interface FlowResult {
@@ -103,7 +101,7 @@ function getResolvedIssueDescription(lightType: string, context: any): string {
         'coolant_temperature_light': 'התחממות זמנית',
         'check_engine_light': 'מכסה דלק לא היה סגור',
         'oil_pressure_light': 'מפלס שמן נמוך'
-    };
+    }
     return names[lightType] || 'הבעיה נפתרה';
 }
 
@@ -120,6 +118,68 @@ function applyScenarioBoost(lightType: string, scenarioId: string, scores: Recor
         newScores[causeId] = (newScores[causeId] || 0) + boost;
     }
     return newScores;
+}
+
+// Build conversation narrative from context for mechanic summary
+function buildConversationNarrative(lightType: string, context: any, diagnosisText: string): string {
+    const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
+    const parts: string[] = [];
+
+    // Start with what was reported
+    parts.push(`הלקוח דיווח על ${lightName}.`);
+
+    // Add scenario info if available
+    if (context.currentLightScenario) {
+        const scenarioLabels: Record<string, string> = {
+            'wont_start': 'הרכב לא מניע',
+            'steady': 'הנורה דולקת קבוע',
+            'flashing': 'הנורה מהבהבת',
+            'intermittent': 'הנורה דולקת לסירוגין',
+            'after_refuel': 'לאחר תדלוק',
+            'during_drive': 'במהלך נסיעה',
+            'from_parking': 'מחניה'
+        };
+        const scenario = scenarioLabels[context.currentLightScenario];
+        if (scenario) parts.push(`מצב שדווח: ${scenario}.`);
+    }
+
+    // Add shown instructions (what checks were performed)
+    if (context.shownInstructionIds?.length > 0) {
+        const instructionNames: Record<string, string> = {
+            'check_terminals': 'בדיקת קטבי מצבר',
+            'jump_start': 'התנעה עם כבלים',
+            'check_gas_cap': 'בדיקת מכסה דלק',
+            'check_oil_level': 'בדיקת מפלס שמן',
+            'check_coolant': 'בדיקת נוזל קירור',
+            'check_tire_pressure': 'בדיקת לחץ אוויר'
+        };
+        const checks = context.shownInstructionIds
+            .map((id: string) => instructionNames[id] || id)
+            .join(', ');
+        parts.push(`בדיקות שבוצעו: ${checks}.`);
+    }
+
+    // Add Q&A history from answeredQuestions if available
+    if (context.answeredQuestions?.length > 0) {
+        const qaStrings = context.answeredQuestions
+            .map((qa: any) => `נשאל "${qa.question}" - השיב "${qa.answer}"`)
+            .slice(-3) // Last 3 questions
+            .join('. ');
+        parts.push(qaStrings + '.');
+    } else if (context.askedQuestionIds?.length > 0) {
+        // Fallback to just showing what was asked
+        parts.push(`נשאלו ${context.askedQuestionIds.length} שאלות.`);
+    }
+
+    // Add last question and answer if available
+    if (context.currentQuestionText && context.lastUserAnswer) {
+        parts.push(`שאלה אחרונה: "${context.currentQuestionText}" - תשובה: "${context.lastUserAnswer}".`);
+    }
+
+    // Add diagnosis result
+    parts.push(`אבחון: ${diagnosisText}.`);
+
+    return parts.join(' ');
 }
 
 interface ResolutionPath {
@@ -184,6 +244,8 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
 
     // RESOLVED
     if (resolution.status === 'resolved' || resolution.status === 'resolved_temp') {
+        const resolvedDescription = resolution.diagnosis || getResolvedIssueDescription(lightType, context);
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -191,10 +253,29 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
                 title: resolution.diagnosis || 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [{ issue: resolution.diagnosis || getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: resolution.recommendation || 'הבעיה נפתרה' }],
+                results: [{ issue: resolvedDescription, probability: 0.8, explanation: resolution.recommendation || 'הבעיה נפתרה' }],
                 status: { color: 'green', text: resolution.status === 'resolved_temp' ? 'נפתר זמנית' : 'הבעיה נפתרה', instruction: resolution.recommendation || 'ניתן להמשיך כרגיל' },
                 recommendations: [resolution.recommendation, resolution.if_returns].filter(Boolean),
                 endConversation: true,
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${context.vehicleInfo.manufacturer || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, resolvedDescription),
+                        diagnoses: [{ issue: resolvedDescription, probability: 0.8 }],
+                        recommendations: [resolution.recommendation, resolution.if_returns].filter(Boolean) as string[],
+                        needsTow: false,
+                        urgency: 'low' as const,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: resolvedDescription,
+                        topIssue: resolvedDescription,
+                        nextAction: resolution.recommendation || 'ניתן להמשיך כרגיל'
+                    }
+                },
                 context: mergedContext
             })
         };
@@ -244,6 +325,9 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
     // NEEDS_MECHANIC / NEEDS_TOW
     if (resolution.status === 'needs_mechanic' || resolution.status === 'needs_mechanic_urgent' || resolution.status === 'needs_tow') {
         const severity = resolution.status === 'needs_tow' ? 'critical' : 'high';
+        const urgency = resolution.status === 'needs_tow' ? 'critical' as const : 'high' as const;
+        const diagnosisText = resolution.diagnosis || 'נדרשת בדיקה במוסך';
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -251,10 +335,30 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
                 title: resolution.diagnosis || 'נדרש טיפול מקצועי',
                 severity,
                 confidence: 0.7,
-                results: [{ issue: resolution.diagnosis || 'נדרשת בדיקה במוסך', probability: 0.7, explanation: resolution.recommendation || '' }],
+                results: [{ issue: diagnosisText, probability: 0.7, explanation: resolution.recommendation || '' }],
                 status: { color: resolution.status === 'needs_tow' ? 'red' : 'orange', text: resolution.status === 'needs_tow' ? 'הזמן גרר' : 'פנה למוסך', instruction: resolution.recommendation || 'יש לפנות למוסך בהקדם' },
                 recommendations: [resolution.recommendation].filter(Boolean),
                 endConversation: true,
+                showTowButton: resolution.status === 'needs_tow',
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${context.vehicleInfo.manufacturer || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, diagnosisText),
+                        diagnoses: [{ issue: diagnosisText, probability: 0.7 }],
+                        recommendations: [resolution.recommendation].filter(Boolean) as string[],
+                        needsTow: resolution.status === 'needs_tow',
+                        urgency,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: diagnosisText,
+                        topIssue: diagnosisText,
+                        nextAction: resolution.recommendation || 'יש לפנות למוסך בהקדם'
+                    }
+                },
                 context: mergedContext
             })
         };
@@ -354,7 +458,7 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
 }
 
 // KB FLOW (Warning lights)
-// HYBRID_LIGHTS use KB for questions but AI for diagnosis (imported from hybrid-diagnosis.ts)
+// All lights now use unified AI diagnosis (hybrid-diagnosis.ts deprecated)
 
 export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const { userText, answers, context } = req;
@@ -364,6 +468,18 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
 
     const lightType = context.detectedLightType;
     const uiSeverity = context.lightSeverity || 'caution';
+
+    // 🚨 SAFETY CHECK: Detect critical safety phrases mid-conversation
+    // This catches cases like user mentioning "עשן מהמנוע" while in KB flow
+    const { analyzeSafetyOnly } = await import('@/lib/ai/context-analyzer');
+    const safetyRule = analyzeSafetyOnly(userText);
+    if (safetyRule) {
+        console.log(`[KBFlow] 🚨 Safety rule triggered mid-conversation: ${safetyRule.id}`);
+        return {
+            handled: true,
+            response: handleSafetyStop(safetyRule)
+        };
+    }
 
     console.log(`[KBFlow] Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting'} | Answer: "${userText}"`);
 
@@ -387,11 +503,12 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 effectiveText = positiveOption;
             } else {
                 // No matching option - generate resolved diagnosis
+                const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
                 return {
                     handled: true,
                     response: NextResponse.json({
                         type: 'diagnosis_report',
-                        title: `נורת ${(warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType}`,
+                        title: `נורת ${lightName}`,
                         confidence: 0.8,
                         confidenceLevel: 'high',
                         results: [{ issue: 'ביצעת את ההוראות בהצלחה', probability: 0.9, explanation: 'הבעיה ככל הנראה נפתרה' }],
@@ -400,6 +517,25 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                         nextSteps: 'עקוב אחר הנורה בנסיעות הבאות',
                         recommendations: ['בדוק שהנורה אכן כבתה', 'אם הנורה חוזרת - פנה למוסך'],
                         endConversation: true,
+                        // Include conversationSummaries for garage dashboard
+                        conversationSummaries: {
+                            mechanic: {
+                                schemaVersion: 2,
+                                vehicleType: (context as any).vehicleInfo ? `${(context as any).vehicleInfo?.manufacturer || (context as any).vehicleInfo?.make || ''} ${(context as any).vehicleInfo?.model || ''} ${(context as any).vehicleInfo?.year || ''}`.trim() : 'לא ידוע',
+                                originalComplaint: `נורת ${lightName}`,
+                                conversationNarrative: buildConversationNarrative(lightType, context, 'הבעיה נפתרה'),
+                                diagnoses: [{ issue: 'הבעיה נפתרה', probability: 0.9 }],
+                                recommendations: ['בדוק שהנורה אכן כבתה', 'אם הנורה חוזרת - פנה למוסך'],
+                                needsTow: false,
+                                urgency: 'low' as const,
+                                category: lightName
+                            },
+                            user: {
+                                shortDescription: 'הבעיה נפתרה בהצלחה',
+                                topIssue: 'הבעיה נפתרה',
+                                nextAction: 'עקוב אחר הנורה בנסיעות הבאות'
+                            }
+                        },
                         context: mergeContext(context, { resolved: true })
                     })
                 };
@@ -464,7 +600,9 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                             askedQuestionIds: [...(context.askedQuestionIds || []), 'first_question'],
                             currentQuestionId: followupQ.id || `followup_${optionId}`,
                             currentQuestionText: followupQ.text,
-                            currentQuestionOptions: followupOptions
+                            currentQuestionOptions: followupOptions,
+                            lastUserAnswer: effectiveText,
+                            answeredQuestions: [...(context.answeredQuestions || []), { question: context.currentQuestionText || 'שאלה ראשונה', answer: effectiveText }]
                         })
                     })
                 };
@@ -546,6 +684,8 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
 
     // Resolved option fallback
     if (isResolvedOption(effectiveText)) {
+        const resolvedDesc = getResolvedIssueDescription(lightType, context);
+        const lightName = (warningLightsKB as any)[lightType]?.names?.he?.[0] || lightType;
         return {
             handled: true,
             response: NextResponse.json({
@@ -553,10 +693,29 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 title: 'נפתר',
                 severity: 'low',
                 confidence: 0.8,
-                results: [{ issue: getResolvedIssueDescription(lightType, context), probability: 0.8, explanation: 'המשתמש דיווח שהנורה כבתה' }],
+                results: [{ issue: resolvedDesc, probability: 0.8, explanation: 'המשתמש דיווח שהנורה כבתה' }],
                 status: { color: 'green', text: 'הבעיה נפתרה', instruction: 'ניתן להמשיך כרגיל' },
                 recommendations: ['בדוק שוב מחר בבוקר', 'אם הנורה חוזרת – פנה למוסך'],
                 endConversation: true,
+                // Include conversationSummaries for garage dashboard
+                conversationSummaries: {
+                    mechanic: {
+                        schemaVersion: 2,
+                        vehicleType: context.vehicleInfo ? `${(context.vehicleInfo as any).manufacturer || context.vehicleInfo.make || ''} ${context.vehicleInfo.model || ''} ${context.vehicleInfo.year || ''}`.trim() : 'לא ידוע',
+                        originalComplaint: `נורת ${lightName}`,
+                        conversationNarrative: buildConversationNarrative(lightType, context, resolvedDesc),
+                        diagnoses: [{ issue: resolvedDesc, probability: 0.8 }],
+                        recommendations: ['בדוק שוב מחר בבוקר', 'אם הנורה חוזרת – פנה למוסך'],
+                        needsTow: false,
+                        urgency: 'low' as const,
+                        category: lightName
+                    },
+                    user: {
+                        shortDescription: resolvedDesc,
+                        topIssue: resolvedDesc,
+                        nextAction: 'ניתן להמשיך כרגיל'
+                    }
+                },
                 context: mergeContext(context, { currentLightScenario: scenarioId, causeScores: updatedScores })
             })
         };
@@ -566,10 +725,67 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const askedIds = [...(context.askedQuestionIds || [])];
     if (!askedIds.includes(lastQuestionId)) askedIds.push(lastQuestionId);
 
-    // Check if should diagnose
+    // Check if should diagnose - now uses AI for ALL diagnoses
     if (shouldDiagnose(updatedScores, askedIds.length, uiSeverity)) {
-        const diagnosis = generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds);
-        return { handled: true, response: NextResponse.json(diagnosis) };
+        console.log('[KBFlow] Ready to diagnose - using AI unified diagnosis');
+
+        // Build conversation history for AI
+        const conversationHistory = answers.map(a => ({
+            role: 'user' as const,
+            content: `${(a as any).question || ''} → ${a.answer}`
+        }));
+
+        // Call unified AI diagnosis
+        const unifiedDiag = await generateUnifiedDiagnosis({
+            lightType,
+            scenarioId,
+            conversationHistory,
+            vehicleInfo: context.vehicleInfo,
+            requestDescription: answers[0]?.answer || '',
+            answers
+        });
+
+        const userDiag = unifiedDiag.userDiagnosis;
+        const mechSummary = unifiedDiag.mechanicSummary;
+
+        return {
+            handled: true,
+            response: NextResponse.json({
+                type: 'diagnosis_report',
+                title: userDiag.title,
+                confidence: userDiag.confidence,
+                confidenceLevel: userDiag.confidenceLevel,
+                results: mechSummary.diagnoses.map(d => ({
+                    issue: d.issue,
+                    probability: d.probability,
+                    explanation: userDiag.explanation
+                })),
+                status: {
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                    text: userDiag.topIssue,
+                    instruction: userDiag.nextAction
+                },
+                selfFix: [],
+                nextSteps: userDiag.nextAction,
+                recommendations: userDiag.recommendations,
+                endConversation: true,
+                showTowButton: userDiag.needsTow,
+                // Include conversationSummaries for frontend to save
+                conversationSummaries: {
+                    mechanic: mechSummary,
+                    user: {
+                        shortDescription: userDiag.explanation,
+                        topIssue: userDiag.topIssue,
+                        nextAction: userDiag.nextAction
+                    }
+                },
+                context: mergeContext(context, {
+                    currentLightScenario: scenarioId,
+                    causeScores: updatedScores,
+                    askedQuestionIds: askedIds
+                })
+            })
+        };
     }
 
     // Get next step
@@ -632,129 +848,78 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
         };
     }
 
-    // No more steps: generate diagnosis
-    // For HYBRID_LIGHTS, use AI diagnosis instead of KB scoring
-    if (HYBRID_LIGHTS.includes(lightType as any)) {
-        console.log(`[KBFlow] Hybrid diagnosis for ${lightType}`);
-        const aiDiagnosis = await generateAIDiagnosis(lightType, scenarioId, answers, context.vehicleInfo, context);
-        return { handled: true, response: aiDiagnosis };
-    }
+    // ⚠️ ANTI-PREMATURE-DIAGNOSIS: If we haven't asked enough questions, don't jump to diagnosis!
+    const MIN_QUESTIONS_FOR_DIAGNOSIS = 3;
+    const questionCount = askedIds.length;
 
-    return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId, updatedScores, answers, context.vehicleInfo, context.shownInstructionIds)) };
-}
-
-// Scenario flow (static trees)
-export async function handleScenarioStep(req: RequestContext): Promise<FlowResult> {
-    const { userText, context, answers } = req;
-
-    if (!context?.currentScenarioId || !context.currentStepId) {
-        return { response: null, handled: false };
-    }
-
-    const scenario: Scenario | undefined = (SCENARIOS as any)[context.currentScenarioId];
-    const step = scenario?.steps?.[context.currentStepId];
-
-    if (!scenario || !step) {
-        return { response: null, handled: false };
-    }
-
-    const normalized = (userText || '').trim();
-    const optionLabels = step.options.map(o => o.label);
-    let selectedOption = step.options.find(o => o.label === normalized) ?? null;
-
-    // Deterministic selection (no AI)
-    if (!selectedOption && normalized && optionLabels.length > 0) {
-        const { selected } = normalizeSelection(normalized, optionLabels);
-        if (selected) {
-            selectedOption = step.options.find(o => o.label === selected) ?? null;
-        }
-    }
-
-    if (!selectedOption) {
+    if (questionCount < MIN_QUESTIONS_FOR_DIAGNOSIS) {
+        console.log(`[KBFlow] Only ${questionCount} questions asked (min: ${MIN_QUESTIONS_FOR_DIAGNOSIS}). Using AI to continue conversation.`);
+        // Route to AI to ask more clarifying questions before diagnosis
         return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'scenario_step',
-                step: { id: step.id, text: 'כדי להמשיך, בבקשה בחר אחת מהאפשרויות.', options: optionLabels },
-                context
-            })
+            response: null,
+            handled: false  // Will fallback to callExpertAI in route.ts
         };
     }
 
-    const reportData = context.reportData ?? { verified: [], ruledOut: [], skipped: [], criticalFindings: [] };
-    const { newScores, newReport } = updateSuspectsAndReport(context.suspects || {}, selectedOption, scenario, reportData);
-    const hasCritical = Array.isArray(newReport?.criticalFindings) && newReport.criticalFindings.length > 0;
+    // No more steps AND enough questions asked: generate unified AI diagnosis for ALL lights
+    console.log(`[KBFlow] Generating unified AI diagnosis for ${lightType} (${questionCount} questions asked)`);
 
-    if (selectedOption.stopAlert) {
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'safety_alert',
-                title: selectedOption.stopAlert.title,
-                message: selectedOption.stopAlert.message,
-                level: 'CRITICAL',
-                stopChat: true,
-                context: mergeContext(context, { suspects: newScores, reportData: newReport })
-            })
-        };
-    }
+    // Build conversation history for AI
+    const conversationHistory = answers.map(a => ({
+        role: 'user' as const,
+        content: `${(a as any).question || ''} → ${a.answer}`
+    }));
 
-    const nextStepId = selectedOption.nextStepId;
+    // Call unified AI diagnosis (works for ALL lights, including former HYBRID_LIGHTS)
+    const unifiedDiag = await generateUnifiedDiagnosis({
+        lightType,
+        scenarioId,
+        conversationHistory,
+        vehicleInfo: context.vehicleInfo,
+        requestDescription: answers[0]?.answer || '',
+        answers
+    });
 
-    if (!nextStepId) {
-        // Use unified AI diagnosis for consistent output (same as what mechanic receives)
-        const conversationHistory = answers?.map((a: UserAnswer) => ({
-            role: 'user' as const,
-            content: `${a.question} → ${a.answer}`
-        })) || [];
+    const userDiag = unifiedDiag.userDiagnosis;
+    const mechSummary = unifiedDiag.mechanicSummary;
 
-        const unifiedDiag = await generateUnifiedDiagnosis({
-            description: userText || '',
-            conversationHistory,
-            vehicleInfo: undefined,
-            detectedLightType: context?.detectedLightType
-        });
-
-        const hasCritical = unifiedDiag.urgency === 'critical' || unifiedDiag.urgency === 'high';
-
-        return {
-            handled: true,
-            response: NextResponse.json({
-                type: 'diagnosis_report',
-                title: 'אבחון תקלה',
-                confidence: unifiedDiag.confidence,
-                confidenceLevel: unifiedDiag.confidenceLevel,
-                results: unifiedDiag.diagnoses,
-                status: unifiedDiag.status,
-                selfFix: [],
-                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
-                recommendations: unifiedDiag.recommendations,
-                disclaimer: 'האבחון מבוסס על תיאור בלבד ואינו מחליף בדיקה מקצועית במוסך.',
-                showTowButton: unifiedDiag.needsTow || hasCritical,
-                severity: hasCritical ? 'high' : 'low',
-                category: unifiedDiag.category,
-                endConversation: true,
-                context: mergeContext(context, { suspects: newScores, reportData: newReport, currentScenarioId: null, currentStepId: null, activeFlow: null, unifiedDiagnosis: true })
-            })
-        };
-    }
-
-    const nextStep = scenario.steps[nextStepId];
-    if (!nextStep) return { response: null, handled: false };
-
-    const nextOptions = nextStep.options.map(o => o.label);
     return {
         handled: true,
         response: NextResponse.json({
-            type: 'scenario_step',
-            step: { id: nextStep.id, text: nextStep.text, options: nextOptions },
+            type: 'diagnosis_report',
+            title: userDiag.title,
+            confidence: userDiag.confidence,
+            confidenceLevel: userDiag.confidenceLevel,
+            results: mechSummary.diagnoses.map(d => ({
+                issue: d.issue,
+                probability: d.probability,
+                explanation: userDiag.explanation
+            })),
+            status: {
+                color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                text: userDiag.topIssue,
+                instruction: userDiag.nextAction
+            },
+            selfFix: [],
+            nextSteps: userDiag.nextAction,
+            recommendations: userDiag.recommendations,
+            endConversation: true,
+            showTowButton: userDiag.needsTow,
+            detectedLightType: lightType,
+            kbSource: true,
+            // Include conversationSummaries for frontend to save
+            conversationSummaries: {
+                mechanic: mechSummary,
+                user: {
+                    shortDescription: userDiag.explanation,
+                    topIssue: userDiag.topIssue,
+                    nextAction: userDiag.nextAction
+                }
+            },
             context: mergeContext(context, {
-                currentScenarioId: scenario.id,
-                currentStepId: nextStep.id,
-                suspects: newScores,
-                reportData: newReport,
-                currentQuestionText: nextStep.text,
-                currentQuestionOptions: nextOptions
+                currentLightScenario: scenarioId,
+                causeScores: updatedScores,
+                askedQuestionIds: askedIds
             })
         })
     };
@@ -810,8 +975,16 @@ export async function callExpertAI(body: any): Promise<any> {
         const parsed = extractJSON(raw);
         const result: any = parsed ?? {};
 
-        // Check both top-level and candidate.warning_light from AI response
-        let lightType = result.warning_light || result.light_type || result.detected_light || result.light_id || result.detectedLightType || result.candidate?.warning_light || detectedLight;
+        // Check both top-level and candidate.warning_light from AI response (extended extraction)
+        let lightType = result.warning_light
+            || result.light_type
+            || result.detected_light
+            || result.light_id
+            || result.detectedLightType
+            || result.candidate?.warning_light
+            || result.candidate?.light_id
+            || result.candidate?.detected_light
+            || detectedLight;
         if (typeof lightType === 'string') lightType = lightType.trim();
 
         // Get confidence from candidate if available
@@ -855,8 +1028,31 @@ export async function callExpertAI(body: any): Promise<any> {
             });
         }
 
-        if (result.type === 'diagnosis_report' || result.type === 'ai_response') {
-            return NextResponse.json({ ...result, type: result.type === 'ai_response' ? 'diagnosis_report' : result.type, endConversation: true, context: mergeContext(context, result?.context) });
+        // Handle diagnosis_report - this is a valid final state
+        if (result.type === 'diagnosis_report') {
+            return NextResponse.json({ ...result, endConversation: true, context: mergeContext(context, result?.context) });
+        }
+
+        // Handle ai_response - NEVER end conversation prematurely!
+        // Either route to KB if light detected, or convert to question
+        if (result.type === 'ai_response') {
+            console.log(`[Expert AI] NON-FINAL ai_response received - converting to question or KB route`);
+
+            // If we detected a valid light, route to KB
+            if (lightType && (warningLightsKB as any)[lightType]) {
+                const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : 'caution';
+                console.log(`[Expert AI] ai_response -> routing to KB for light: ${lightType}`);
+                return handleWarningLightDetection(lightType, severity, context);
+            }
+
+            // Otherwise, convert to a question to continue conversation
+            console.log(`[Expert AI] ai_response -> converting to question (no valid light detected)`);
+            return NextResponse.json({
+                type: 'question',
+                text: result.text ?? 'כדי לדייק, תוכל לתאר מה אתה רואה?',
+                options: result.options ?? buildLightPickerOptions(),
+                context: mergeContext(context, { activeFlow: null, ...(result.context ?? {}) })
+            });
         }
 
         // Normalize options for all AI responses (AI may return {id, label} objects)
@@ -865,16 +1061,37 @@ export async function callExpertAI(body: any): Promise<any> {
             normalizedResult.options = result.options.map((o: any) => typeof o === 'string' ? o : o?.label || String(o)).filter(Boolean);
         }
 
+        // FIRST IMAGE PROTECTION: Never end conversation on first image without questions
+        if (hasImages && answers.length === 0) {
+            console.log(`[Expert AI] First image received - ensuring conversation continues`);
+
+            // If we have a light, route to KB
+            if (lightType && (warningLightsKB as any)[lightType]) {
+                const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : 'caution';
+                console.log(`[Expert AI] First image -> detected light ${lightType}, routing to KB`);
+                return handleWarningLightDetection(lightType, severity, context);
+            }
+
+            // Otherwise, ask clarifying question
+            console.log(`[Expert AI] First image -> no light detected, asking for clarification`);
+            return NextResponse.json({
+                type: 'question',
+                text: result.text ?? 'קיבלתי את התמונה. האם יש נורת אזהרה דולקת בלוח המחוונים?',
+                options: result.options ?? buildLightPickerOptions(),
+                context: mergeContext(context, { activeFlow: null, firstImageProcessed: true })
+            });
+        }
+
         // DEAD-END DETECTION: Check for empty/stuck responses or too many questions
-        const questionCount = answers.length;
+        const questionCount2 = answers.length;
         const MAX_QUESTIONS = 8;
         const emptyPhrases = ['המשך', 'המשך...', 'continue', 'ok', 'אוקיי'];
         const isEmptyResponse = !result.text || emptyPhrases.some(p => (result.text || '').trim().toLowerCase() === p.toLowerCase());
         const hasNoOptions = !normalizedResult.options || normalizedResult.options.length === 0;
         const isStuck = isEmptyResponse || (hasNoOptions && result.type === 'question');
 
-        if (isStuck || questionCount >= MAX_QUESTIONS) {
-            console.log(`[Expert AI] Dead-end detected: isStuck=${isStuck}, questionCount=${questionCount} - using unified diagnosis`);
+        if (isStuck || questionCount2 >= MAX_QUESTIONS) {
+            console.log(`[Expert AI] Dead-end detected: isStuck=${isStuck}, questionCount=${questionCount2} - using unified diagnosis`);
 
             // Use unified diagnosis generator for consistent quality
             const conversationHistory = answers.map((a: UserAnswer) => ({
@@ -883,26 +1100,48 @@ export async function callExpertAI(body: any): Promise<any> {
             }));
 
             const unifiedDiag = await generateUnifiedDiagnosis({
-                description: currentInput,
+                requestDescription: currentInput,
                 conversationHistory,
                 vehicleInfo: undefined, // Not available in this context
-                detectedLightType: context?.detectedLightType
+                lightType: context?.detectedLightType
             });
+
+            // Extract user-facing diagnosis from unified result
+            const userDiag = unifiedDiag.userDiagnosis;
+            const mechSummary = unifiedDiag.mechanicSummary;
 
             return NextResponse.json({
                 type: 'diagnosis_report',
-                title: 'אבחון תקלה',
-                confidence: unifiedDiag.confidence,
-                confidenceLevel: unifiedDiag.confidenceLevel,
-                results: unifiedDiag.diagnoses,
-                status: unifiedDiag.status,
+                title: userDiag.title || 'אבחון תקלה',
+                confidence: userDiag.confidence,
+                confidenceLevel: userDiag.confidenceLevel,
+                results: mechSummary.diagnoses.map(d => ({
+                    issue: d.issue,
+                    probability: d.probability,
+                    explanation: userDiag.explanation
+                })),
+                status: {
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                    text: userDiag.topIssue,
+                    instruction: userDiag.nextAction
+                },
                 selfFix: [],
-                nextSteps: unifiedDiag.recommendations[0] || 'פנה למוסך לאבחון מקצועי.',
-                recommendations: unifiedDiag.recommendations,
+                nextSteps: userDiag.nextAction,
+                recommendations: userDiag.recommendations,
                 disclaimer: 'האבחון מבוסס על תיאור הבעיה. מומלץ אישור במוסך.',
                 endConversation: true,
-                showTowButton: unifiedDiag.needsTow,
-                category: unifiedDiag.category,
+                showTowButton: userDiag.needsTow,
+                category: mechSummary.category,
+                // Include conversationSummaries in expected format for frontend
+                conversationSummaries: {
+                    mechanic: mechSummary,
+                    user: {
+                        shortDescription: userDiag.explanation,
+                        topIssue: userDiag.topIssue,
+                        nextAction: userDiag.nextAction
+                    }
+                },
+                mechanicSummary: mechSummary, // Also include directly for backward compatibility
                 context: mergeContext(context, { unifiedDiagnosis: true })
             });
         }
@@ -941,23 +1180,6 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
         lightSeverity: isCritical ? 'danger' : severity,
         kbSource: true,
         context: { ...(existingContext ?? {}), detectedLightType: lightId, lightSeverity: isCritical ? 'danger' : severity, isLightContext: true, askedQuestionIds: ['first_question'], currentQuestionId: 'first_question', causeScores: {}, currentQuestionText: questionText, currentQuestionOptions: questionOptions, activeFlow: 'KB' as const }
-    });
-}
-
-export function handleScenarioStart(scenarioId: string): any {
-    const scenario: Scenario | undefined = (SCENARIOS as any)[scenarioId];
-    if (!scenario) return null;
-
-    const firstStep = scenario.steps[scenario.startingStepId];
-    const suspects: Record<string, number> = {};
-    scenario.suspects.forEach(s => (suspects[s.id] = 0));
-    const stepOptions = firstStep.options.map(o => o.label);
-
-    return NextResponse.json({
-        type: 'scenario_start',
-        title: scenario.title,
-        step: { id: firstStep.id, text: firstStep.text, options: stepOptions },
-        context: { currentScenarioId: scenario.id, currentStepId: firstStep.id, suspects, reportData: { verified: [], ruledOut: [], skipped: [], criticalFindings: [] }, currentQuestionText: firstStep.text, currentQuestionOptions: stepOptions, activeFlow: 'SCENARIO' as const }
     });
 }
 

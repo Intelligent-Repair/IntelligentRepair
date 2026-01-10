@@ -63,6 +63,18 @@ function normalizeQuestions(raw: any): StoredQuestionsV2 | null {
 
   // Array of message objects: extract only type="question"
   if (Array.isArray(raw)) {
+    // Check if it's an array of plain strings (from frontend state.messages.map(m => m.text))
+    if (raw.length > 0 && typeof raw[0] === 'string') {
+      const items = raw
+        .map((text: string, i: number) => ({
+          id: `q${i + 1}`,
+          text: String(text ?? "").trim(),
+        }))
+        .filter((q: { text: string }) => q.text);
+      return items.length > 0 ? { schemaVersion: 2, items } : null;
+    }
+
+    // Objects with type/sender fields
     const items = raw
       .filter((m: any) => m?.type === "question" || (m?.sender === "ai" && m?.type === "question"))
       .map((m: any, i: number) => ({
@@ -107,6 +119,18 @@ function normalizeAnswers(raw: any, questions: StoredQuestionsV2 | null): Stored
 
   // Array of message objects: extract user messages
   if (Array.isArray(raw)) {
+    // Check if it's an array of plain strings (from frontend state.messages.map(m => m.text))
+    if (raw.length > 0 && typeof raw[0] === 'string') {
+      const items = raw
+        .map((text: string, i: number) => ({
+          questionId: questions?.items?.[i]?.id ?? `q${i + 1}`,
+          text: String(text ?? "").trim(),
+        }))
+        .filter((a: { text: string }) => a.text);
+      return items.length > 0 ? { schemaVersion: 2, items } : null;
+    }
+
+    // Objects with sender/kind fields
     const userAnswers = raw.filter((m: any) => m?.sender === "user" || m?.kind === "user");
     const items = userAnswers
       .map((m: any, i: number) => ({
@@ -143,6 +167,13 @@ export async function POST(req: Request) {
     const normalizedRecommendations = normalizeRecommendations(body.ai_recommendations);
     const qv2 = normalizeQuestions(body.ai_questions);
     const av2 = normalizeAnswers(body.ai_answers, qv2);
+
+    // DEBUG: Log what we received
+    console.log('[from-draft] Received body.ai_questions:', JSON.stringify(body.ai_questions)?.substring(0, 200));
+    console.log('[from-draft] Received body.ai_answers:', JSON.stringify(body.ai_answers)?.substring(0, 200));
+    console.log('[from-draft] Received body.ai_mechanic_summary:', body.ai_mechanic_summary ? 'EXISTS' : 'NULL');
+    console.log('[from-draft] Normalized qv2:', qv2 ? `${qv2.items.length} items` : 'NULL');
+    console.log('[from-draft] Normalized av2:', av2 ? `${av2.items.length} items` : 'NULL');
 
     // Confidence: use actual value or null (never hardcode)
     const ai_confidence =

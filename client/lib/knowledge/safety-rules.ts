@@ -33,9 +33,9 @@ export const SAFETY_RULES: SafetyRule[] = [
       'הרכב בוער',
       'עלה באש',
       'להבות מהרכב',
-      'להבות',
-      'גיצים',
-      'ניצוצות'
+      'להבות מהמנוע',
+      'גיצים מהרכב',
+      'ניצוצות מהרכב'
     ],
     message: 'עצור במקום בטוח, כבה את המנוע מיד, צא מהרכב, התרחק למרחק בטחון והזמן מכבי אש (102).',
     level: 'CRITICAL',
@@ -55,36 +55,18 @@ export const SAFETY_RULES: SafetyRule[] = [
     keywords: [
       'אדים מהמנוע',
       'קיטור מהמנוע',
-      'קיטור',
-      'רתיחה',
+      'יוצא קיטור',
       'המנוע רותח',
-      'מים רותחים',
+      'מים רותחים מהמנוע',
       'נוזל קירור נשפך',
       'נוזל קירור על הרצפה',
       'מים יוצאים מהמנוע',
-      'ריח מתוק חזק'
+      'ריח מתוק חזק מהמנוע'
     ],
     message: '🚨 חשד לרתיחה! עצור בצד הדרך מיד, כבה את המנוע ואל תפתח את מכסה המנוע בשום מצב! סכנת כוויות. התרחק מהרכב והזמן גרר.',
     level: 'CRITICAL',
     endConversation: true,
     followUpMessage: 'עצרת במקום בטוח? מצוין. אל תפתח את מכסה המנוע או פקק הרדיאטור עד שהמנוע יתקרר לחלוטין (לפחות 30 דקות). הזמן גרר למוסך.'
-  },
-  {
-    id: 'overheating_severe',
-    keywords: ['מחוג חום באדום', 'נורת חום אדומה', 'נורת טמפרטורה אדומה', 'מד חום עולה', 'מד חום גבוה', 'מחוג באדום'],
-    message: 'חשד להתחממות יתר! עצור בצד בבטחה וכבה את המנוע. אסור לפתוח את פקק הרדיאטור כשהמנוע חם - סכנת כוויות.',
-    level: 'CRITICAL',
-    endConversation: false,
-    nextScenarioId: 'overheating',
-    followUpMessage: 'יופי, עכשיו כשהרכב כבוי והמנוע מתקרר, נוכל לבצע אבחון בזהירות. בוא נתחיל.'
-  },
-  {
-    id: 'oil_pressure',
-    keywords: ['נורת שמן אדומה', 'לחץ שמן', 'אין שמן', 'מנורת קומקום', 'נורת שמן מהבהבת', 'נורית שמן', 'מנורת אלדין אדומה'],
-    message: 'חשד לבעיית לחץ שמן קריטית! עצור וכבה את המנוע מיד. המשך נסיעה עלול לגרום לנזק חמור למנוע. הזמן גרר.',
-    level: 'CRITICAL',
-    endConversation: true,
-    followUpMessage: 'עצרת? מצוין. הזמן גרר למוסך לטיפול בבעיית השימון.'
   },
 
   // WARNING rules - אזהרה לפני פעולה מסוכנת

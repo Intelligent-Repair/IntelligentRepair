@@ -8,16 +8,18 @@ export async function GET(req: Request) {
 
         const supabase = createAdminClient();
 
-        // Fetch all garages
+        // Fetch ALL garages - include owner_national_id to determine hasOwner
         let query = supabase
             .from("garages")
-            .select("id, garage_name, phone, City, Street, Number, owner_user_id")
+            .select("id, garage_name, phone, City, Street, Number, operating_hours, owner_national_id")
             .order("garage_name", { ascending: true });
 
         // Filter by city if provided
         if (city && city.trim()) {
             query = query.eq("City", city.trim());
         }
+
+        // Show ALL garages - hasOwner flag will determine if send button appears
 
         const { data: garages, error } = await query;
 
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
             );
         }
 
-        // Also fetch unique cities for the filter dropdown
+        // Fetch unique cities from ALL garages for filter dropdown
         const { data: citiesData, error: citiesError } = await supabase
             .from("garages")
             .select("City")
@@ -39,25 +41,20 @@ export async function GET(req: Request) {
             ? []
             : [...new Set(citiesData?.map((g: { City: string | null }) => g.City).filter(Boolean))].sort();
 
-        // hasOwner = TRUE only if owner_user_id is NOT NULL
-        // (We already updated fictitious garages to have NULL)
+        // Set hasOwner based on actual owner_national_id value
         const processedGarages = (garages || [])
             .map(g => ({
                 ...g,
-                hasOwner: g.owner_user_id !== null
+                hasOwner: g.owner_national_id !== null,
             }))
             .sort((a, b) => {
-                // Garages with real owners come first
+                // Garages with owners first
                 if (a.hasOwner && !b.hasOwner) return -1;
                 if (!a.hasOwner && b.hasOwner) return 1;
                 return a.garage_name.localeCompare(b.garage_name);
             });
 
-        // DEBUG: Log each garage's hasOwner status
-        console.log(`[garages] Found ${processedGarages.length} garages:`);
-        processedGarages.forEach(g => {
-            console.log(`  - ${g.garage_name}: owner_user_id=${g.owner_user_id}, hasOwner=${g.hasOwner}`);
-        });
+        console.log(`[garages] Found ${processedGarages.length} registered garages`);
 
         return NextResponse.json({
             garages: processedGarages,
@@ -71,4 +68,3 @@ export async function GET(req: Request) {
         );
     }
 }
-

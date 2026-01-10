@@ -2,13 +2,17 @@
 import { SAFETY_RULES } from '@/lib/knowledge/safety-rules';
 import carSymptomsData from '@/lib/knowledge/car-symptoms.json';
 import warningLightsKB from '@/lib/knowledge/warning-lights.json';
-import type { SafetyRule } from '@/lib/types/knowledge';
+import type { SafetyRule, SymptomMapping } from '@/lib/types/knowledge';
 
 export type LightSeverity = 'danger' | 'caution';
 
+/**
+ * תוצאת ניתוח הקשר - מה לעשות עם הקלט של המשתמש
+ */
 export type AnalysisResult =
   | { type: 'SAFETY_STOP'; rule: SafetyRule }
   | { type: 'WARNING_LIGHT'; lightId: string; severity: LightSeverity }
+  | { type: 'SYMPTOM_MATCH'; symptom: SymptomMapping; category: string }
   | { type: 'START_SCENARIO'; scenarioId: string }
   | { type: 'CONSULT_AI' };
 
@@ -95,7 +99,10 @@ export function analyzeSafetyOnly(text: string): SafetyRule | null {
 
   for (const rule of SAFETY_RULES) {
     for (const kw of rule.keywords) {
-      if (containsNonNegated(tokens, kw)) return rule;
+      if (containsNonNegated(tokens, kw)) {
+        console.log(`[Safety] 🚨 Rule triggered: ${rule.id} by keyword: "${kw}" | Level: ${rule.level}`);
+        return rule;
+      }
     }
   }
   return null;
@@ -130,6 +137,7 @@ export function analyzeUserContext(text: string): AnalysisResult {
   // C) SYMPTOM MAPPINGS (car-symptoms.json)
   const symptoms = (carSymptomsData as any)?.symptoms ?? [];
   for (const group of symptoms) {
+    const categoryName = group?.category ?? 'unknown';
     const mappings = group?.mappings ?? [];
     for (const mapping of mappings) {
       const keywords: string[] = mapping?.keywords ?? [];
@@ -151,7 +159,17 @@ export function analyzeUserContext(text: string): AnalysisResult {
           }
         }
 
-        // C3: Light mapping -> only if user reports a light indicator
+        // C3: General symptom mapping -> SYMPTOM_MATCH (NEW!)
+        // Returns the symptom with first_questions for KB-driven flow
+        if (mapping.type === 'symptom') {
+          return {
+            type: 'SYMPTOM_MATCH',
+            symptom: mapping as SymptomMapping,
+            category: categoryName
+          };
+        }
+
+        // C4: Light mapping -> only if user reports a light indicator
         if (mapping.type === 'light') {
           const lightId: string = mapping.targetId;
 

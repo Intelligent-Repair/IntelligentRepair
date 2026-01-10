@@ -57,24 +57,23 @@ Return ONLY a valid JSON object. No markdown, no extra text.
 
 Schema:
 {
-  "type": "question" | "ai_response",
+  "type": "question" | "diagnosis_report",
   "text": "<string>",
   "options"?: ["<string>", ...],
-
-  "candidate"?: {
-    "warning_light"?: "<lightId>",
-    "scenario_id"?: "<scenarioId>",
-    "confidence": 0.0,
-    "evidence": ["<short reason>", ...]
-  }
+  
+  // If a warning light is detected, include at ROOT level (not in candidate):
+  "warning_light"?: "<lightId>",
+  "confidence"?: 0.0-1.0,
+  "evidence"?: ["<short reason>", ...]
 }
 
 Rules:
 - Return ONLY valid JSON. No markdown, no extra text.
-- Do NOT output hard diagnosis as fact. Treat everything as suggestion.
-- If you include candidate.warning_light it MUST be one of the provided KB IDs.
-- If detectedLightType exists (KB_COORDINATION), you may ONLY reference that injected light.
+- Type MUST be "question" or "diagnosis_report" only. NEVER use "ai_response".
+- If you detect a warning light, put warning_light at the ROOT of the JSON (not inside candidate).
+- warning_light MUST be one of the provided KB IDs.
 - If type is "question", you MUST include "options" (array of strings).
+- Use diagnosis_report ONLY when you have enough information to diagnose (after 3+ questions).
 - Keep text concise and in Hebrew.
 `.trim();
 }
@@ -152,6 +151,9 @@ Mode: ${mode}
 User input:
 "${sanitizedDescription}"
 
+⛔ BANNED - DO NOT ASK THESE QUESTIONS AGAIN (already asked):
+${answers.length > 0 ? answers.map((a, i) => `${i + 1}. "${(a as any)?.question || 'unknown'}"`).join('\n') : 'No questions asked yet.'}
+
 Recent Q/A history:
 ${answersContext}
 
@@ -159,18 +161,23 @@ Detected warning light (if any): ${detectedLightType ? `"${detectedLightType}" (
 
 ${mode === 'IMAGE_IDENTIFICATION' ? `
 Instructions for IMAGE_IDENTIFICATION:
-- Identify the warning_light ID from the provided available_lights list.
-- Return JSON with type="question", include candidate.warning_light with confidence and evidence.
-- Do NOT guess if unclear; ask the user to describe the light.
+- Analyze the image to identify which warning_light from available_lights list.
+- Return type="question" ONLY. NEVER return diagnosis_report or ai_response.
+- If you identify a light, include warning_light at ROOT level (not in candidate):
+  { "type": "question", "warning_light": "<lightId>", "confidence": 0.8, "evidence": ["reason"], "text": "<first KB question>", "options": [...] }
+- If unclear, ask the user to describe the light in words.
+- NEVER end conversation on first image.
 ` : ''}
 
 ${mode === 'KB_COORDINATION' ? `
 Instructions for KB_COORDINATION:
+- Return type="question" ONLY. NEVER return diagnosis_report here.
 - Do NOT invent new questions.
 - Use the injected KB slice ONLY.
 - If a followup question is relevant, ask it.
 - Otherwise, ask the KB first_question or a clarifying KB question derived ONLY from injected KB.
 - Always return options as an array of strings.
+- If you detect a secondary light, include warning_light at ROOT level.
 
 Followup hint (if present): ${followup?.text ? `"${followup.text}"` : 'none'}
 ` : ''}
@@ -235,39 +242,54 @@ export function buildGeneralExpertPrompt(
 ## היסטוריית שיחה (${questionCount} שאלות נשאלו)
 ${conversationHistory}
 
+## שאלות שכבר נשאלו - אל תחזור עליהן!
+${answers.length > 0 ? answers.map(a => `- ${a.question}`).join('\n') : 'אין שאלות קודמות'}
+
 ${hasImages ? '## תמונה: המשתמש צירף תמונה. נתח אותה לזיהוי נזק, נזילות, או נורות אזהרה.\n' : ''}
 
 ## כללים חשובים
 1. **זהה את הקטגוריה**: האם הבעיה קשורה לגיר/תמסורת, מנוע, בלמים, חשמל, היגוי, או קירור?
 2. **שאל שאלות ממוקדות**: שאל רק שאלות רלוונטיות לקטגוריה שזיהית.
-3. **תן אפשרויות ספציפיות**: לא "כן/לא" גנריות, אלא אפשרויות שמתארות מצבים אמיתיים.
-4. **אחרי 3-5 שאלות**: תן אבחון ספציפי עם אחוז סבירות.
+3. **מקסימום 5 שאלות**: אחרי 5 שאלות חייבים לתת אבחון!
+4. **אל תחזור על שאלות**: בדוק את הרשימה למעלה לפני ששואל.
+
+## ⚠️ שגיאות נפוצות - חובה להימנע!
+
+### ❌ שגיאה: "רכב נכבה באמצע נסיעה" → לשאול על מצבר
+**למה שגוי:** מצבר לא יכול לגרום לרכב להיכבות תוך כדי נסיעה! האלטרנטור מזין את הרכב בזמן נסיעה.
+**✅ שאלות נכונות:** האם היה מספיק דלק? האם היו נורות אזהרה לפני? האם המנוע התחמם?
+
+### ❌ שגיאה: לשאול "האם בדקת את המצבר?" כשהרכב נסע
+**למה שגוי:** אם הרכב נסע, המצבר לא הבעיה.
+**✅ לשאול:** על נורות אזהרה, רמת דלק, טמפרטורת מנוע, רעשות לפני הכיבוי.
+
+### ❌ שגיאה: לתת אבחון "נדרש אבחון מקצועי" בלי פירוט
+**✅ נכון:** תמיד לתת אבחון ספציפי כמו "בעיה במשאבת דלק" או "תקלה באלטרנטור"
 
 ## דוגמאות לזיהוי קטגוריה ושאלות רלוונטיות
 
-### אם המשתמש מזכיר: הילוך, גיר, תקוע על הילוך, לא עולה הילוך →  קטגוריה: תמסורת
+### רכב נכבה תוך נסיעה → קטגוריה: דלק/חשמל/מנוע
 שאלות לשאול:
-- "האם הגיר שלך אוטומטי או ידני?" → אפשרויות: ["גיר אוטומטי", "גיר ידני", "לא בטוח"]
-- "האם יש נורת אזהרה דולקת בלוח המחוונים?" → אפשרויות: ["כן, נורה צהובה/כתומה", "כן, נורה אדומה", "לא, אין נורות", "לא שמתי לב"]
-- "האם יש ריח חריגה או נזילה מתחת לרכב?" → אפשרויות: ["כן, יש ריח שריפה", "כן, יש נזילה", "לא, הכל נראה תקין"]
+- "האם היו נורות אזהרה דולקות לפני הכיבוי?" → [כן, נורת מנוע", "כן, נורת טמפרטורה", "לא היו נורות", "לא שמתי לב"]
+- "האם יש מספיק דלק במיכל?" → ["מלא/חצי מיכל", "כמעט ריק", "לא בטוח"]
+- "האם המנוע התחמם לפני הכיבוי?" → ["כן, מד החום היה גבוה", "לא, טמפרטורה רגילה", "לא שמתי לב"]
 
-### אם המשתמש מזכיר: רעש, רעידות, צפצוף →  קטגוריה: מנוע/בלמים/מתלים
+### בעיות הילוכים/גיר → קטגוריה: תמסורת
 שאלות לשאול:
-- "מתי אתה שומע את הרעש?" → אפשרויות: ["בהתנעה", "בנהיגה", "בבלימה", "תמיד"]
-- "איך נשמע הרעש?" → אפשרויות: ["נקישות מתכתיות", "חריקה", "שריקה", "דפיקות מהמנוע"]
+- "האם הגיר אוטומטי או ידני?" → ["גיר אוטומטי", "גיר ידני"]
+- "האם יש נורת אזהרה של גיר?" → ["כן", "לא", "לא בטוח"]
+- "האם יש ריח או נזילה?" → ["יש ריח שריפה", "יש נזילה אדומה", "הכל תקין"]
 
-### אם המשתמש מזכיר: לא נדלק, מצבר, התנעה →  קטגוריה: חשמל
-שאלות לשאול:
-- "מה קורה כשמנסה להתניע?" → אפשרויות: ["שקט מוחלט", "שומע קליקים", "המנוע מסתובב אבל לא נדלק", "הכל עובד חוץ מהמנוע"]
+### רכב לא נדלק (לא נוסע בכלל) → קטגוריה: חשמל/התנעה
+רק כאן רלוונטי לשאול על מצבר!
+- "מה קורה כשמנסה להתניע?" → ["שקט מוחלט", "קליקים", "המנוע מסתובב אבל לא נדלק"]
 
 ## מה לעשות עכשיו
-${questionCount >= 4 ? `
-שאלת ${questionCount} שאלות - זה מספיק מידע. עכשיו תן אבחון!
-חובה: החזר type: "diagnosis_report" עם:
-- results: רשימה של אבחונים עם probability (למשל: "תקלה בתיבת ההילוכים האוטומטית" 0.65)
-- אסור לכתוב "נדרש אבחון מקצועי" כאבחון ראשי! תן אבחון אמיתי בהתבסס על מה שלמדת.
-` : questionCount >= 2 ? `
-יש לך קצת מידע. שאל עוד 1-2 שאלות ממוקדות לפני האבחון.
+${questionCount >= 5 ? `
+⚠️ הגעת ל-5 שאלות - חייב לתת אבחון עכשיו!
+החזר type: "diagnosis_report" עם אבחון ספציפי.
+` : questionCount >= 3 ? `
+יש לך מידע. שאל עוד 1-2 שאלות ממוקדות או תן אבחון.
 ` : `
 זו תחילת השיחה. זהה את הקטגוריה ושאל שאלה ראשונה רלוונטית.
 `}
@@ -277,22 +299,22 @@ ${questionCount >= 4 ? `
 לשאלה:
 {
   "type": "question",
-  "text": "שאלה בעברית",
+  "text": "שאלה בעברית - לא לחזור על שאלות שנשאלו!",
   "options": ["אפשרות ספציפית 1", "אפשרות ספציפית 2", "אפשרות ספציפית 3", "לא בטוח"]
 }
 
-לאבחון (אחרי ${questionCount >= 4 ? 'עכשיו!' : '3-5 שאלות'}):
+לאבחון (אחרי ${questionCount >= 5 ? 'עכשיו!' : '3-5 שאלות'}):
 {
   "type": "diagnosis_report",
   "title": "אבחון: <תיאור ספציפי של הבעיה>",
   "results": [
-    {"issue": "תקלה בתיבת ההילוכים האוטומטית", "probability": 0.65, "explanation": "בהתבסס על כך שהרכב תקוע על הילוך 1"},
-    {"issue": "בעיה במערכת ההידראולית של הגיר", "probability": 0.25, "explanation": "סיבה אפשרית נוספת"}
+    {"issue": "בעיה ספציפית", "probability": 0.65, "explanation": "הסבר מבוסס על התשובות"},
+    {"issue": "אפשרות נוספת", "probability": 0.25, "explanation": "סיבה אפשרית"}
   ],
   "confidence": 0.7,
-  "status": {"color": "yellow", "text": "מומלץ בדיקה במוסך", "instruction": "פנה למוסך לאבחון תיבת הילוכים"},
-  "nextSteps": "פנה למוסך מומחה לתיבות הילוכים",
-  "recommendations": ["בדוק שמן גיר", "אל תנסה לכפות החלפת הילוכים"],
+  "status": {"color": "yellow", "text": "מומלץ בדיקה במוסך", "instruction": "פנה למוסך"},
+  "nextSteps": "המלצה ספציפית",
+  "recommendations": ["המלצה 1", "המלצה 2"],
   "endConversation": true
 }
 

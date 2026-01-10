@@ -1,63 +1,43 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
-// Helper function to get garage ID
-async function getGarageId(supabase: any, userId: string, mode: string): Promise<number | null> {
-  if (mode === "global") return null;
-  
-  const { data: garage, error } = await supabase
-    .from("garages")
-    .select("id")
-    .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
-    .single();
-
-  if (error || !garage) return null;
-  return garage.id;
-}
+// Issue type labels in Hebrew
+const ISSUE_TYPE_LABELS: Record<string, string> = {
+  engine: 'מנוע',
+  brakes: 'בלמים',
+  electrical: 'חשמל',
+  ac: 'מיזוג אוויר',
+  starting: 'מערכת התנעה',
+  gearbox: 'תיבת הילוכים',
+  noise: 'רעש/רטט',
+  suspension: 'מתלים',
+  transmission: 'הנעה',
+  fuel_system: 'מערכת דלק',
+  cooling_system: 'מערכת קירור',
+  exhaust: 'פליטה',
+  tires: 'צמיגים',
+  steering: 'היגוי',
+  other: 'אחר',
+};
 
 // Helper function to apply date range filter
-function applyDateRangeFilter(query: any, dateRange: string | null) {
-  if (!dateRange || dateRange === "all") return query;
-  
+function getStartDate(dateRange: string | null): Date | null {
+  if (!dateRange || dateRange === "all") return null;
+
   const now = new Date();
-  let startDate: Date;
-  
+
   switch (dateRange) {
     case "today":
-      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000);
     case "weekly":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     case "monthly":
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     case "yearly":
-      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      break;
+      return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
     default:
-      return query;
+      return null;
   }
-  
-  return query.gte("created_at", startDate.toISOString());
-}
-
-// Helper function to check if description matches issue type
-function matchesIssueType(description: string | null, issueType: string | null): boolean {
-  if (!issueType || issueType === "all" || !description) return true;
-  
-  const desc = description.toLowerCase();
-  const type = issueType.toLowerCase();
-  
-  if (type === "engine") return desc.includes("מנוע") || desc.includes("engine") || desc.includes("חום") || desc.includes("שמן");
-  if (type === "brakes") return desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה");
-  if (type === "electrical") return desc.includes("חשמל") || desc.includes("electrical") || desc.includes("חשמלי");
-  if (type === "ac") return desc.includes("מיזוג") || desc.includes("ac") || desc.includes("קירור");
-  if (type === "starting") return desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר");
-  if (type === "gearbox") return desc.includes("תיבת") || desc.includes("gearbox") || desc.includes("הילוכים");
-  if (type === "noise") return desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט");
-  
-  return true;
 }
 
 export async function GET(request: Request) {
@@ -65,8 +45,6 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "local";
-    const manufacturers = searchParams.get("manufacturers")?.split(",").filter(Boolean) || [];
-    const models = searchParams.get("models")?.split(",").filter(Boolean) || [];
     const dateRange = searchParams.get("dateRange");
     const issueType = searchParams.get("issueType");
 
@@ -80,87 +58,91 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const garageId = await getGarageId(supabase, user.id, mode);
+    let garageId: string | null = null;
 
-    // Build query
-    let query = supabase
-      .from("requests")
-      .select(`
-        id,
-        description,
-        problem_description,
-        created_at,
-        car:people_cars (
-          vehicle_catalog:vehicle_catalog_id (
-            manufacturer,
-            model
-          )
-        )
-      `);
+    // Get garage ID for local mode
+    if (mode !== "global") {
+      // Get user's national_id from users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("national_id")
+        .eq("id", user.id)
+        .single();
 
-    // Apply date range filter
-    query = applyDateRangeFilter(query, dateRange);
-
-    // Filter by garage_id if in local mode
-    if (garageId !== null) {
-      const { data: repairsData } = await supabase
-        .from("repairs")
-        .select("request_id")
-        .eq("garage_id", garageId);
-
-      const requestIds = repairsData?.map((r: any) => r.request_id) || [];
-      if (requestIds.length > 0) {
-        query = query.in("id", requestIds);
-      } else {
-        return NextResponse.json({ top5: [] });
+      if (userError || !userData?.national_id) {
+        return NextResponse.json({ topIssues: [] });
       }
+
+      // Find garage by owner_national_id
+      const { data: garage, error: garageError } = await supabase
+        .from("garages")
+        .select("id")
+        .eq("owner_national_id", userData.national_id)
+        .single();
+
+      if (garageError || !garage) {
+        return NextResponse.json({ topIssues: [] });
+      }
+      garageId = garage.id;
     }
 
-    const { data: requests, error: requestsError } = await query;
+    // Query repairs table for issue types
+    let query = supabase
+      .from("repairs")
+      .select("final_issue_type")
+      .not("final_issue_type", "is", null);
 
-    if (requestsError) {
+    // Apply garage filter
+    if (garageId) {
+      query = query.eq("garage_id", garageId);
+    }
+
+    // Apply date filter
+    const startDate = getStartDate(dateRange);
+    if (startDate) {
+      query = query.gte("completed_at", startDate.toISOString());
+    }
+
+    // Apply issue type filter
+    if (issueType && issueType !== "all") {
+      query = query.eq("final_issue_type", issueType);
+    }
+
+    const { data: repairs, error: repairsError } = await query;
+
+    if (repairsError) {
+      console.error('[top-issues] DB error:', repairsError);
       return NextResponse.json(
-        { error: "Failed to fetch requests", details: requestsError.message },
+        { error: "Failed to fetch repairs", details: repairsError.message },
         { status: 500 }
       );
     }
 
-    // Count issue descriptions
+    // Count occurrences by issue type
     const issueCounts = new Map<string, number>();
 
-    requests?.forEach((req: any) => {
-      const catalog = req.car?.vehicle_catalog;
-
-      // Apply manufacturer filter
-      if (manufacturers.length > 0 && catalog && !manufacturers.includes(catalog.manufacturer)) return;
-
-      // Apply model filter
-      if (models.length > 0 && catalog && !models.includes(catalog.model)) return;
-
-      const description = req.problem_description || req.description || "";
-      
-      // Apply issue type filter
-      if (!matchesIssueType(description, issueType)) return;
-
-      // Normalize description (take first 100 chars as key)
-      const normalized = description.substring(0, 100).trim();
-      if (normalized) {
-        issueCounts.set(normalized, (issueCounts.get(normalized) || 0) + 1);
+    repairs?.forEach((repair: any) => {
+      const issueType = repair.final_issue_type;
+      if (issueType) {
+        issueCounts.set(issueType, (issueCounts.get(issueType) || 0) + 1);
       }
     });
 
-    // Convert to array, sort by count descending, take top 5
+    // Convert to array with Hebrew labels, sort descending, take top 5
     const top5 = Array.from(issueCounts.entries())
-      .map(([issue_description, occurrences]) => ({ issue_description, occurrences }))
+      .map(([issue_type, occurrences]) => ({
+        issue_description: ISSUE_TYPE_LABELS[issue_type] || issue_type,
+        occurrences
+      }))
       .sort((a, b) => b.occurrences - a.occurrences)
       .slice(0, 5);
 
     return NextResponse.json({ top5 });
   } catch (err) {
+    console.error('[top-issues] Server error:', err);
     return NextResponse.json(
       { error: "Server error", details: String(err) },
       { status: 500 }
     );
   }
 }
-

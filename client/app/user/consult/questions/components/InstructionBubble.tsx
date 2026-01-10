@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Eye, Wrench, Droplets, Settings2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Eye, Wrench, Droplets, Settings2, AlertTriangle, CheckCircle2, Clock, Coins } from "lucide-react";
 
 
 
@@ -11,12 +11,24 @@ interface InstructionStep {
   actionType?: 'inspect' | 'fill' | 'adjust' | 'check' | 'warning' | 'critical' | 'default';
 }
 
+interface SelfFixMeta {
+  difficulty?: 'easy' | 'medium' | 'hard';
+  timeEstimate?: string;
+  toolsNeeded?: string[];
+  costEstimate?: { diy?: string; parts?: string; garage?: string };
+  whenToStop?: string;
+  successIndicators?: string[];
+  warning?: string;
+}
+
 interface InstructionBubbleProps {
   message?: string;
   steps?: InstructionStep[] | string[];
   actionType?: 'inspect' | 'fill' | 'adjust' | 'check' | 'warning' | 'critical' | 'default';
   title?: string;
   isCritical?: boolean;
+  /** Metadata for self-fix actions from KB */
+  selfFixMeta?: SelfFixMeta;
 }
 
 // 🔧 אייקונים לפי סוג הפעולה
@@ -85,7 +97,8 @@ export default function InstructionBubble({
   steps,
   actionType = 'default',
   title,
-  isCritical = false
+  isCritical = false,
+  selfFixMeta
 }: InstructionBubbleProps) {
   // Determine effective action type
   const effectiveType = isCritical ? 'critical' : actionType;
@@ -113,6 +126,21 @@ export default function InstructionBubble({
 
   // 🔧 FIX: Handle completely empty state
   const hasContent = instructionSteps.length > 0 || (message && message.trim().length > 0);
+
+  // Difficulty labels
+  const difficultyLabels: Record<string, { text: string; color: string }> = {
+    easy: { text: 'קל', color: 'text-green-400' },
+    medium: { text: 'בינוני', color: 'text-yellow-400' },
+    hard: { text: 'מתקדם', color: 'text-red-400' }
+  };
+
+  // Check if we have any metadata to show
+  const hasMetadata = selfFixMeta && (
+    selfFixMeta.difficulty ||
+    selfFixMeta.timeEstimate ||
+    (selfFixMeta.toolsNeeded && selfFixMeta.toolsNeeded.length > 0) ||
+    selfFixMeta.costEstimate
+  );
 
   return (
     <motion.div
@@ -145,6 +173,56 @@ export default function InstructionBubble({
             {titleText}
           </span>
         </div>
+
+        {/* Self-fix metadata section (NEW) */}
+        {hasMetadata && (
+          <div className="mb-4 pb-3 border-b border-white/10 space-y-2">
+            <div className="flex flex-wrap gap-3 text-xs">
+              {/* Difficulty */}
+              {selfFixMeta?.difficulty && (
+                <span className={`flex items-center gap-1 ${difficultyLabels[selfFixMeta.difficulty]?.color || 'text-white/70'}`}>
+                  <span className="opacity-60">קושי:</span>
+                  {difficultyLabels[selfFixMeta.difficulty]?.text || selfFixMeta.difficulty}
+                </span>
+              )}
+              {/* Time */}
+              {selfFixMeta?.timeEstimate && (
+                <span className="flex items-center gap-1 text-white/70">
+                  <Clock size={12} />
+                  {selfFixMeta.timeEstimate}
+                </span>
+              )}
+              {/* Tools */}
+              {selfFixMeta?.toolsNeeded && selfFixMeta.toolsNeeded.length > 0 && (
+                <span className="flex items-center gap-1 text-white/70">
+                  <Wrench size={12} />
+                  {selfFixMeta.toolsNeeded.join(', ')}
+                </span>
+              )}
+            </div>
+
+            {/* Cost estimate */}
+            {selfFixMeta?.costEstimate && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Coins size={12} className="text-emerald-400 mt-0.5" />
+                {selfFixMeta.costEstimate.diy && (
+                  <span className="text-emerald-300">DIY: {selfFixMeta.costEstimate.diy}</span>
+                )}
+                {selfFixMeta.costEstimate.garage && (
+                  <span className="text-amber-300">מוסך: {selfFixMeta.costEstimate.garage}</span>
+                )}
+              </div>
+            )}
+
+            {/* Warning */}
+            {selfFixMeta?.warning && (
+              <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-2 text-xs text-red-200">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 text-red-400" />
+                {selfFixMeta.warning}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 🔧 FIX: Show message text above steps when both exist */}
         {showMessageAbove && (

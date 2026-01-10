@@ -11,8 +11,16 @@ import {
     Send,
     Filter,
     Loader2,
-    CheckCircle2
+    CheckCircle2,
+    Clock
 } from "lucide-react";
+
+interface OperatingHours {
+    day: string;
+    open: string;
+    close: string;
+    isClosed: boolean;
+}
 
 interface Garage {
     id: string;
@@ -22,6 +30,7 @@ interface Garage {
     Street: string | null;
     Number: string | null;
     hasOwner: boolean;  // TRUE = real garage with owner, FALSE = display only
+    operating_hours?: OperatingHours[] | null;
 }
 
 export default function GaragesPage() {
@@ -117,6 +126,55 @@ export default function GaragesPage() {
     const formatPhoneLink = (phone: string | null): string => {
         if (!phone) return "";
         return `tel:${phone.replace(/[^0-9+]/g, "")}`;
+    };
+
+    // Format operating hours for display
+    const formatOperatingHours = (hours: OperatingHours[] | null | undefined): string => {
+        if (!hours || !Array.isArray(hours) || hours.length === 0) {
+            return "שעות פעילות לא זמינות";
+        }
+
+        // Get current day (0 = Sunday, 6 = Saturday)
+        const today = new Date().getDay();
+        const todayHours = hours[today];
+
+        if (todayHours && !todayHours.isClosed) {
+            return `פתוח היום: ${todayHours.open} - ${todayHours.close}`;
+        }
+
+        // Find next open day
+        for (let i = 1; i <= 7; i++) {
+            const nextDay = (today + i) % 7;
+            const nextDayHours = hours[nextDay];
+            if (nextDayHours && !nextDayHours.isClosed) {
+                return `פתוח מחר (${nextDayHours.day}): ${nextDayHours.open} - ${nextDayHours.close}`;
+            }
+        }
+
+        return "סגור כעת";
+    };
+
+    // Get operating hours summary
+    const getOperatingHoursSummary = (hours: OperatingHours[] | null | undefined): string => {
+        if (!hours || !Array.isArray(hours) || hours.length === 0) {
+            return "";
+        }
+
+        // Count open days
+        const openDays = hours.filter(h => !h.isClosed).length;
+        if (openDays === 0) return "סגור כל השבוע";
+        if (openDays === 7) return "פתוח כל השבוע";
+
+        // Get common hours if all open days have same hours
+        const openDaysHours = hours.filter(h => !h.isClosed);
+        const firstOpen = openDaysHours[0];
+        const allSame = openDaysHours.every(h => h.open === firstOpen.open && h.close === firstOpen.close);
+        
+        if (allSame) {
+            return `${openDays} ימים בשבוע: ${firstOpen.open} - ${firstOpen.close}`;
+        }
+
+        return `${openDays} ימים בשבוע`;
     };
 
     return (
@@ -226,13 +284,29 @@ export default function GaragesPage() {
                                             {garage.phone && (
                                                 <a
                                                     href={formatPhoneLink(garage.phone)}
-                                                    className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors mb-4"
+                                                    className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors mb-2"
                                                 >
                                                     <Phone size={16} />
                                                     <span className="text-sm font-medium" dir="ltr">
                                                         {garage.phone}
                                                     </span>
                                                 </a>
+                                            )}
+
+                                            {/* Operating Hours - Only show for garages with owners */}
+                                            {garage.hasOwner && garage.operating_hours && (
+                                                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Clock size={16} className="text-white/50 flex-shrink-0" />
+                                                        <span className="text-sm font-semibold text-white/90">שעות פעילות</span>
+                                                    </div>
+                                                    <div className="text-sm text-white/70 mb-1">
+                                                        {formatOperatingHours(garage.operating_hours)}
+                                                    </div>
+                                                    <div className="text-xs text-white/50">
+                                                        {getOperatingHoursSummary(garage.operating_hours)}
+                                                    </div>
+                                                </div>
                                             )}
 
                                             {/* Send Button - only for garages with owners */}
