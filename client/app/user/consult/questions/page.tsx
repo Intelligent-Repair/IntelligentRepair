@@ -303,6 +303,15 @@ export default function QuestionsPage() {
                     steps={instructionMeta.steps}
                     actionType={instructionMeta.actionType || "inspect"}
                     isCritical={instructionMeta.actionType === "critical" || instructionMeta.isCritical}
+                    selfFixMeta={instructionMeta.difficulty || instructionMeta.costEstimate ? {
+                      difficulty: instructionMeta.difficulty,
+                      timeEstimate: instructionMeta.timeEstimate,
+                      toolsNeeded: instructionMeta.toolsNeeded,
+                      costEstimate: instructionMeta.costEstimate,
+                      warning: instructionMeta.warning,
+                      whenToStop: instructionMeta.whenToStop,
+                      successIndicators: instructionMeta.successIndicators
+                    } : undefined}
                   />
                 );
               }

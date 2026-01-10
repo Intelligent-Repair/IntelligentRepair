@@ -4,6 +4,106 @@ export type ActionType = 'VERIFIES' | 'RULES_OUT' | 'INFO' | 'SKIPPED';
 export type SeverityLevel = 'NORMAL' | 'CRITICAL';
 export type SafetyLevel = 'CRITICAL' | 'WARNING';
 
+// --- Types for car-symptoms.json (Schema v4) ---
+export type SymptomMappingType = 'light' | 'symptom' | 'safety' | 'scenario';
+export type SymptomSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type SymptomUrgency = 'now' | 'soon' | 'next_service';
+export type SymptomActionType = 'inspect' | 'check' | 'clean' | 'adjust' | 'fill';
+export type SymptomDifficulty = 'easy' | 'medium' | 'hard';
+
+/**
+ * הערכת עלות לתיקון
+ */
+export interface CostEstimate {
+  /** עלות לבדיקה עצמית */
+  diy?: string;
+  /** עלות חלפים בלבד */
+  parts?: string;
+  /** עלות במוסך כולל עבודה */
+  garage?: string;
+}
+
+/**
+ * פעולת תיקון עצמי פשוטה (ל-car-symptoms.json)
+ * מבנה פשוט יותר מ-KBSelfFixAction של warning-lights
+ */
+export interface SimpleSelfFixAction {
+  /** מזהה ייחודי */
+  id: string;
+  /** שם הפעולה */
+  name: string;
+  /** סוג הפעולה */
+  actionType: SymptomActionType;
+  /** רמת קושי */
+  difficulty?: SymptomDifficulty;
+  /** כלים נדרשים */
+  tools_needed?: string[];
+  /** זמן משוער לביצוע */
+  time_estimate?: string;
+  /** שלבי הביצוע */
+  steps: string[];
+  /** הערכת עלות */
+  cost_estimate?: CostEstimate;
+  /** מתי לעצור ולפנות למוסך */
+  when_to_stop?: string;
+  /** סימנים להצלחה */
+  success_indicators?: string[];
+  /** מה לעשות אם נכשל */
+  next_if_failed?: 'needs_mechanic' | 'needs_tow' | 'continue_driving';
+  /** אזהרה בטיחותית */
+  warning?: string;
+}
+
+/**
+ * מיפוי סימפטום בודד - יכול להיות נורה, סימפטום כללי, או מצב בטיחות
+ */
+export interface SymptomMapping {
+  /** מזהה ייחודי לסימפטום */
+  id?: string;
+  /** מילות מפתח לזיהוי */
+  keywords: string[];
+  /** מזהה יעד (לנורות - lightId) */
+  targetId?: string;
+  /** סוג המיפוי */
+  type: SymptomMappingType;
+  /** רמת חומרה */
+  severity?: SymptomSeverity;
+  /** שאלות ראשוניות לשאול מה-KB לפני AI */
+  first_questions?: string[];
+  /** סיבות אפשריות לבעיה */
+  possible_causes?: string[];
+  /** דחיפות הטיפול */
+  urgency?: SymptomUrgency;
+  /** הערת בטיחות */
+  safety_note?: string;
+  /** פעולות תיקון עצמי */
+  self_fix_actions?: SimpleSelfFixAction[];
+}
+
+/**
+ * קטגוריית סימפטומים (נורות, רעשים, התנהגות וכו')
+ */
+export interface SymptomCategory {
+  /** שם הקטגוריה */
+  category: string;
+  /** תיאור הקטגוריה */
+  description: string;
+  /** סוג ברירת מחדל עבור מיפויים בקטגוריה */
+  type?: SymptomMappingType;
+  /** רשימת המיפויים */
+  mappings: SymptomMapping[];
+}
+
+/**
+ * מבנה קובץ car-symptoms.json המלא
+ */
+export interface CarSymptomsKB {
+  schemaVersion: number;
+  description: string;
+  symptoms: SymptomCategory[];
+}
+
+
 export interface Suspect {
   id: string;      // מזהה הרכיב (battery, starter)
   name: string;    // שם לתצוגה (מצבר, סטרטר)
@@ -273,4 +373,86 @@ export interface WarningLight {
   importance?: string;
   first_question: KBQuestion;
   scenarios: Record<string, KBScenario>;
+}
+
+// --- עדכון 5: מבנה פשוט חדש עבור warning-lights.json (schemaVersion: simple-v1) ---
+
+/**
+ * בדיקה עצמית שהמשתמש יכול לבצע
+ */
+export interface SimpleSelfCheck {
+  /** הוראה למשתמש */
+  instruction: string;
+  /** מה לחפש */
+  what_to_look_for: string;
+  /** מה המשמעות אם מצא */
+  if_found: string;
+}
+
+/**
+ * תיקון מהיר שהמשתמש יכול לבצע
+ */
+export interface SimpleQuickFix {
+  /** הפעולה לביצוע */
+  action: string;
+  /** איך יודעים שזה עבד */
+  success_indicator: string;
+}
+
+/**
+ * רמת חומרה פשוטה
+ */
+export type SimpleWarningLightSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * נורת אזהרה במבנה הפשוט (AI-First)
+ * זהו המבנה החדש שמשמש כמקור מידע ל-AI
+ */
+export interface SimpleWarningLight {
+  /** שם בעברית */
+  name_he: string;
+  /** שם באנגלית */
+  name_en: string;
+  /** שמות נרדפים שמשתמשים עשויים להשתמש בהם */
+  aliases?: string[];
+  /** סמל אמוג'י */
+  symbol: string;
+  /** צבעים אפשריים */
+  colors: string[];
+  /** נורות קשורות שעשויות להופיע יחד */
+  related_lights?: string[];
+  /** רמת חומרה */
+  severity: SimpleWarningLightSeverity;
+  /** האם אפשר להמשיך לנסוע */
+  can_drive: boolean;
+  /** מרחק מקסימלי בק"מ שאפשר לנסוע */
+  max_distance_km: number;
+  /** מהירות מקסימלית מומלצת */
+  speed_limit_kmh: number;
+  /** מה הנורה אומרת */
+  what_it_means: string;
+  /** סיבות נפוצות עם אחוזים */
+  common_causes: string[];
+  /** בדיקות עצמיות */
+  self_checks: SimpleSelfCheck[];
+  /** תיקונים מהירים */
+  quick_fixes: SimpleQuickFix[];
+  /** מתי לעצור מיד */
+  when_to_stop_immediately: string[];
+  /** מתי צריך מוסך */
+  when_garage_needed: string[];
+  /** טווח עלויות משוער */
+  estimated_repair_cost_range: string;
+  /** זמן תיקון טיפוסי */
+  typical_repair_time: string;
+  /** טיפים מקצועיים */
+  pro_tips: string[];
+}
+
+/**
+ * מבנה קובץ warning-lights.json במבנה הפשוט
+ */
+export interface SimpleWarningLightsKB {
+  schemaVersion: string;
+  [lightId: string]: SimpleWarningLight | string;
 }

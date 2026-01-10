@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
-// Helper function to get garage ID
-async function getGarageId(supabase: any, userId: string, mode: string): Promise<number | null> {
-  if (mode === "global") return null;
-  
+// Helper function to get garage ID by national_id
+async function getGarageId(supabase: any, nationalId: string | null, mode: string): Promise<number | null> {
+  if (mode === "global" || !nationalId) return null;
+
   const { data: garage, error } = await supabase
     .from("garages")
     .select("id")
-    .or(`owner_user_id.eq.${userId},user_id.eq.${userId}`)
+    .eq("owner_national_id", nationalId)
     .single();
 
   if (error || !garage) return null;
@@ -18,10 +18,10 @@ async function getGarageId(supabase: any, userId: string, mode: string): Promise
 // Helper function to apply date range filter
 function applyDateRangeFilter(query: any, dateRange: string | null) {
   if (!dateRange || dateRange === "all") return query;
-  
+
   const now = new Date();
   let startDate: Date;
-  
+
   switch (dateRange) {
     case "today":
       startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -38,17 +38,17 @@ function applyDateRangeFilter(query: any, dateRange: string | null) {
     default:
       return query;
   }
-  
+
   return query.gte("created_at", startDate.toISOString());
 }
 
 // Helper function to check if description matches issue type
 function matchesIssueType(description: string | null, issueType: string | null): boolean {
   if (!issueType || issueType === "all" || !description) return true;
-  
+
   const desc = description.toLowerCase();
   const type = issueType.toLowerCase();
-  
+
   if (type === "engine") return desc.includes("מנוע") || desc.includes("engine") || desc.includes("חום") || desc.includes("שמן");
   if (type === "brakes") return desc.includes("בלמים") || desc.includes("brake") || desc.includes("בלימה");
   if (type === "electrical") return desc.includes("חשמל") || desc.includes("electrical") || desc.includes("חשמלי");
@@ -56,7 +56,7 @@ function matchesIssueType(description: string | null, issueType: string | null):
   if (type === "starting") return desc.includes("התנעה") || desc.includes("start") || desc.includes("מצבר");
   if (type === "gearbox") return desc.includes("תיבת") || desc.includes("gearbox") || desc.includes("הילוכים");
   if (type === "noise") return desc.includes("רעש") || desc.includes("noise") || desc.includes("רטט");
-  
+
   return true;
 }
 
@@ -81,7 +81,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const garageId = await getGarageId(supabase, user.id, mode);
+    // Get user's national_id for garage lookup
+    const { data: userData } = await supabase
+      .from("users")
+      .select("national_id")
+      .eq("id", user.id)
+      .single();
+
+    const garageId = await getGarageId(supabase, userData?.national_id || null, mode);
 
     // Build base query for requests
     let requestsQuery = supabase
@@ -149,7 +156,7 @@ export async function GET(request: Request) {
         const desc = req.problem_description || req.description || "";
         return matchesIssueType(desc, issueType);
       }) || [];
-      
+
       data.push({ label: "סה״כ פניות", value: filtered.length });
     } else if (chartMode === "resolvedIssues") {
       const filtered = requests?.filter((req: any) => {
@@ -160,7 +167,7 @@ export async function GET(request: Request) {
         const desc = req.problem_description || req.description || "";
         return matchesIssueType(desc, issueType);
       }) || [];
-      
+
       data.push({ label: "פניות שנפתרו", value: filtered.length });
     } else if (chartMode === "unresolvedIssues") {
       const filtered = requests?.filter((req: any) => {
@@ -171,27 +178,27 @@ export async function GET(request: Request) {
         const desc = req.problem_description || req.description || "";
         return matchesIssueType(desc, issueType);
       }) || [];
-      
+
       data.push({ label: "פניות שלא נפתרו", value: filtered.length });
     } else if (chartMode === "issuesByManufacturer") {
       const manufacturerCounts = new Map<string, number>();
-      
+
       requests?.forEach((req: any) => {
         const catalog = req.car?.vehicle_catalog;
         if (!catalog || !catalog.manufacturer) return;
-        
+
         if (manufacturers.length > 0 && !manufacturers.includes(catalog.manufacturer)) return;
         if (models.length > 0 && catalog.model && !models.includes(catalog.model)) return;
-        
+
         const desc = req.problem_description || req.description || "";
         if (!matchesIssueType(desc, issueType)) return;
-        
+
         manufacturerCounts.set(
           catalog.manufacturer,
           (manufacturerCounts.get(catalog.manufacturer) || 0) + 1
         );
       });
-      
+
       Array.from(manufacturerCounts.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
@@ -200,21 +207,21 @@ export async function GET(request: Request) {
         });
     } else if (chartMode === "issuesByModel") {
       const modelCounts = new Map<string, number>();
-      
+
       requests?.forEach((req: any) => {
         const catalog = req.car?.vehicle_catalog;
         if (!catalog || !catalog.model) return;
-        
+
         if (manufacturers.length > 0 && !manufacturers.includes(catalog.manufacturer)) return;
         if (models.length > 0 && !models.includes(catalog.model)) return;
-        
+
         const desc = req.problem_description || req.description || "";
         if (!matchesIssueType(desc, issueType)) return;
-        
+
         const key = `${catalog.manufacturer} ${catalog.model}`;
         modelCounts.set(key, (modelCounts.get(key) || 0) + 1);
       });
-      
+
       Array.from(modelCounts.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)

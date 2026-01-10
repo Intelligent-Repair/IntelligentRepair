@@ -30,17 +30,29 @@ export async function GET(
             );
         }
 
-        // Find the garage owned by this user
-        // Note: garages table only has owner_user_id (no user_id field)
+        // Get user's national_id from users table
+        const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("national_id")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userData?.national_id) {
+            return NextResponse.json(
+                { error: "User profile incomplete - missing national_id" },
+                { status: 400 }
+            );
+        }
+
+        // Find the garage by owner_national_id
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
-            .eq("owner_user_id", user.id)
+            .eq("owner_national_id", userData.national_id)
             .maybeSingle();
 
         if (garageError) {
             console.error("[garage/requests/request_id] Garage lookup error:", garageError);
-            console.error("[garage/requests/request_id] User ID:", user.id);
             return NextResponse.json(
                 { error: "Failed to find garage", details: garageError.message },
                 { status: 500 }
@@ -48,15 +60,14 @@ export async function GET(
         }
 
         if (!garage) {
-            console.error("[garage/requests/request_id] No garage found for user:", user.id);
-            console.error("[garage/requests/request_id] User email:", user.email);
+            console.error("[garage/requests/request_id] No garage found for national_id:", userData.national_id);
             return NextResponse.json(
                 { error: "No garage found for this user" },
                 { status: 404 }
             );
         }
 
-        console.log("[garage/requests/request_id] Found garage:", garage.id, "for user:", user.id);
+        console.log("[garage/requests/request_id] Found garage:", garage.id);
 
         // Fetch garage_request and verify it belongs to this garage
         const { data: garageRequest, error: requestError } = await supabase
@@ -174,17 +185,29 @@ export async function PATCH(
             );
         }
 
-        // Find the garage owned by this user
-        // Note: garages table only has owner_user_id (no user_id field)
+        // Get user's national_id from users table
+        const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("national_id")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userData?.national_id) {
+            return NextResponse.json(
+                { error: "User profile incomplete - missing national_id" },
+                { status: 400 }
+            );
+        }
+
+        // Find the garage by owner_national_id
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
-            .eq("owner_user_id", user.id)
+            .eq("owner_national_id", userData.national_id)
             .maybeSingle();
 
         if (garageError) {
             console.error("[garage/requests/request_id] Garage lookup error:", garageError);
-            console.error("[garage/requests/request_id] User ID:", user.id);
             return NextResponse.json(
                 { error: "Failed to find garage", details: garageError.message },
                 { status: 500 }
@@ -192,15 +215,14 @@ export async function PATCH(
         }
 
         if (!garage) {
-            console.error("[garage/requests/request_id] No garage found for user:", user.id);
-            console.error("[garage/requests/request_id] User email:", user.email);
+            console.error("[garage/requests/request_id] No garage found for national_id:", userData.national_id);
             return NextResponse.json(
                 { error: "No garage found for this user" },
                 { status: 404 }
             );
         }
 
-        console.log("[garage/requests/request_id] Found garage:", garage.id, "for user:", user.id);
+        console.log("[garage/requests/request_id] Found garage:", garage.id);
 
         // Update garage_request status
         const updateData: any = {};

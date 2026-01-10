@@ -15,12 +15,11 @@ import {
     getNextQuestion,
     getNextStep,
     checkImmediateAction,
-    generateDiagnosis,
     updateSuspectsAndReport,
     generateScenarioReport,
     matchOption
 } from '@/lib/ai/diagnostic-utils';
-import { generateAIDiagnosis, HYBRID_LIGHTS } from '@/lib/ai/hybrid-diagnosis';
+// Note: hybrid-diagnosis.ts is deprecated - all lights now use unified-diagnosis-v2.ts
 import { generateUnifiedDiagnosis } from '@/lib/ai/unified-diagnosis-v2';
 import type { KBNextStep, KBInstruction } from '@/lib/ai/diagnostic-utils';
 
@@ -459,7 +458,7 @@ function handleResolutionPath(resolution: ResolutionPath, lightType: string, sce
 }
 
 // KB FLOW (Warning lights)
-// HYBRID_LIGHTS use KB for questions but AI for diagnosis (imported from hybrid-diagnosis.ts)
+// All lights now use unified AI diagnosis (hybrid-diagnosis.ts deprecated)
 
 export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const { userText, answers, context } = req;
@@ -469,6 +468,18 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
 
     const lightType = context.detectedLightType;
     const uiSeverity = context.lightSeverity || 'caution';
+
+    // 🚨 SAFETY CHECK: Detect critical safety phrases mid-conversation
+    // This catches cases like user mentioning "עשן מהמנוע" while in KB flow
+    const { analyzeSafetyOnly } = await import('@/lib/ai/context-analyzer');
+    const safetyRule = analyzeSafetyOnly(userText);
+    if (safetyRule) {
+        console.log(`[KBFlow] 🚨 Safety rule triggered mid-conversation: ${safetyRule.id}`);
+        return {
+            handled: true,
+            response: handleSafetyStop(safetyRule)
+        };
+    }
 
     console.log(`[KBFlow] Light: ${lightType} | Scenario: ${context.currentLightScenario || 'detecting'} | Answer: "${userText}"`);
 
@@ -850,22 +861,68 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
         };
     }
 
-    // No more steps AND enough questions asked: generate diagnosis
-    // For HYBRID_LIGHTS, use AI diagnosis instead of KB scoring
-    if (HYBRID_LIGHTS.includes(lightType as any)) {
-        console.log(`[KBFlow] Hybrid diagnosis for ${lightType} (${questionCount} questions asked)`);
-        const aiDiagnosis = await generateAIDiagnosis(lightType, scenarioId ?? '', answers, context?.vehicleInfo, context);
-        return { handled: true, response: aiDiagnosis };
-    }
+    // No more steps AND enough questions asked: generate unified AI diagnosis for ALL lights
+    console.log(`[KBFlow] Generating unified AI diagnosis for ${lightType} (${questionCount} questions asked)`);
 
-    return { handled: true, response: NextResponse.json(generateDiagnosis(lightType, scenarioId ?? '', updatedScores, answers, context?.vehicleInfo, context?.shownInstructionIds)) };
-}
+    // Build conversation history for AI
+    const conversationHistory = answers.map(a => ({
+        role: 'user' as const,
+        content: `${(a as any).question || ''} → ${a.answer}`
+    }));
 
-// Scenario flow - DISABLED (scenarios.ts removed, all symptoms now go to AI)
-export async function handleScenarioStep(req: RequestContext): Promise<FlowResult> {
-    // SCENARIOS removed - scenario flows now bypassed to AI
-    // This function always returns not-handled, routing to AI fallback
-    return { response: null, handled: false };
+    // Call unified AI diagnosis (works for ALL lights, including former HYBRID_LIGHTS)
+    const unifiedDiag = await generateUnifiedDiagnosis({
+        lightType,
+        scenarioId,
+        conversationHistory,
+        vehicleInfo: context.vehicleInfo,
+        requestDescription: answers[0]?.answer || '',
+        answers
+    });
+
+    const userDiag = unifiedDiag.userDiagnosis;
+    const mechSummary = unifiedDiag.mechanicSummary;
+
+    return {
+        handled: true,
+        response: NextResponse.json({
+            type: 'diagnosis_report',
+            title: userDiag.title,
+            confidence: userDiag.confidence,
+            confidenceLevel: userDiag.confidenceLevel,
+            results: mechSummary.diagnoses.map(d => ({
+                issue: d.issue,
+                probability: d.probability,
+                explanation: userDiag.explanation
+            })),
+            status: {
+                color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
+                text: userDiag.topIssue,
+                instruction: userDiag.nextAction
+            },
+            selfFix: [],
+            nextSteps: userDiag.nextAction,
+            recommendations: userDiag.recommendations,
+            endConversation: true,
+            showTowButton: userDiag.needsTow,
+            detectedLightType: lightType,
+            kbSource: true,
+            // Include conversationSummaries for frontend to save
+            conversationSummaries: {
+                mechanic: mechSummary,
+                user: {
+                    shortDescription: userDiag.explanation,
+                    topIssue: userDiag.topIssue,
+                    nextAction: userDiag.nextAction
+                }
+            },
+            context: mergeContext(context, {
+                currentLightScenario: scenarioId,
+                causeScores: updatedScores,
+                askedQuestionIds: askedIds
+            })
+        })
+    };
 }
 
 // Expert AI fallback
@@ -1124,12 +1181,6 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
         kbSource: true,
         context: { ...(existingContext ?? {}), detectedLightType: lightId, lightSeverity: isCritical ? 'danger' : severity, isLightContext: true, askedQuestionIds: ['first_question'], currentQuestionId: 'first_question', causeScores: {}, currentQuestionText: questionText, currentQuestionOptions: questionOptions, activeFlow: 'KB' as const }
     });
-}
-
-// Scenario start - DISABLED (scenarios.ts removed, all symptoms now go to AI)
-export function handleScenarioStart(scenarioId: string): any {
-    // SCENARIOS removed - always return null to route to AI
-    return null;
 }
 
 export function handleSafetyStop(rule: SafetyRule): any {

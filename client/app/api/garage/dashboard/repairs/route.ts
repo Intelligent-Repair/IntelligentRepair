@@ -74,30 +74,30 @@ export async function GET(request: Request) {
 
     // If mode is not "global", get the garage_id for this user
     if (mode !== "global") {
-      // First, find the user in public.users table by email
-      const { data: publicUser, error: userError } = await supabase
+      // Get user's national_id from users table
+      const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("id")
-        .eq("email", user.email)
+        .select("national_id")
+        .eq("id", user.id)
         .single();
 
-      if (userError || !publicUser) {
-        console.log('[Dashboard repairs] User not found in public.users, trying auth user id');
-        // Fallback: try with auth user id directly
+      if (userError || !userData?.national_id) {
+        console.log('[Dashboard repairs] User national_id not found');
+        return NextResponse.json({
+          repairs: [],
+          totalCount: 0,
+        });
       }
 
-      const userIdToMatch = publicUser?.id || user.id;
-
-      // Find garage by owner_user_id
+      // Find garage by owner_national_id
       const { data: garage, error: garageError } = await supabase
         .from("garages")
         .select("id")
-        .eq("owner_user_id", userIdToMatch)
+        .eq("owner_national_id", userData.national_id)
         .single();
 
       if (garageError || !garage) {
-        console.log('[Dashboard repairs] Garage not found for user:', userIdToMatch);
-        // Return empty data instead of 404 error
+        console.log('[Dashboard repairs] Garage not found for national_id:', userData.national_id);
         return NextResponse.json({
           repairs: [],
           totalCount: 0,

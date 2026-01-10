@@ -71,12 +71,26 @@ export async function GET(req: Request) {
             );
         }
 
-        // Find the garage owned by this user
-        // Note: Only owner_user_id exists in the garages table (no user_id field)
+        // Get user's national_id from users table
+        const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("national_id")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userData?.national_id) {
+            console.error("[garage/profile] User national_id not found:", userError);
+            return NextResponse.json(
+                { error: "User profile incomplete - missing national_id" },
+                { status: 400 }
+            );
+        }
+
+        // Find the garage by owner_national_id
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id, garage_name, phone, email, City, Street, Number, operating_hours")
-            .eq("owner_user_id", user.id)
+            .eq("owner_national_id", userData.national_id)
             .single();
 
         if (garageError || !garage) {
@@ -136,15 +150,28 @@ export async function PUT(req: Request) {
             );
         }
 
+        // Get user's national_id from users table
+        const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("national_id")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userData?.national_id) {
+            return NextResponse.json(
+                { error: "User profile incomplete - missing national_id" },
+                { status: 400 }
+            );
+        }
+
         const body = await req.json();
         const { profile, operatingHours } = body;
 
-        // Find the garage owned by this user
-        // Note: Only owner_user_id exists in the garages table (no user_id field)
+        // Find the garage by owner_national_id
         const { data: garage, error: garageError } = await supabase
             .from("garages")
             .select("id")
-            .eq("owner_user_id", user.id)
+            .eq("owner_national_id", userData.national_id)
             .single();
 
         if (garageError || !garage) {

@@ -62,23 +62,25 @@ export async function GET(request: Request) {
 
     // Get garage ID for local mode
     if (mode !== "global") {
-      // First, find the user in public.users table by email
-      const { data: publicUser } = await supabase
+      // Get user's national_id from users table
+      const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("id")
-        .eq("email", user.email)
+        .select("national_id")
+        .eq("id", user.id)
         .single();
 
-      const userIdToMatch = publicUser?.id || user.id;
+      if (userError || !userData?.national_id) {
+        return NextResponse.json({ topIssues: [] });
+      }
 
+      // Find garage by owner_national_id
       const { data: garage, error: garageError } = await supabase
         .from("garages")
         .select("id")
-        .eq("owner_user_id", userIdToMatch)
+        .eq("owner_national_id", userData.national_id)
         .single();
 
       if (garageError || !garage) {
-        // Return empty data instead of 404
         return NextResponse.json({ topIssues: [] });
       }
       garageId = garage.id;
