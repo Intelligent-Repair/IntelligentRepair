@@ -50,13 +50,16 @@ export async function GET(req: Request) {
         id,
         ai_summary,
         mechanic_notes,
+        final_issue_type,
         created_at,
         request:requests (
           id,
           description,
           status,
           created_at,
+          car_id,
           car:people_cars (
+            id,
             license_plate,
             vehicle_catalog:vehicle_catalog_id (
               manufacturer,

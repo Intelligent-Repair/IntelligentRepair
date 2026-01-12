@@ -74,17 +74,34 @@ export async function GET(request: Request) {
 
     // If mode is not "global", get the garage_id for this user
     if (mode !== "global") {
+      // Get user's national_id from users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("national_id")
+        .eq("id", user.id)
+        .single();
+
+      if (userError || !userData?.national_id) {
+        console.log('[Dashboard repairs] User national_id not found');
+        return NextResponse.json({
+          repairs: [],
+          totalCount: 0,
+        });
+      }
+
+      // Find garage by owner_national_id
       const { data: garage, error: garageError } = await supabase
         .from("garages")
         .select("id")
-        .or(`owner_user_id.eq.${user.id},user_id.eq.${user.id}`)
+        .eq("owner_national_id", userData.national_id)
         .single();
 
       if (garageError || !garage) {
-        return NextResponse.json(
-          { error: "Garage not found" },
-          { status: 404 }
-        );
+        console.log('[Dashboard repairs] Garage not found for national_id:', userData.national_id);
+        return NextResponse.json({
+          repairs: [],
+          totalCount: 0,
+        });
       }
 
       garageId = garage.id;

@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench, Home, Trash2 } from 'lucide-react';
 
 interface GarageRequest {
     id: string;
@@ -42,31 +42,48 @@ export default function GarageInquiriesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRequest, setSelectedRequest] = useState<GarageRequest | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
     const router = useRouter();
 
     // Fetch requests from API
-    useEffect(() => {
-        const fetchRequests = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch('/api/garage/requests');
-                const data = await res.json();
+    const fetchRequests = useCallback(async (showLoader = true) => {
+        if (showLoader) setLoading(true);
+        try {
+            const res = await fetch('/api/garage/requests');
+            const data = await res.json();
 
-                if (data.error) {
-                    setError(data.error);
-                } else {
-                    setRequests(data.requests || []);
-                }
-            } catch (err) {
-                console.error('Error fetching requests:', err);
-                setError('שגיאה בטעינת הפניות');
-            } finally {
-                setLoading(false);
+            if (data.error) {
+                setError(data.error);
+            } else {
+                setRequests(data.requests || []);
+                setLastRefresh(new Date());
             }
-        };
-
-        fetchRequests();
+        } catch (err) {
+            console.error('Error fetching requests:', err);
+            setError('שגיאה בטעינת הפניות');
+        } finally {
+            if (showLoader) setLoading(false);
+        }
     }, []);
+
+    // Initial fetch on mount
+    useEffect(() => {
+        fetchRequests();
+    }, [fetchRequests]);
+
+    // Auto-refresh every 30 seconds (only when modal is closed)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            // Don't refresh if modal is open
+            if (!selectedRequest) {
+                fetchRequests(false); // Don't show loader on auto-refresh
+            }
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(interval);
+    }, [fetchRequests, selectedRequest]);
 
     // Filter and search requests
     const filteredRequests = useMemo(() => {
@@ -75,9 +92,9 @@ export default function GarageInquiriesPage() {
         // Filter by status
         if (activeFilter !== 'all') {
             if (activeFilter === 'answered') {
-                // Show both answered, closed_no, and closed_yes as "נקראו ונענו"
-                result = result.filter(r => 
-                    r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
+                // Show answered, completed, closed_no, and closed_yes as "נקראו ונענו"
+                result = result.filter(r =>
+                    r.status === 'answered' || r.status === 'completed' || r.status === 'closed_no' || r.status === 'closed_yes'
                 );
             } else {
                 result = result.filter(r => r.status === activeFilter);
@@ -131,6 +148,32 @@ export default function GarageInquiriesPage() {
         }
     }, [selectedRequest]);
 
+    // Delete request
+    const handleDelete = useCallback(async (requestId: string) => {
+        setDeleting(true);
+        try {
+            const res = await fetch(`/api/garage/requests/${requestId}/delete`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                // Remove from local state
+                setRequests(prev => prev.filter(r => r.id !== requestId));
+                setSelectedRequest(null);
+                setShowDeleteConfirm(false);
+            } else {
+                const data = await res.json();
+                console.error('Delete failed:', data);
+                alert('שגיאה במחיקת הפנייה');
+            }
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('שגיאה במחיקת הפנייה');
+        } finally {
+            setDeleting(false);
+        }
+    }, []);
+
     // Open popup with request details
     const handleOpenDetails = (request: GarageRequest) => {
         console.log('[handleOpenDetails] Opening:', { id: request.id, status: request.status });
@@ -154,12 +197,14 @@ export default function GarageInquiriesPage() {
                 return { label: 'נצפה', className: 'bg-yellow-900/50 text-yellow-300' };
             case 'answered':
                 return { label: 'נענה', className: 'bg-green-900/50 text-green-300' };
+            case 'completed':
+                return { label: 'הושלם', className: 'bg-green-900/50 text-green-300' };
             case 'closed_no':
-                return { label: 'נסגר ללא דיווח', className: 'bg-gray-900/50 text-gray-300' };
+                return { label: 'סיים ללא טיפול', className: 'bg-gray-900/50 text-gray-300' };
             case 'closed_yes':
-                return { label: 'נסגר עם דיווח', className: 'bg-green-900/50 text-green-300' };
+                return { label: 'הושלם', className: 'bg-green-900/50 text-green-300' };
             default:
-                return { label: 'חדש', className: 'bg-red-900/50 text-red-300' };
+                return { label: status || 'לא ידוע', className: 'bg-gray-900/50 text-gray-300' };
         }
     };
 
@@ -301,9 +346,33 @@ export default function GarageInquiriesPage() {
             </div>
 
             <main dir="rtl" className="relative mx-auto w-full max-w-7xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
-                <h1 className="text-4xl font-extrabold text-white mb-8 border-b border-white/10 pb-4">
-                    פניות מלקוחות (Inbox)
-                </h1>
+                {/* Header with back button */}
+                <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
+                    <div>
+                        <h1 className="text-4xl font-extrabold text-white">
+                            פניות מלקוחות (Inbox)
+                        </h1>
+                        <p className="text-sm text-slate-400 mt-1">
+                            עדכון אחרון: {lastRefresh.toLocaleTimeString('he-IL')} • רענון אוטומטי כל 30 שניות
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => fetchRequests(false)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-slate-300 text-sm"
+                            title="רענון ידני"
+                        >
+                            🔄 רענן
+                        </button>
+                        <button
+                            onClick={() => router.push('/garage')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-white"
+                        >
+                            <Home className="w-5 h-5" />
+                            חזרה לתפריט הראשי
+                        </button>
+                    </div>
+                </div>
 
                 {/* Filters */}
                 <section className="flex flex-wrap gap-4 mb-8">
@@ -313,10 +382,10 @@ export default function GarageInquiriesPage() {
                         const count = filter.key === 'all'
                             ? requests.length
                             : filter.key === 'answered'
-                            ? requests.filter(r => 
-                                r.status === 'answered' || r.status === 'closed_no' || r.status === 'closed_yes'
-                            ).length
-                            : requests.filter(r => r.status === filter.key).length;
+                                ? requests.filter(r =>
+                                    r.status === 'answered' || r.status === 'completed' || r.status === 'closed_no' || r.status === 'closed_yes'
+                                ).length
+                                : requests.filter(r => r.status === filter.key).length;
 
                         return (
                             <button
@@ -440,7 +509,10 @@ export default function GarageInquiriesPage() {
                         <div className="flex justify-between items-center p-6 border-b border-white/10">
                             <h2 className="text-2xl font-bold text-white">פרטי פנייה</h2>
                             <button
-                                onClick={() => setSelectedRequest(null)}
+                                onClick={() => {
+                                    setSelectedRequest(null);
+                                    setShowDeleteConfirm(false);
+                                }}
                                 className="text-slate-400 hover:text-white transition"
                             >
                                 <X className="w-6 h-6" />
@@ -483,42 +555,76 @@ export default function GarageInquiriesPage() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-6 border-t border-white/10 flex justify-end gap-4">
-                            <button
-                                onClick={() => setSelectedRequest(null)}
-                                className="px-6 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition"
-                            >
-                                סגור
-                            </button>
-                            
-                            {/* Show action buttons only for pending or viewed status */}
-                            {(selectedRequest.status === 'pending' || selectedRequest.status === 'viewed') && (
-                                <>
+                        <div className="p-6 border-t border-white/10">
+                            {/* Delete Confirmation */}
+                            {showDeleteConfirm ? (
+                                <div className="flex items-center justify-between bg-red-900/30 border border-red-500/50 rounded-lg p-4">
+                                    <span className="text-red-300">האם אתה בטוח שברצונך למחוק פנייה זו?</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(false)}
+                                            className="px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition"
+                                        >
+                                            ביטול
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(selectedRequest.id)}
+                                            disabled={deleting}
+                                            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {deleting ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4" />
+                                            )}
+                                            אישור מחיקה
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between">
+                                    {/* Delete Button - Left side */}
                                     <button
-                                        onClick={async () => {
-                                            await updateStatus(selectedRequest.id, 'closed_no');
-                                            setSelectedRequest(null);
-                                        }}
-                                        disabled={updatingStatus}
-                                        className="px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="px-4 py-2 rounded-lg bg-red-900/50 text-red-300 hover:bg-red-900/70 transition flex items-center gap-2"
                                     >
-                                        {updatingStatus ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <X className="w-4 h-4" />
+                                        <Trash2 className="w-4 h-4" />
+                                        מחק פנייה
+                                    </button>
+
+                                    {/* Right side buttons */}
+                                    <div className="flex gap-4">
+                                        {/* Show action buttons only for pending or viewed status */}
+                                        {(selectedRequest.status === 'pending' || selectedRequest.status === 'viewed') && (
+                                            <>
+                                                <button
+                                                    onClick={async () => {
+                                                        await updateStatus(selectedRequest.id, 'closed_no');
+                                                        setSelectedRequest(null);
+                                                    }}
+                                                    disabled={updatingStatus}
+                                                    className="px-6 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition flex items-center gap-2 disabled:opacity-50"
+                                                >
+                                                    {updatingStatus ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <X className="w-4 h-4" />
+                                                    )}
+                                                    סיים ללא טיפול
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        router.push(`/garage/requests/${selectedRequest.id}/report`);
+                                                    }}
+                                                    className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
+                                                >
+                                                    <Wrench className="w-4 h-4" />
+                                                    דווח על סיום טיפול
+                                                </button>
+                                            </>
                                         )}
-                                        סגור ללא דיווח
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            router.push(`/garage/requests/${selectedRequest.id}/report`);
-                                        }}
-                                        className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
-                                    >
-                                        <Wrench className="w-4 h-4" />
-                                        דווח על סיום טיפול
-                                    </button>
-                                </>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
