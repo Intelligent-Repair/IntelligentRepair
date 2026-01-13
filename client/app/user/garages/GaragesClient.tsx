@@ -205,9 +205,9 @@ export default function GaragesClient() {
                                 onChange={(e) => setSelectedCity(e.target.value)}
                                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pr-10 pl-4 text-white appearance-none focus:outline-none focus:border-blue-500/50 transition-colors"
                             >
-                                <option value="">כל הערים</option>
+                                <option value="" className="bg-[#1a1f2e] text-white">כל הערים</option>
                                 {cities.map((city) => (
-                                    <option key={city} value={city}>{city}</option>
+                                    <option key={city} value={city} className="bg-[#1a1f2e] text-white">{city}</option>
                                 ))}
                             </select>
                         </div>
