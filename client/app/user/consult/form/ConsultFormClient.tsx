@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { CarFront, Send, Loader2, Pencil, Bot, Sparkles } from "lucide-react";
+import { CarFront, Send, Loader2, Pencil, Bot, Sparkles, Home, ArrowRight } from "lucide-react";
 import ImageUploader from "./ImageUploader";
 import type { Variants } from "framer-motion";
 
@@ -32,14 +32,14 @@ export default function ConsultFormClient() {
   // CRITICAL: Reset all draft-related state on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     // Clear description state
     setDescription("");
-    
+
     // Clear images state
     setImageUrls([]);
     window.sessionStorage.removeItem("draft_images");
-    
+
     console.log("[DRAFT] form state reset - description and images cleared");
   }, []);
 
@@ -56,7 +56,7 @@ export default function ConsultFormClient() {
     // Clear all draft-related state to ensure fresh start
     window.sessionStorage.removeItem("draft_description");
     window.sessionStorage.removeItem("consult_questions_state");
-    
+
     // ALWAYS generate a new UUID - never reuse existing
     const generateId = () => {
       if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -66,7 +66,7 @@ export default function ConsultFormClient() {
     };
 
     const newId = generateId();
-      window.sessionStorage.setItem("draft_id", newId);
+    window.sessionStorage.setItem("draft_id", newId);
     setDraftId(newId);
     console.log("[DRAFT] new draft created in form:", newId);
   }, []);
@@ -225,7 +225,7 @@ export default function ConsultFormClient() {
       },
     },
   };
-  
+
 
   const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
@@ -238,7 +238,7 @@ export default function ConsultFormClient() {
       },
     },
   };
-  
+
 
   return (
     <div
@@ -275,7 +275,16 @@ export default function ConsultFormClient() {
       </div>
       {/* Atmospheric Glow behind card */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/20 blur-[100px] rounded-full pointer-events-none -z-0" />
-      
+
+      {/* Back Button - Return to Vehicle Selection */}
+      <button
+        onClick={() => router.push("/user/consult")}
+        className="fixed right-4 top-4 z-50 p-2.5 rounded-xl bg-slate-900/80 backdrop-blur-xl border border-white/10 hover:bg-slate-800/80 transition-all duration-200 text-white/70 hover:text-white"
+        title="חזרה לבחירת רכב"
+      >
+        <ArrowRight size={20} />
+      </button>
+
       <motion.div
         className="w-full max-w-xl md:max-w-2xl space-y-6 relative z-10"
         variants={containerVariants}
@@ -293,9 +302,9 @@ export default function ConsultFormClient() {
           {/* AI Visual Cluster */}
           <div className="relative">
             <Bot size={32} className="text-blue-400" />
-            <Sparkles 
-              size={16} 
-              className="absolute -top-1 -right-2 text-yellow-300 animate-pulse" 
+            <Sparkles
+              size={16}
+              className="absolute -top-1 -right-2 text-yellow-300 animate-pulse"
             />
           </div>
         </motion.h1>
@@ -381,7 +390,7 @@ export default function ConsultFormClient() {
           {/* Submit Button */}
           <motion.button
             onClick={handleContinue}
-            whileHover={{ 
+            whileHover={{
               scale: 1.02,
               boxShadow: "0 0 20px rgba(37,99,235,0.5)",
             }}

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 // ייבוא כל האייקונים הדרושים (כדי למנוע ReferenceError)
-import { User, Mail, Phone, MapPin, Loader2, Save, Clock } from 'lucide-react'; 
+import { User, Mail, Phone, MapPin, Loader2, Save, Clock, ArrowRight } from 'lucide-react';
 
 // *** שם הפונקציה שונה ל-GarageProfilePage כדי להתאים לשם התיקייה ***
 export default function GarageProfilePage() {
@@ -18,7 +18,7 @@ export default function GarageProfilePage() {
         street: '',
         number: '',
         is_loading: true,
-    }); 
+    });
     const [operatingHours, setOperatingHours] = useState<Array<{ day: string; open: string; close: string; isClosed: boolean }>>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function GarageProfilePage() {
         setProfile(prev => ({ ...prev, is_loading: true }));
         setStatusMessage(null);
         setError(null);
-        
+
         try {
             const res = await fetch('/api/garage/profile');
             const data = await res.json();
@@ -162,7 +162,7 @@ export default function GarageProfilePage() {
     if (profile.is_loading) {
         return (
             <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-b from-[#050816] via-[#071226] to-[#03050c] text-white">
-                <Loader2 className="w-10 h-10 animate-spin text-sky-400"/>
+                <Loader2 className="w-10 h-10 animate-spin text-sky-400" />
                 <p className="mr-4 text-xl">טוען פרופיל מוסך...</p>
             </div>
         );
@@ -170,16 +170,26 @@ export default function GarageProfilePage() {
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#050816] via-[#071226] to-[#03050c] text-white">
-             {/* אפקטי האור והטשטוש */}
+            {/* אפקטי האור והטשטוש */}
             <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-sky-500/20 blur-[200px]" />
                 <div className="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-b from-cyan-400/10 via-transparent to-indigo-500/10 blur-[180px]" />
             </div>
 
             <main dir="rtl" className="relative mx-auto w-full max-w-4xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
-                
+
+                {/* Back Button - Return to Garage Home */}
+                <button
+                    onClick={() => router.push('/garage')}
+                    className="mb-6 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200 text-white/70 hover:text-white flex items-center gap-2"
+                    title="חזרה לדף הבית"
+                >
+                    <ArrowRight size={20} />
+                    <span className="text-sm">חזרה לדף הראשי</span>
+                </button>
+
                 <h1 className="text-4xl font-extrabold text-white mb-8 border-b border-white/10 pb-4 flex items-center gap-3">
-                    <User className="w-8 h-8 text-cyan-300"/> ניהול פרופיל והגדרות מוסך
+                    <User className="w-8 h-8 text-cyan-300" /> ניהול פרופיל והגדרות מוסך
                 </h1>
 
                 {statusMessage && (
@@ -193,29 +203,29 @@ export default function GarageProfilePage() {
                         {error}
                     </div>
                 )}
-                
+
                 <form onSubmit={handleUpdate} className="rounded-xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur-md space-y-6">
-                    
+
                     {/* --- סעיף 1: פרטי המוסך הבסיסיים --- */}
                     <h2 className="text-2xl font-bold text-sky-300 border-b border-white/20 pb-2 mb-6">פרטי קשר וכתובת</h2>
-                    
+
                     {/* שם המוסך */}
                     <div>
                         <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2">שם המוסך</label>
                         <input type="text" name="name" value={profile.name} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
-                    
+
                     {/* אימייל (קריאה בלבד) */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Mail className="w-4 h-4"/> כתובת אימייל (שם משתמש)</label>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Mail className="w-4 h-4" /> כתובת אימייל (שם משתמש)</label>
                         <input type="email" value={profile.email} disabled className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded-lg text-slate-500 cursor-not-allowed text-right" dir="rtl" />
                     </div>
-                    
+
                     {/* טלפון */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Phone className="w-4 h-4"/> מספר טלפון ליצירת קשר</label>
-                        <input 
-                            type="tel" 
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Phone className="w-4 h-4" /> מספר טלפון ליצירת קשר</label>
+                        <input
+                            type="tel"
                             name="phone"
                             value={profile.phone}
                             onChange={handleChange}
@@ -227,36 +237,36 @@ export default function GarageProfilePage() {
 
                     {/* עיר */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> עיר</label>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> עיר</label>
                         <input type="text" name="city" value={profile.city} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
 
                     {/* רחוב */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> רחוב</label>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> רחוב</label>
                         <input type="text" name="street" value={profile.street} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
 
                     {/* מספר */}
                     <div>
-                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> מספר</label>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> מספר</label>
                         <input type="text" name="number" value={profile.number} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
-                    
+
                     {/* --- סעיף 2: שעות פעילות (החדש) --- */}
                     <h2 className="text-2xl font-bold text-sky-300 border-b border-white/20 pb-2 mb-6 pt-8 flex items-center gap-2">
-                        <Clock className="w-6 h-6"/> שעות פעילות המוסך
+                        <Clock className="w-6 h-6" /> שעות פעילות המוסך
                     </h2>
 
                     <div className="space-y-4">
                         {operatingHours.map((hour, index) => (
                             <div key={hour.day} className="flex items-center bg-zinc-800/50 p-3 rounded-lg border border-zinc-700/50">
-                                
+
                                 {/* שם היום */}
                                 <div className="w-1/4 font-semibold text-white/90">
                                     {hour.day}
                                 </div>
-                                
+
                                 {/* שעת פתיחה */}
                                 <div className="w-1/4 mx-2">
                                     <input
@@ -267,10 +277,10 @@ export default function GarageProfilePage() {
                                         className={`w-full p-2 rounded-lg text-center ${hour.isClosed ? 'bg-zinc-900 text-slate-500 cursor-not-allowed' : 'bg-zinc-700 text-white border-none focus:ring-1 focus:ring-cyan-500'}`}
                                     />
                                 </div>
-                                
+
                                 {/* מקף מפריד */}
                                 <span className={`text-center w-1/12 font-bold ${hour.isClosed ? 'text-slate-500' : 'text-white'}`}>-</span>
-                                
+
                                 {/* שעת סגירה */}
                                 <div className="w-1/4 mx-2">
                                     <input
@@ -281,7 +291,7 @@ export default function GarageProfilePage() {
                                         className={`w-full p-2 rounded-lg text-center ${hour.isClosed ? 'bg-zinc-900 text-slate-500 cursor-not-allowed' : 'bg-zinc-700 text-white border-none focus:ring-1 focus:ring-cyan-500'}`}
                                     />
                                 </div>
-                                
+
                                 {/* צ'קבוקס "סגור" */}
                                 <div className="w-1/4 flex justify-end items-center mr-2">
                                     <label className="inline-flex items-center cursor-pointer">
@@ -300,18 +310,18 @@ export default function GarageProfilePage() {
                     </div>
 
                     {/* כפתור שמירה */}
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={isSaving}
                         className="w-full mt-8 rounded-full bg-gradient-to-r from-cyan-400 via-sky-300 to-cyan-500 px-12 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-cyan-500/40 transition hover:-translate-y-0.5 hover:shadow-cyan-500/60 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         {isSaving ? (
                             <>
-                                <Loader2 className="w-5 h-5 animate-spin"/> שומר פרטים...
+                                <Loader2 className="w-5 h-5 animate-spin" /> שומר פרטים...
                             </>
                         ) : (
                             <>
-                                <Save className="w-5 h-5"/> שמירת שינויים
+                                <Save className="w-5 h-5" /> שמירת שינויים
                             </>
                         )}
                     </button>
