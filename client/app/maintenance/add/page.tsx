@@ -113,6 +113,14 @@ export default function AddVehiclePage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // ולידציה על לוחית רישוי - מינימום 7 ספרות
+        const minDigits = 7;
+        if (licensePlate.length < minDigits) {
+            alert(`לוחית רישוי חייבת להכיל לפחות ${minDigits} ספרות`);
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -164,14 +172,15 @@ export default function AddVehiclePage() {
             console.log("[AddVehicle] Insert result:", { insertData, insertError });
 
             if (insertError) {
-                console.error("[AddVehicle] Insert Error:", insertError);
-
-                // בדיקה אם השגיאה היא לוחית רישוי כפולה
+                // בדיקה אם השגיאה היא לוחית רישוי כפולה - לא מדפיסים error אדום
                 if (insertError.message?.includes('license_plate') ||
                     insertError.code === '23505') {
-                    throw new Error('לוחית הרישוי כבר קיימת במערכת. אנא בדוק שוב את המספר.');
+                    console.log("[AddVehicle] Duplicate license plate detected");
+                    alert('לוחית הרישוי כבר קיימת במערכת. אנא בדוק שוב את המספר.');
+                    return; // יוצאים בלי לזרוק שגיאה
                 }
 
+                console.error("[AddVehicle] Insert Error:", insertError);
                 throw new Error(insertError.message || 'שגיאה בהוספת הרכב');
             }
 

@@ -63,9 +63,11 @@ export default function VehicleDetailsPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'technical' | 'reminders'>('technical');
     const [loading, setLoading] = useState(true);
+    const [loadingManual, setLoadingManual] = useState(false);
 
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [manual, setManual] = useState<Manual | null>(null);
+    const [manualError, setManualError] = useState(false);
     const [initialReminders, setInitialReminders] = useState<RemindersSnapshot | null>(null);
 
     // טעינת נתונים
@@ -116,30 +118,9 @@ export default function VehicleDetailsPage() {
                         remind_winter: formattedVehicle.remind_winter,
                     });
 
-                    // חיפוש ספר רכב
+                    // חיפוש ספר רכב עם retry אוטומטי
                     if (catalog?.model) {
-                        try {
-                            const res = await fetch("/api/manuals/ensure", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    manufacturer: catalog.manufacturer,
-                                    model: catalog.model,
-                                    year: catalog.year,
-                                }),
-                            });
-
-                            if (!res.ok) {
-                                const text = await res.text();
-                                console.error("API /manuals/ensure נכשל:", text);
-                                throw new Error("שליפת ספר רכב נכשלה");
-                            }
-
-                            const json = await res.json();
-                            if (json.manual) setManual(json.manual);
-                        } catch (error) {
-                            console.error("Error loading manual:", error);
-                        }
+                        await loadManualWithRetry(catalog.manufacturer, catalog.model, catalog.year);
                     }
                 }
             } catch (error) {
@@ -152,6 +133,70 @@ export default function VehicleDetailsPage() {
 
         loadData();
     }, [id]);
+
+    // פונקציית טעינת ספר רכב עם retry אוטומטי
+    const loadManualWithRetry = async (manufacturer: string, model: string, year: number, maxRetries = 3) => {
+        setLoadingManual(true);
+        setManualError(false);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[Manual] Attempt ${attempt}/${maxRetries} for ${manufacturer} ${model} ${year}`);
+
+                const res = await fetch("/api/manuals/ensure", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ manufacturer, model, year }),
+                });
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error(`[Manual] Attempt ${attempt} failed:`, text);
+
+                    // אם זה לא הניסיון האחרון, ממתינים ומנסים שוב
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // המתנה הולכת וגדלה
+                        continue;
+                    }
+                    throw new Error("שליפת ספר רכב נכשלה");
+                }
+
+                const json = await res.json();
+                if (json.manual) {
+                    console.log(`[Manual] Success on attempt ${attempt}`);
+                    setManual(json.manual);
+                    setManualError(false);
+                    setLoadingManual(false);
+                    return; // הצלחה - יוצאים מהפונקציה
+                } else {
+                    // אין manual בתשובה - נמשיך לנסות או נסיים
+                    console.log(`[Manual] No manual in response on attempt ${attempt}, continuing...`);
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+                        continue;
+                    }
+                    // ניסיונות נגמרו - לא נמצא ספר רכב (לא שגיאה, פשוט לא קיים)
+                    console.log(`[Manual] No manual found after ${maxRetries} attempts`);
+                }
+            } catch (error) {
+                console.error(`[Manual] Error on attempt ${attempt}:`, error);
+
+                // אם זה הניסיון האחרון, מסמנים שגיאה
+                if (attempt === maxRetries) {
+                    setManualError(true);
+                }
+            }
+        }
+
+        setLoadingManual(false);
+    };
+
+    // פונקציה לניסיון חוזר ידני
+    const retryLoadManual = () => {
+        if (vehicle) {
+            loadManualWithRetry(vehicle.manufacturer, vehicle.model, vehicle.year);
+        }
+    };
 
     // שמירת תזכורות
     const saveReminders = async () => {
@@ -201,8 +246,8 @@ export default function VehicleDetailsPage() {
                 (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string')
                     ? (error as any).message
                     : typeof error === 'string'
-                    ? error
-                    : 'שגיאה לא ידועה';
+                        ? error
+                        : 'שגיאה לא ידועה';
             console.error('saveReminders error:', error);
             alert('שגיאה: ' + message);
         }
@@ -226,7 +271,39 @@ export default function VehicleDetailsPage() {
         }
     };
 
-    if (loading) return <div className="text-white text-center mt-20">טוען פרטי רכב...</div>;
+    if (loading) return (
+        <div dir="rtl" className="min-h-screen flex flex-col items-center justify-center p-6">
+            {/* Animated Loading Container */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-12 shadow-2xl max-w-md w-full">
+                {/* Spinning Car Icon */}
+                <div className="flex justify-center mb-8">
+                    <div className="relative">
+                        <div className="w-20 h-20 rounded-full border-4 border-blue-500/20 animate-pulse"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <svg className="w-10 h-10 text-blue-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Loading Text */}
+                <h2 className="text-xl font-bold text-white text-center mb-4">
+                    טוען פרטי רכב...
+                </h2>
+
+                {/* Progress Bar Animation */}
+                <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 rounded-full animate-loading-bar"></div>
+                </div>
+
+                {/* Subtitle */}
+                <p className="text-white/50 text-sm text-center mt-4">
+                    מביאים את כל המידע הטכני...
+                </p>
+            </div>
+        </div>
+    );
     if (!vehicle) return <div className="text-white text-center mt-20">רכב לא נמצא במערכת</div>;
 
     return (
@@ -278,9 +355,22 @@ export default function VehicleDetailsPage() {
                 {/* טאב 1: מידע טכני */}
                 {activeTab === 'technical' && (
                     <div className="grid gap-6">
-                        {!manual ? (
+                        {loadingManual ? (
                             <div className="p-10 text-center bg-white/5 rounded-2xl border border-dashed border-white/20">
-                                <p className="text-white/50">לא נמצא ספר רכב לדגם זה במערכת.</p>
+                                <div className="flex items-center justify-center gap-3">
+                                    <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <p className="text-white/70">טוען מידע טכני...</p>
+                                </div>
+                            </div>
+                        ) : !manual ? (
+                            <div className="p-10 text-center bg-white/5 rounded-2xl border border-dashed border-white/20">
+                                <p className="text-white/50 mb-4">לא נמצא ספר רכב לדגם זה במערכת.</p>
+                                <button
+                                    onClick={retryLoadManual}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors"
+                                >
+                                    נסה שוב
+                                </button>
                             </div>
                         ) : (
                             <>
