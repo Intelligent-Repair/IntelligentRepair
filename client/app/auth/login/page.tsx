@@ -5,10 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
-type UserType = "driver" | "garage";
-
 export default function LoginPage() {
-  const [userType, setUserType] = useState<UserType>("driver");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -70,36 +67,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* User Type Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-300 mb-3">
-          בחירת סוג משתמש
-        </label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="userType"
-              value="driver"
-              checked={userType === "driver"}
-              onChange={(e) => setUserType(e.target.value as UserType)}
-              className="w-4 h-4 text-sky-500 bg-white/10 border-white/20 focus:ring-sky-500 focus:ring-2"
-            />
-            <span className="text-white">משתמש פרטי</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="userType"
-              value="garage"
-              checked={userType === "garage"}
-              onChange={(e) => setUserType(e.target.value as UserType)}
-              className="w-4 h-4 text-sky-500 bg-white/10 border-white/20 focus:ring-sky-500 focus:ring-2"
-            />
-            <span className="text-white">מוסך</span>
-          </label>
-        </div>
-      </div>
+
 
       {/* Login Form */}
       <form onSubmit={handleLogin} className="space-y-5">
