@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const justRegistered = searchParams.get("registered") === "true";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -57,6 +61,15 @@ export default function LoginPage() {
       <h1 className="text-3xl font-semibold text-white text-center mb-8">
         התחברות למערכת
       </h1>
+
+      {/* Success Message - shown after registration */}
+      {justRegistered && (
+        <div
+          className="mb-6 p-4 rounded-xl bg-green-500/20 border border-green-500/50 text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2"
+        >
+          ההרשמה הושלמה בהצלחה! 🎉 כעת ניתן להתחבר למערכת
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
