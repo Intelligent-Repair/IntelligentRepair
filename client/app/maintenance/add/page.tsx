@@ -117,7 +117,15 @@ export default function AddVehiclePage() {
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            console.log("[AddVehicle] User:", user?.id);
+
             if (!user) throw new Error('משתמש לא מחובר, אנא התחבר מחדש');
+
+            console.log("[AddVehicle] Searching for catalog item:", {
+                manufacturer: selectedManufacturer,
+                model: selectedModel,
+                year: parseInt(selectedYear)
+            });
 
             // מציאת ה-ID של הרכב מהקטלוג
             const { data: catalogItem, error: catalogError } = await supabase
@@ -128,13 +136,21 @@ export default function AddVehiclePage() {
                 .eq('year', parseInt(selectedYear))
                 .single(); // מחזיר שורה אחת בלבד
 
+            console.log("[AddVehicle] Catalog result:", { catalogItem, catalogError });
+
             if (catalogError || !catalogItem) {
-                console.error("Catalog Error:", catalogError);
+                console.error("[AddVehicle] Catalog Error:", catalogError);
                 throw new Error('לא נמצא רכב מתאים בקטלוג או שיש כפילות בנתונים');
             }
 
+            console.log("[AddVehicle] Inserting to people_cars:", {
+                user_id: user.id,
+                vehicle_catalog_id: catalogItem.id,
+                license_plate: licensePlate,
+            });
+
             // שמירה בטבלת people_cars
-            const { error: insertError } = await supabase
+            const { data: insertData, error: insertError } = await supabase
                 .from('people_cars')
                 .insert([
                     {
@@ -142,15 +158,29 @@ export default function AddVehiclePage() {
                         vehicle_catalog_id: catalogItem.id,
                         license_plate: licensePlate,
                     }
-                ]);
+                ])
+                .select();
 
-            if (insertError) throw insertError;
+            console.log("[AddVehicle] Insert result:", { insertData, insertError });
+
+            if (insertError) {
+                console.error("[AddVehicle] Insert Error:", insertError);
+
+                // בדיקה אם השגיאה היא לוחית רישוי כפולה
+                if (insertError.message?.includes('license_plate') ||
+                    insertError.code === '23505') {
+                    throw new Error('לוחית הרישוי כבר קיימת במערכת. אנא בדוק שוב את המספר.');
+                }
+
+                throw new Error(insertError.message || 'שגיאה בהוספת הרכב');
+            }
 
             alert('הרכב נוסף בהצלחה! 🚗');
             router.push('/maintenance');
             router.refresh();
 
         } catch (error) {
+            console.error("[AddVehicle] Full error:", error);
             const errorMessage = error instanceof Error ? error.message : 'שגיאה לא ידועה';
             alert('שגיאה בשמירה: ' + errorMessage);
         } finally {
