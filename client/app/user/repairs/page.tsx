@@ -206,7 +206,7 @@ export default function UserRepairsPage() {
 
         {filteredRepairs.length === 0 ? (
           <div className="text-center py-20 text-white/50">
-            <Car size={48} className="mx-auto mb-4 opacity-30" />
+            <Car size={48} className="mx-auto mb-4 opacity-30" style={{ transform: 'scaleX(-1)' }} />
             <p className="text-xl">אין טיפולים להצגה</p>
             {selectedVehicle !== "all" && (
               <button
