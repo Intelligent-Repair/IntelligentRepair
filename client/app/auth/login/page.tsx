@@ -1,9 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
+
+// Separate component for the success message that uses useSearchParams
+function RegistrationSuccessMessage() {
+  const searchParams = useSearchParams();
+  const justRegistered = searchParams.get("registered") === "true";
+
+  if (!justRegistered) return null;
+
+  return (
+    <div
+      className="mb-6 p-4 rounded-xl bg-green-500/20 border border-green-500/50 text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2"
+    >
+      ההרשמה הושלמה בהצלחה! 🎉 כעת ניתן להתחבר למערכת
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -58,6 +75,11 @@ export default function LoginPage() {
         התחברות למערכת
       </h1>
 
+      {/* Success Message - wrapped in Suspense for useSearchParams */}
+      <Suspense fallback={null}>
+        <RegistrationSuccessMessage />
+      </Suspense>
+
       {/* Error Message */}
       {error && (
         <div
@@ -66,8 +88,6 @@ export default function LoginPage() {
           {error}
         </div>
       )}
-
-
 
       {/* Login Form */}
       <form onSubmit={handleLogin} className="space-y-5">
@@ -130,4 +150,3 @@ export default function LoginPage() {
     </>
   );
 }
-

@@ -146,12 +146,9 @@ export default function RegisterPage() {
         return;
       }
 
-      // Redirect based on role
-      if (data.role === "driver") {
-        router.push("/user");
-      } else if (data.role === "garage") {
-        router.push("/garage");
-      }
+      // After successful registration, redirect to login page
+      // The user needs to log in to create a proper session
+      router.push("/auth/login?registered=true");
     } catch (err) {
       setError("שגיאת רשת. נסה שוב מאוחר יותר.");
       setIsLoading(false);
