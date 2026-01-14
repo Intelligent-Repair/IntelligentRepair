@@ -15,6 +15,10 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [passwordMismatch, setPasswordMismatch] = useState(false);
 
+  // Validation error states for specific fields
+  const [phoneError, setPhoneError] = useState("");
+  const [idError, setIdError] = useState("");
+
   // Driver fields
   const [idNumber, setIdNumber] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -52,15 +56,52 @@ export default function RegisterPage() {
     }
   };
 
+  // Validate Israeli phone number (10 digits starting with 05)
+  const validatePhone = (phoneNumber: string): boolean => {
+    // Remove spaces, dashes and other non-digit characters
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    // Israeli mobile: 05X-XXXXXXX (10 digits) or landline: 0X-XXXXXXX (9-10 digits)
+    const israeliPhoneRegex = /^05\d{8}$/;
+    return israeliPhoneRegex.test(cleanPhone);
+  };
+
+  // Validate Israeli ID number (9 digits)
+  const validateNationalId = (id: string): boolean => {
+    // Remove non-digit characters
+    const cleanId = id.replace(/\D/g, "");
+    // Israeli ID is exactly 9 digits
+    return cleanId.length === 9;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setPasswordMismatch(false);
+    setPhoneError("");
+    setIdError("");
 
     // Validate password match
     if (password !== confirmPassword) {
       setPasswordMismatch(true);
       setError("הסיסמאות אינן תואמות");
+      return;
+    }
+
+    // Get the correct phone and ID based on user type
+    const currentPhone = userType === "driver" ? phone : garagePhone;
+    const currentId = userType === "driver" ? idNumber : garageOwnerNationalId;
+
+    // Validate phone number
+    if (!validatePhone(currentPhone)) {
+      setPhoneError("מספר טלפון לא תקין. נא להזין מספר בפורמט 05XXXXXXXX (10 ספרות)");
+      setError("מספר טלפון לא תקין");
+      return;
+    }
+
+    // Validate national ID
+    if (!validateNationalId(currentId)) {
+      setIdError("תעודת זהות לא תקינה. נא להזין 9 ספרות");
+      setError("תעודת זהות לא תקינה");
       return;
     }
 
@@ -100,7 +141,7 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setError(data.message || "שגיאה בהרשמה");
+        setError(data.message || data.error || "שגיאה בהרשמה");
         setIsLoading(false);
         return;
       }
@@ -216,17 +257,26 @@ export default function RegisterPage() {
                 htmlFor="idNumber"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
-                תעודת זהות
+                תעודת זהות <span className="text-red-400">*</span>
               </label>
               <input
                 id="idNumber"
                 type="text"
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value)}
+                onChange={(e) => {
+                  setIdNumber(e.target.value);
+                  setIdError("");
+                }}
                 required
-                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס תעודת זהות"
+                maxLength={9}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${idError ? "border-red-500/50 animate-shake" : "border-white/20"} text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                placeholder="הכנס 9 ספרות"
               />
+              {idError && (
+                <p className="mt-1 text-sm text-red-400 text-right">
+                  {idError}
+                </p>
+              )}
             </div>
 
             <div>
@@ -234,17 +284,26 @@ export default function RegisterPage() {
                 htmlFor="phone"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
-                טלפון
+                טלפון <span className="text-red-400">*</span>
               </label>
               <input
                 id="phone"
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setPhoneError("");
+                }}
                 required
-                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס מספר טלפון"
+                maxLength={10}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${phoneError ? "border-red-500/50 animate-shake" : "border-white/20"} text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                placeholder="05XXXXXXXX"
               />
+              {phoneError && (
+                <p className="mt-1 text-sm text-red-400 text-right">
+                  {phoneError}
+                </p>
+              )}
             </div>
 
             <div>
@@ -374,17 +433,26 @@ export default function RegisterPage() {
                 htmlFor="garagePhone"
                 className="block text-sm font-medium text-slate-300 mb-2"
               >
-                טלפון
+                טלפון <span className="text-red-400">*</span>
               </label>
               <input
                 id="garagePhone"
                 type="tel"
                 value={garagePhone}
-                onChange={(e) => setGaragePhone(e.target.value)}
+                onChange={(e) => {
+                  setGaragePhone(e.target.value);
+                  setPhoneError("");
+                }}
                 required
-                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס מספר טלפון"
+                maxLength={10}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${phoneError ? "border-red-500/50 animate-shake" : "border-white/20"} text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                placeholder="05XXXXXXXX"
               />
+              {phoneError && (
+                <p className="mt-1 text-sm text-red-400 text-right">
+                  {phoneError}
+                </p>
+              )}
             </div>
 
             <div>
@@ -398,18 +466,27 @@ export default function RegisterPage() {
                 id="garageOwnerNationalId"
                 type="text"
                 value={garageOwnerNationalId}
-                onChange={(e) => setGarageOwnerNationalId(e.target.value)}
+                onChange={(e) => {
+                  setGarageOwnerNationalId(e.target.value);
+                  setIdError("");
+                }}
                 required
-                className="input-glow w-full rounded-xl bg-white/10 border border-white/20 text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition"
-                placeholder="הכנס תעודת זהות"
+                maxLength={9}
+                className={`input-glow w-full rounded-xl bg-white/10 border ${idError ? "border-red-500/50 animate-shake" : "border-white/20"} text-white text-right placeholder:text-slate-300 placeholder:text-right px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition`}
+                placeholder="הכנס 9 ספרות"
               />
+              {idError && (
+                <p className="mt-1 text-sm text-red-400 text-right">
+                  {idError}
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">
                 כתובת המוסך
               </label>
-              
+
               <div className="space-y-4">
                 <div>
                   <label
