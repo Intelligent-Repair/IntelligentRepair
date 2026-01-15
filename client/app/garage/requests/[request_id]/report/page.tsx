@@ -4,6 +4,7 @@
 import { ArrowRight, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import RepairCompletionForm from '@/components/garage/RepairCompletionForm';
+import { createServerSupabase } from "@/lib/supabaseServer";
 
 interface PageProps {
     params: Promise<{ request_id: string }>;
@@ -29,28 +30,31 @@ interface GarageRequestData {
 }
 
 async function fetchAcceptedGarageRequest(requestId: string): Promise<{ garageRequest: GarageRequestData | null; error: string | null }> {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
     try {
-        // Fetch the accepted garage_request for this request
-        const res = await fetch(`${baseUrl}/api/garage/requests/by-request/${requestId}`, {
-            cache: 'no-store',
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const supabase = await createServerSupabase();
 
-        if (res.status === 404) {
+        // Fetch the accepted garage_request for this request
+        const { data: garageRequest, error } = await supabase
+            .from('garage_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+
+        if (error) {
+            console.error('[ReportPage] DB error:', error);
+            if (error.code === 'PGRST116') {
+                return { garageRequest: null, error: 'לא נמצאה הצעה מאושרת לבקשה זו' };
+            }
+            return { garageRequest: null, error: 'שגיאה בטעינת הנתונים מהשרת' };
+        }
+
+        if (!garageRequest) {
             return { garageRequest: null, error: 'לא נמצאה הצעה מאושרת לבקשה זו' };
         }
 
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            return { garageRequest: null, error: data.error || `HTTP ${res.status}` };
-        }
-
-        const data = await res.json();
-        return { garageRequest: data.garageRequest || data, error: null };
+        return { garageRequest, error: null };
     } catch (err) {
-        console.error('[ReportPage] Fetch error:', err);
+        console.error('[ReportPage] Unexpected error:', err);
         return { garageRequest: null, error: 'שגיאה בטעינת הנתונים' };
     }
 }
