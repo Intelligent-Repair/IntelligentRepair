@@ -224,17 +224,19 @@ export async function PATCH(
 
         console.log("[garage/requests/request_id] Found garage:", garage.id);
 
-        // Update garage_request status
+        // Update garage_request status and get the request_id for parent update
         const updateData: any = {};
         if (status) {
             updateData.status = status;
         }
 
-        const { error: updateError } = await supabase
+        const { data: garageRequest, error: updateError } = await supabase
             .from("garage_requests")
             .update(updateData)
             .eq("id", requestId)
-            .eq("garage_id", garage.id);
+            .eq("garage_id", garage.id)
+            .select("request_id")
+            .single();
 
         if (updateError) {
             console.error("[garage/requests/request_id] Update error:", updateError);
@@ -242,6 +244,23 @@ export async function PATCH(
                 { error: "Failed to update request", details: updateError.message },
                 { status: 500 }
             );
+        }
+
+        // If completed or closed, also update the parent request status
+        if ((status === 'completed' || status === 'closed_no' || status === 'closed_yes') && garageRequest?.request_id) {
+            // Map garage_request status to parent request status
+            const parentStatus = status === 'completed' ? 'completed' : 'closed';
+
+            const { error: reqError } = await supabase
+                .from('requests')
+                .update({ status: parentStatus })
+                .eq('id', garageRequest.request_id);
+
+            if (reqError) {
+                console.warn('[garage/requests/request_id] Failed to update parent request:', reqError);
+            } else {
+                console.log('[garage/requests/request_id] Parent request updated to:', parentStatus);
+            }
         }
 
         return NextResponse.json({

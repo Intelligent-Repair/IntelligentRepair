@@ -73,7 +73,7 @@ export default function UserDashboardPage() {
       pending_approval: { text: "ממתין לאישור", className: "bg-purple-500/20 text-purple-300" },
       approved: { text: "אושר", className: "bg-teal-500/20 text-teal-300" },
       completed: { text: "הושלם", className: "bg-green-500/20 text-green-300" },
-      closed: { text: "סגור", className: "bg-green-500/20 text-green-300" },
+      closed: { text: "נסגר ללא טיפול", className: "bg-gray-500/20 text-gray-300" },
       cancelled: { text: "בוטל", className: "bg-red-500/20 text-red-300" },
       rejected: { text: "נדחה", className: "bg-red-500/20 text-red-300" },
     };
