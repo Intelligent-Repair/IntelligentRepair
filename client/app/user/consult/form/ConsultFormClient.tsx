@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { CarFront, Send, Loader2, Pencil, Bot, Sparkles, Home, ArrowRight } from "lucide-react";
+import { CarFront, Send, Loader2, Bot, Sparkles, Home, ArrowRight } from "lucide-react";
 import ImageUploader from "./ImageUploader";
 import type { Variants } from "framer-motion";
 
@@ -350,8 +350,6 @@ export default function ConsultFormClient() {
                   <div className="text-sm text-slate-400 mt-1">{vehicle.year}</div>
                 )}
               </div>
-              {/* Edit Icon (Visual only) */}
-              <Pencil className="w-4 h-4 text-slate-400 opacity-50" />
             </div>
           </motion.div>
         )}
