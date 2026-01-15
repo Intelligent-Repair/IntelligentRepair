@@ -142,6 +142,70 @@ export default function InstructionBubble({
     selfFixMeta.costEstimate
   );
 
+  // CRITICAL EMERGENCY CARD - Glassmorphism design with red glow
+  if (isCritical) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 25
+        }}
+        className="flex w-full mb-4 justify-center"
+        dir="rtl"
+      >
+        <div className="
+          w-[90%] max-w-md p-6 
+          bg-[#0f172a]/95 backdrop-blur-sm
+          rounded-2xl 
+          shadow-[0_0_30px_rgba(220,38,38,0.3)]
+          border-2 border-red-600
+          text-center
+        ">
+          {/* Large Warning Icon */}
+          <div className="flex justify-center mb-5">
+            <div className="w-16 h-16 rounded-full border-2 border-red-600 flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.4)]">
+              <AlertTriangle size={32} className="text-red-600" />
+            </div>
+          </div>
+
+          {/* Main Title - Big and Bold */}
+          <h2 className="text-2xl font-black text-red-500 mb-3">
+            סכנה! עצירה מיידית
+          </h2>
+
+          {/* Instructions */}
+          {instructionSteps.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {instructionSteps.map((item, index) => (
+                <p key={index} className="text-white text-lg leading-relaxed">
+                  {item.step}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Additional message if provided */}
+          {showMessageAbove && (
+            <p className="text-white/80 text-sm mb-4">{message}</p>
+          )}
+
+          {/* Warning Footer */}
+          <div className="pt-4 border-t border-red-600/30">
+            <p className="text-red-500 text-sm font-medium flex items-center justify-center gap-2">
+              <AlertTriangle size={14} />
+              המשך נסיעה עלול לגרום נזק לרכב!
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // NORMAL INSTRUCTION CARD - Standard design for non-critical
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -161,7 +225,7 @@ export default function InstructionBubble({
         ${colors.bg} backdrop-blur-md ${colors.border} ${colors.text}
         rounded-[20px] rounded-br-sm 
         shadow-[0_4px_16px_rgba(245,158,11,0.15)]
-        ${isCritical ? 'border-2 animate-pulse' : 'border'}
+        border
       `}>
         {/* Header with icon on RIGHT (RTL) */}
         <div className="flex items-center gap-2 mb-3 flex-row-reverse justify-end">

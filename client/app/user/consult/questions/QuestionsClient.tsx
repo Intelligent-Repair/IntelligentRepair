@@ -265,6 +265,7 @@ export default function QuestionsClient() {
                     towConditions={diagnosisData.towConditions}
                     mechanicReport={diagnosisData.mechanicReport}
                     conversationSummaries={diagnosisData.conversationSummaries}
+                    userReportSummary={diagnosisData.conversationSummaries?.user?.shortDescription || diagnosisData.userSummary}
                     onOpenMechanicRequest={() => handleSaveRequest("MECHANIC")}
                   />
                 );
