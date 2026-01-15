@@ -45,11 +45,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             return NextResponse.json({ error: 'Failed to update garage_request' }, { status: 500 });
         }
 
-        // If completed, also update the parent request status
-        if (status === 'completed' && garageRequest?.request_id) {
+        // If completed or closed, also update the parent request status
+        if ((status === 'completed' || status === 'closed_no' || status === 'closed_yes') && garageRequest?.request_id) {
+            // Map garage_request status to parent request status
+            const parentStatus = status === 'completed' ? 'completed' : 'closed';
+
             const { error: reqError } = await supabase
                 .from('requests')
-                .update({ status: 'completed' })
+                .update({ status: parentStatus })
                 .eq('id', garageRequest.request_id);
 
             if (reqError) {
