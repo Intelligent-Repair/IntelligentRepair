@@ -34,6 +34,18 @@ interface FilterOptions {
   years: number[];
 }
 
+
+interface TopVehicle {
+  manufacturer: string;
+  model: string;
+  count: number;
+}
+
+interface TopIssue {
+  issue_description: string;
+  occurrences: number;
+}
+
 export default function GarageKnowledgeBasePage() {
   const router = useRouter();
 
@@ -44,6 +56,10 @@ export default function GarageKnowledgeBasePage() {
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
+
+  // Stats State
+  const [topVehicles, setTopVehicles] = useState<TopVehicle[]>([]);
+  const [topIssues, setTopIssues] = useState<TopIssue[]>([]);
 
   // Modal state
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
@@ -92,10 +108,34 @@ export default function GarageKnowledgeBasePage() {
     }
   }, [mode, offset, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate]);
 
+  // Fetch stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("mode", mode);
+      if (dateRange !== "all") params.set("dateRange", dateRange);
+
+      const [vehiclesRes, issuesRes] = await Promise.all([
+        fetch(`/api/garage/dashboard/top-models?${params.toString()}`),
+        fetch(`/api/garage/dashboard/top-issues?${params.toString()}`)
+      ]);
+
+      const vehiclesData = await vehiclesRes.json();
+      const issuesData = await issuesRes.json();
+
+      if (vehiclesRes.ok) setTopVehicles(vehiclesData.top5 || []);
+      if (issuesRes.ok) setTopIssues(issuesData.top5 || []);
+
+    } catch (err) {
+      console.error('[Dashboard] Error fetching stats:', err);
+    }
+  }, [mode, dateRange]);
+
   // Initial load and reload on filter change
   useEffect(() => {
     fetchRepairs();
-  }, [fetchRepairs]);
+    fetchStats();
+  }, [fetchRepairs, fetchStats]);
 
   // Reset offset when filters change
   useEffect(() => {
@@ -471,6 +511,73 @@ export default function GarageKnowledgeBasePage() {
             </div>
           )}
         </section>
+
+        {/* Top Stats Section */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+            {/* Top 5 Vehicles */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-xl backdrop-blur-md">
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <Car className="w-6 h-6 text-purple-400" />
+                5 הרכבים הנפוצים
+              </h3>
+              <div className="space-y-4">
+                {topVehicles.length > 0 ? (
+                  topVehicles.map((vehicle, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-purple-500/20 text-purple-300 text-sm font-bold">
+                          {index + 1}
+                        </span>
+                        <span className="text-white font-medium">
+                          {vehicle.manufacturer} {vehicle.model !== 'לא ידוע' ? vehicle.model : ''}
+                        </span>
+                      </div>
+                      <span className="text-slate-400 text-sm">
+                        {vehicle.count} תיקונים
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-slate-500 py-8">
+                    אין נתונים להצגה
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top 5 Issues */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-xl backdrop-blur-md">
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <Wrench className="w-6 h-6 text-pink-400" />
+                5 התקלות הנפוצות
+              </h3>
+              <div className="space-y-4">
+                {topIssues.length > 0 ? (
+                  topIssues.map((issue, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-pink-500/20 text-pink-300 text-sm font-bold">
+                          {index + 1}
+                        </span>
+                        <span className="text-white font-medium">
+                          {issue.issue_description}
+                        </span>
+                      </div>
+                      <span className="text-slate-400 text-sm">
+                        {issue.occurrences} מקרים
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-slate-500 py-8">
+                    אין נתונים להצגה
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div >
   );
