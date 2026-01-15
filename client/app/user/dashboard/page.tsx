@@ -69,19 +69,14 @@ export default function UserDashboardPage() {
     const statusMap: Record<string, { text: string; className: string }> = {
       open: { text: "פתוח", className: "bg-blue-500/20 text-blue-300" },
       in_progress: { text: "בטיפול", className: "bg-yellow-500/20 text-yellow-300" },
-      pending_quotes: { text: "ממתין להצעות", className: "bg-orange-500/20 text-orange-300" },
-      pending_approval: { text: "ממתין לאישור", className: "bg-purple-500/20 text-purple-300" },
-      approved: { text: "אושר", className: "bg-teal-500/20 text-teal-300" },
-      completed: { text: "הושלם", className: "bg-green-500/20 text-green-300" },
       closed: { text: "סגור", className: "bg-green-500/20 text-green-300" },
       cancelled: { text: "בוטל", className: "bg-red-500/20 text-red-300" },
-      rejected: { text: "נדחה", className: "bg-red-500/20 text-red-300" },
     };
 
     const statusInfo = statusMap[status] || { text: status, className: "bg-gray-500/20 text-gray-300" };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${statusInfo.className}`}>
+      <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.className}`}>
         {statusInfo.text}
       </span>
     );
@@ -142,8 +137,9 @@ export default function UserDashboardPage() {
                     </td>
                     <td className="py-4 px-6 text-white/90">
                       {request.car
-                        ? `${request.car.vehicle_catalog?.manufacturer || ""} ${request.car.vehicle_catalog?.model || ""
-                        } (${request.car.license_plate || ""})`
+                        ? `${request.car.vehicle_catalog?.manufacturer || ""} ${
+                            request.car.vehicle_catalog?.model || ""
+                          } (${request.car.license_plate || ""})`
                         : "-"}
                     </td>
                     <td className="py-4 px-6">{getStatusBadge(request.status)}</td>

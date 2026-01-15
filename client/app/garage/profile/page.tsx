@@ -3,8 +3,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Phone, MapPin, Loader2, Save, Clock, ArrowRight } from 'lucide-react';
+// ייבוא כל האייקונים הדרושים (כדי למנוע ReferenceError)
+import { User, Mail, Phone, MapPin, Loader2, Save, Clock } from 'lucide-react'; 
 
+// *** שם הפונקציה שונה ל-GarageProfilePage כדי להתאים לשם התיקייה ***
 export default function GarageProfilePage() {
     const router = useRouter();
     const [profile, setProfile] = useState({
@@ -16,7 +18,7 @@ export default function GarageProfilePage() {
         street: '',
         number: '',
         is_loading: true,
-    });
+    }); 
     const [operatingHours, setOperatingHours] = useState<Array<{ day: string; open: string; close: string; isClosed: boolean }>>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function GarageProfilePage() {
         setProfile(prev => ({ ...prev, is_loading: true }));
         setStatusMessage(null);
         setError(null);
-
+        
         try {
             const res = await fetch('/api/garage/profile');
             const data = await res.json();
@@ -35,6 +37,7 @@ export default function GarageProfilePage() {
                 const errorMessage = data.error || `שגיאה בטעינת הפרופיל (${res.status})`;
                 setError(errorMessage);
                 setProfile(prev => ({ ...prev, is_loading: false }));
+                // Set default operating hours even on error so user can still see the form
                 setOperatingHours([
                     { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
                     { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
@@ -56,9 +59,11 @@ export default function GarageProfilePage() {
                     number: data.profile.number || '',
                     is_loading: false,
                 });
+                // Set operating hours - if empty, use default values
                 if (data.operatingHours && data.operatingHours.length > 0) {
                     setOperatingHours(data.operatingHours);
                 } else {
+                    // Default operating hours
                     setOperatingHours([
                         { day: 'ראשון', open: '08:00', close: '17:00', isClosed: false },
                         { day: 'שני', open: '08:00', close: '17:00', isClosed: false },
@@ -92,9 +97,9 @@ export default function GarageProfilePage() {
         setOperatingHours(newHours);
     };
 
-    const handleToggleClosed = (index: number, isClosed: boolean) => {
+    const handleToggleClosed = (index: number, checked: boolean) => {
         const newHours = [...operatingHours];
-        newHours[index] = { ...newHours[index], isClosed };
+        newHours[index] = { ...newHours[index], isClosed: checked };
         setOperatingHours(newHours);
     };
 
@@ -126,6 +131,7 @@ export default function GarageProfilePage() {
                 setError(data.error);
             } else {
                 setStatusMessage('הפרטים נשמרו בהצלחה! 💪');
+                // חזרה למסך הראשי אחרי 1.5 שניות
                 setTimeout(() => {
                     router.push('/garage');
                 }, 1500);
@@ -138,6 +144,7 @@ export default function GarageProfilePage() {
         }
     };
 
+    // Initialize operating hours if empty
     useEffect(() => {
         if (operatingHours.length === 0 && !profile.is_loading) {
             setOperatingHours([
@@ -155,7 +162,7 @@ export default function GarageProfilePage() {
     if (profile.is_loading) {
         return (
             <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-b from-[#050816] via-[#071226] to-[#03050c] text-white">
-                <Loader2 className="w-10 h-10 animate-spin text-sky-400" />
+                <Loader2 className="w-10 h-10 animate-spin text-sky-400"/>
                 <p className="mr-4 text-xl">טוען פרופיל מוסך...</p>
             </div>
         );
@@ -163,265 +170,151 @@ export default function GarageProfilePage() {
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#050816] via-[#071226] to-[#03050c] text-white">
-            {/* Background Effects */}
+             {/* אפקטי האור והטשטוש */}
             <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-sky-500/20 blur-[200px]" />
                 <div className="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-b from-cyan-400/10 via-transparent to-indigo-500/10 blur-[180px]" />
             </div>
 
-            <main dir="rtl" className="relative mx-auto w-full max-w-4xl px-6 pb-24 pt-8 sm:px-10 lg:px-12">
-
-                {/* Back Button */}
-                <button
-                    onClick={() => router.push('/garage')}
-                    className="mb-6 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200 text-white/70 hover:text-white flex items-center gap-2"
-                    title="חזרה לדף הבית"
-                >
-                    <ArrowRight size={20} />
-                    <span className="text-sm">חזרה לדף הראשי</span>
-                </button>
-
-                {/* Page Title */}
+            <main dir="rtl" className="relative mx-auto w-full max-w-4xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
+                
                 <h1 className="text-4xl font-extrabold text-white mb-8 border-b border-white/10 pb-4 flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-cyan-500/10">
-                        <User className="w-8 h-8 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
-                    </div>
-                    ניהול פרופיל והגדרות מוסך
+                    <User className="w-8 h-8 text-cyan-300"/> ניהול פרופיל והגדרות מוסך
                 </h1>
 
-                {/* Status Messages */}
                 {statusMessage && (
-                    <div className="p-4 mb-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-center font-medium backdrop-blur-sm">
+                    <div className="p-4 mb-4 rounded-xl bg-green-900/40 text-green-300 text-center font-medium">
                         {statusMessage}
                     </div>
                 )}
 
                 {error && (
-                    <div className="p-4 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-center font-medium backdrop-blur-sm">
+                    <div className="p-4 mb-4 rounded-xl bg-red-900/40 text-red-300 text-center font-medium">
                         {error}
                     </div>
                 )}
-
-                <form onSubmit={handleUpdate} className="space-y-8">
-
-                    {/* ===== CARD 1: Contact & Address ===== */}
-                    <div className="rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] p-8">
-
-                        {/* Section Header */}
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent flex items-center gap-3 mb-8">
-                            <div className="p-2 rounded-lg bg-cyan-500/10">
-                                <User className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
-                            </div>
-                            פרטי קשר וכתובת
-                        </h2>
-
-                        {/* Grid Layout */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                            {/* Garage Name - Full Width */}
-                            <div className="md:col-span-2 lg:col-span-3">
-                                <label className="text-sm text-white/50 block mb-2">שם המוסך</label>
-                                <div className="relative">
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40">
-                                        <User className="w-5 h-5" />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={profile.name}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full pr-11 pl-4 py-3 bg-white/5 border-b border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 transition-colors"
-                                        dir="rtl"
-                                        placeholder="הזן את שם המוסך"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Email - Read Only */}
-                            <div className="md:col-span-1">
-                                <label className="text-sm text-white/50 block mb-2 flex items-center gap-2">
-                                    <Mail className="w-4 h-4" /> כתובת אימייל
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30">
-                                        <Mail className="w-5 h-5" />
-                                    </div>
-                                    <input
-                                        type="email"
-                                        value={profile.email}
-                                        disabled
-                                        className="w-full pr-11 pl-4 py-3 bg-white/[0.02] border-b border-white/5 rounded-lg text-white/40 cursor-not-allowed"
-                                        dir="rtl"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Phone */}
-                            <div className="md:col-span-1">
-                                <label className="text-sm text-white/50 block mb-2 flex items-center gap-2">
-                                    <Phone className="w-4 h-4" /> מספר טלפון
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40">
-                                        <Phone className="w-5 h-5" />
-                                    </div>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={profile.phone}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full pr-11 pl-4 py-3 bg-white/5 border-b border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 transition-colors"
-                                        dir="rtl"
-                                        placeholder="050-0000000"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Spacer for alignment on lg */}
-                            <div className="hidden lg:block" />
-
-                            {/* City */}
-                            <div>
-                                <label className="text-sm text-white/50 block mb-2 flex items-center gap-2">
-                                    <MapPin className="w-4 h-4" /> עיר
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40">
-                                        <MapPin className="w-5 h-5" />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        name="city"
-                                        value={profile.city}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full pr-11 pl-4 py-3 bg-white/5 border-b border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 transition-colors"
-                                        dir="rtl"
-                                        placeholder="תל אביב"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Street */}
-                            <div>
-                                <label className="text-sm text-white/50 block mb-2">רחוב</label>
-                                <input
-                                    type="text"
-                                    name="street"
-                                    value={profile.street}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full px-4 py-3 bg-white/5 border-b border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 transition-colors"
-                                    dir="rtl"
-                                    placeholder="רחוב הרצל"
-                                />
-                            </div>
-
-                            {/* Number */}
-                            <div>
-                                <label className="text-sm text-white/50 block mb-2">מספר</label>
-                                <input
-                                    type="text"
-                                    name="number"
-                                    value={profile.number}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full px-4 py-3 bg-white/5 border-b border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-cyan-400/50 transition-colors"
-                                    dir="rtl"
-                                    placeholder="12"
-                                />
-                            </div>
-
-                        </div>
+                
+                <form onSubmit={handleUpdate} className="rounded-xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur-md space-y-6">
+                    
+                    {/* --- סעיף 1: פרטי המוסך הבסיסיים --- */}
+                    <h2 className="text-2xl font-bold text-sky-300 border-b border-white/20 pb-2 mb-6">פרטי קשר וכתובת</h2>
+                    
+                    {/* שם המוסך */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2">שם המוסך</label>
+                        <input type="text" name="name" value={profile.name} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                    </div>
+                    
+                    {/* אימייל (קריאה בלבד) */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Mail className="w-4 h-4"/> כתובת אימייל (שם משתמש)</label>
+                        <input type="email" value={profile.email} disabled className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded-lg text-slate-500 cursor-not-allowed text-right" dir="rtl" />
+                    </div>
+                    
+                    {/* טלפון */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><Phone className="w-4 h-4"/> מספר טלפון ליצירת קשר</label>
+                        <input 
+                            type="tel" 
+                            name="phone"
+                            value={profile.phone}
+                            onChange={handleChange}
+                            required
+                            className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right"
+                            dir="rtl"
+                        />
                     </div>
 
-                    {/* ===== CARD 2: Opening Hours ===== */}
-                    <div className="rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] p-8">
-
-                        {/* Section Header */}
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent flex items-center gap-3 mb-8">
-                            <div className="p-2 rounded-lg bg-cyan-500/10">
-                                <Clock className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
-                            </div>
-                            שעות פעילות המוסך
-                        </h2>
-
-                        {/* Hours List */}
-                        <div className="space-y-3">
-                            {operatingHours.map((hour, index) => (
-                                <div
-                                    key={hour.day}
-                                    className="flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-all duration-200"
-                                >
-                                    {/* Day Name */}
-                                    <div className="w-20 font-bold text-white/90">
-                                        {hour.day}
-                                    </div>
-
-                                    {/* Time Inputs */}
-                                    <div className={`flex items-center gap-3 flex-1 justify-center ${hour.isClosed ? 'opacity-40' : ''}`}>
-                                        <input
-                                            type="time"
-                                            value={hour.open}
-                                            disabled={hour.isClosed}
-                                            onChange={(e) => handleHoursChange(index, 'open', e.target.value)}
-                                            className="w-24 py-2 px-3 rounded-full bg-black/20 text-white text-center text-sm border-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50 disabled:cursor-not-allowed"
-                                        />
-                                        <span className="text-white/50 font-medium">—</span>
-                                        <input
-                                            type="time"
-                                            value={hour.close}
-                                            disabled={hour.isClosed}
-                                            onChange={(e) => handleHoursChange(index, 'close', e.target.value)}
-                                            className="w-24 py-2 px-3 rounded-full bg-black/20 text-white text-center text-sm border-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
-
-                                    {/* Toggle Switch */}
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-sm font-medium ${hour.isClosed ? 'text-white/40' : 'text-emerald-400'}`}>
-                                            {hour.isClosed ? 'סגור' : 'פתוח'}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            aria-checked={!hour.isClosed}
-                                            onClick={() => handleToggleClosed(index, !hour.isClosed)}
-                                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${hour.isClosed ? 'bg-slate-600' : 'bg-emerald-500'
-                                                }`}
-                                        >
-                                            <span
-                                                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${hour.isClosed ? 'right-0.5' : 'right-6'
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                    {/* עיר */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> עיר</label>
+                        <input type="text" name="city" value={profile.city} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
                     </div>
 
-                    {/* ===== Save Button ===== */}
-                    <button
-                        type="submit"
+                    {/* רחוב */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> רחוב</label>
+                        <input type="text" name="street" value={profile.street} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                    </div>
+
+                    {/* מספר */}
+                    <div>
+                        <label className="text-sm text-slate-400 block mb-1 flex items-center gap-2"><MapPin className="w-4 h-4"/> מספר</label>
+                        <input type="text" name="number" value={profile.number} onChange={handleChange} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-right" dir="rtl" />
+                    </div>
+                    
+                    {/* --- סעיף 2: שעות פעילות (החדש) --- */}
+                    <h2 className="text-2xl font-bold text-sky-300 border-b border-white/20 pb-2 mb-6 pt-8 flex items-center gap-2">
+                        <Clock className="w-6 h-6"/> שעות פעילות המוסך
+                    </h2>
+
+                    <div className="space-y-4">
+                        {operatingHours.map((hour, index) => (
+                            <div key={hour.day} className="flex items-center bg-zinc-800/50 p-3 rounded-lg border border-zinc-700/50">
+                                
+                                {/* שם היום */}
+                                <div className="w-1/4 font-semibold text-white/90">
+                                    {hour.day}
+                                </div>
+                                
+                                {/* שעת פתיחה */}
+                                <div className="w-1/4 mx-2">
+                                    <input
+                                        type="time"
+                                        value={hour.open}
+                                        disabled={hour.isClosed}
+                                        onChange={(e) => handleHoursChange(index, 'open', e.target.value)}
+                                        className={`w-full p-2 rounded-lg text-center ${hour.isClosed ? 'bg-zinc-900 text-slate-500 cursor-not-allowed' : 'bg-zinc-700 text-white border-none focus:ring-1 focus:ring-cyan-500'}`}
+                                    />
+                                </div>
+                                
+                                {/* מקף מפריד */}
+                                <span className={`text-center w-1/12 font-bold ${hour.isClosed ? 'text-slate-500' : 'text-white'}`}>-</span>
+                                
+                                {/* שעת סגירה */}
+                                <div className="w-1/4 mx-2">
+                                    <input
+                                        type="time"
+                                        value={hour.close}
+                                        disabled={hour.isClosed}
+                                        onChange={(e) => handleHoursChange(index, 'close', e.target.value)}
+                                        className={`w-full p-2 rounded-lg text-center ${hour.isClosed ? 'bg-zinc-900 text-slate-500 cursor-not-allowed' : 'bg-zinc-700 text-white border-none focus:ring-1 focus:ring-cyan-500'}`}
+                                    />
+                                </div>
+                                
+                                {/* צ'קבוקס "סגור" */}
+                                <div className="w-1/4 flex justify-end items-center mr-2">
+                                    <label className="inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={hour.isClosed}
+                                            onChange={(e) => handleToggleClosed(index, e.target.checked)}
+                                            className="form-checkbox h-5 w-5 text-cyan-600 bg-zinc-700 border-zinc-600 rounded focus:ring-cyan-500 transition duration-150 ease-in-out"
+                                        />
+                                        <span className={`mr-2 text-sm font-medium ${hour.isClosed ? 'text-cyan-400' : 'text-slate-400'}`}>סגור</span>
+                                    </label>
+                                </div>
+
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* כפתור שמירה */}
+                    <button 
+                        type="submit" 
                         disabled={isSaving}
-                        className="w-full rounded-xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 px-12 py-4 text-lg font-bold text-slate-950 shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                        className="w-full mt-8 rounded-full bg-gradient-to-r from-cyan-400 via-sky-300 to-cyan-500 px-12 py-3 text-base font-semibold text-slate-950 shadow-lg shadow-cyan-500/40 transition hover:-translate-y-0.5 hover:shadow-cyan-500/60 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         {isSaving ? (
                             <>
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                                שומר פרטים...
+                                <Loader2 className="w-5 h-5 animate-spin"/> שומר פרטים...
                             </>
                         ) : (
                             <>
-                                <Save className="w-6 h-6" />
-                                שמירת שינויים
+                                <Save className="w-5 h-5"/> שמירת שינויים
                             </>
                         )}
                     </button>
-
                 </form>
 
             </main>

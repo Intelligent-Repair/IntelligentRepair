@@ -111,7 +111,6 @@ interface FinalDiagnosisCardProps {
   severity?: 'critical' | 'high' | 'medium' | 'low';
   diagnosisContext?: DiagnosisContext;
   conversationSummaries?: ConversationSummaries;  // NEW
-  userReportSummary?: string;  // NEW: AI summary of what user reported
   onOpenMechanicRequest?: () => void;
 }
 
@@ -351,7 +350,6 @@ export default function FinalDiagnosisCard({
   severity,
   diagnosisContext,
   conversationSummaries,
-  userReportSummary,
   onOpenMechanicRequest,
 }: FinalDiagnosisCardProps) {
   const [showTowingModal, setShowTowingModal] = useState(false);
@@ -397,15 +395,13 @@ export default function FinalDiagnosisCard({
   // Extract title without emoji
   const cleanTitle = title?.replace(/[🔍🚨🛠️🏥ℹ️]/g, '').trim() || 'אבחון סופי';
 
-  // Derive confidence level from TOP DIAGNOSIS probability (not separate confidence field)
-  // This makes more sense for the user - if top diagnosis is 80%, confidence should be "high"
-  const topDiagnosisProbability = topDiagnosis?.probability;
-  const effectiveConfidence = topDiagnosisProbability !== undefined
-    ? normProb(topDiagnosisProbability)
-    : (typeof confidence === "number" ? (confidence > 1 ? confidence / 100 : confidence) : undefined);
+  // Derive confidence level from numeric confidence
+  const normalizedConfidence = typeof confidence === "number"
+    ? (confidence > 1 ? confidence / 100 : confidence)
+    : undefined;
 
-  const derivedConfidenceLabel = effectiveConfidence !== undefined
-    ? effectiveConfidence < 0.55 ? 'נמוכה' : effectiveConfidence < 0.75 ? 'בינונית' : 'גבוהה'
+  const derivedConfidenceLabel = normalizedConfidence !== undefined
+    ? normalizedConfidence < 0.55 ? 'נמוכה' : normalizedConfidence < 0.75 ? 'בינונית' : 'גבוהה'
     : undefined;
 
   const displayConfidenceLevel = confidenceLevel ?? derivedConfidenceLabel;
@@ -493,31 +489,22 @@ export default function FinalDiagnosisCard({
             variants={itemVariants}
             className="rounded-3xl bg-slate-950/80 border border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl"
           >
-            {/* Header - Compact Horizontal Row */}
-            <div className="py-4 px-5 border-b border-white/5 relative overflow-hidden">
-              {/* Background glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent pointer-events-none" />
-
-              <div className="flex items-center justify-between relative z-10">
-                {/* Right: Icon + Title */}
-                <div className="flex items-center gap-3">
-                  {/* Compact Icon with subtle glow */}
-                  <div className="relative">
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-                      <Activity size={20} className="text-cyan-400" />
-                    </div>
+            {/* Header */}
+            <div className="p-6 border-b border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-2xl bg-blue-500/15 shadow-[0_0_20px_rgba(59,130,246,0.25)]">
+                    <Stethoscope size={24} className="text-blue-400" />
                   </div>
-                  {/* Title */}
-                  <h3 className="text-xl font-bold text-white">
-                    אבחון תקלה
-                  </h3>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-white truncate">אבחון תקלה</h3>
+                  </div>
                 </div>
 
-                {/* Left: Confidence Badge */}
                 {displayConfidenceLevel && (
-                  <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs text-emerald-300 font-semibold">ודאות {displayConfidenceLevel}</span>
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                    <Activity size={14} className="text-emerald-400" />
+                    <span className="text-sm text-white/70 font-medium">ודאות {displayConfidenceLevel}</span>
                   </div>
                 )}
               </div>
@@ -526,60 +513,29 @@ export default function FinalDiagnosisCard({
             {/* Content */}
             <div className="p-6 space-y-5">
 
-              {/* Primary Diagnosis Card with Circular Progress */}
+              {/* Top Diagnosis */}
               {topDiagnosis && (
                 <motion.div
                   variants={itemVariants}
-                  className="rounded-2xl p-6 bg-gradient-to-br from-slate-800/80 to-slate-900/60 border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.1)]"
+                  className="rounded-2xl p-5 bg-gradient-to-bl from-blue-500/10 via-purple-500/5 to-transparent border border-blue-500/20"
                 >
-                  <div className="flex items-center gap-6">
-                    {/* Circular Progress Ring */}
-                    <div className="relative flex-shrink-0">
-                      <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Background circle */}
-                        <circle
-                          cx="50" cy="50" r="42"
-                          fill="none"
-                          stroke="rgba(255,255,255,0.1)"
-                          strokeWidth="8"
-                        />
-                        {/* Progress circle with glow */}
-                        <circle
-                          cx="50" cy="50" r="42"
-                          fill="none"
-                          stroke="url(#progressGradient)"
-                          strokeWidth="8"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 42}`}
-                          strokeDashoffset={`${2 * Math.PI * 42 * (1 - normProb(topDiagnosis.probability))}`}
-                          className="drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                        />
-                        <defs>
-                          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#06b6d4" />
-                            <stop offset="100%" stopColor="#22d3ee" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      {/* Percentage in center */}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-black text-cyan-400">{pct(topDiagnosis.probability)}%</span>
-                      </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.25)] flex items-center justify-center">
+                      <span className="text-sm font-bold text-blue-400">1</span>
                     </div>
-
-                    {/* Diagnosis Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-cyan-500/20 text-cyan-300">האבחנה המובילה</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-2 leading-tight">{topDiagnosis.issue}</h3>
-                      {(topDiagnosis.explanation || topDiagnosis.description) && (
-                        <p className="text-sm text-white/50 leading-relaxed line-clamp-2">
-                          {topDiagnosis.explanation || topDiagnosis.description || ''}
-                        </p>
-                      )}
-                    </div>
+                    <h4 className="text-sm font-semibold text-white/70">האבחנה המובילה</h4>
+                    {typeof topDiagnosis.probability === 'number' && (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-xs font-medium text-blue-300">
+                        {pct(topDiagnosis.probability)}%
+                      </span>
+                    )}
                   </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{topDiagnosis.issue}</h3>
+                  {(topDiagnosis.explanation || topDiagnosis.description) && (
+                    <p className="text-sm text-white/50 leading-relaxed">
+                      {topDiagnosis.explanation || topDiagnosis.description || ''}
+                    </p>
+                  )}
                 </motion.div>
               )}
 
@@ -601,89 +557,90 @@ export default function FinalDiagnosisCard({
                 </motion.div>
               )}
 
-              {/* Additional Results - Dark Glass Cards with Mini Progress */}
+              {/* Mechanic Summary Preview - transparency for what gets sent */}
+              {conversationSummaries?.mechanic?.formattedText && (
+                <motion.div
+                  variants={itemVariants}
+                  className="rounded-xl p-4 bg-white/[0.02] border border-white/5"
+                >
+                  <div className="flex items-center gap-2 mb-2 text-white/50">
+                    <Wrench size={14} />
+                    <span className="text-xs font-medium">מה יישלח למוסך?</span>
+                  </div>
+                  <p className="text-xs text-white/40 leading-relaxed whitespace-pre-wrap">
+                    {conversationSummaries.mechanic.formattedText}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Additional Results Grid */}
               {additionalResults.length > 0 && (
-                <div className="grid grid-cols-2 gap-4 mb-2">
+                <div className="grid grid-cols-2 gap-3">
                   {additionalResults.map((result, idx) => (
                     <motion.div
                       key={idx}
                       variants={itemVariants}
-                      className="rounded-xl p-4 bg-slate-800/60 backdrop-blur-sm border border-slate-600/30 hover:border-cyan-500/30 transition-colors"
+                      className="rounded-xl p-4 bg-white/[0.03] border border-white/5"
                     >
-                      <div className="flex items-center gap-3 mb-3">
-                        {/* Mini Circular Progress */}
-                        <div className="relative flex-shrink-0">
-                          <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle
-                              cx="50" cy="50" r="40"
-                              fill="none"
-                              stroke="rgba(255,255,255,0.1)"
-                              strokeWidth="10"
-                            />
-                            <circle
-                              cx="50" cy="50" r="40"
-                              fill="none"
-                              stroke="#0891b2"
-                              strokeWidth="10"
-                              strokeLinecap="round"
-                              strokeDasharray={`${2 * Math.PI * 40}`}
-                              strokeDashoffset={`${2 * Math.PI * 40 * (1 - normProb(result.probability))}`}
-                              className="drop-shadow-[0_0_5px_rgba(6,182,212,0.4)]"
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-xs font-bold text-cyan-400">{pct(result.probability)}%</span>
-                          </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+                          <span className="text-xs font-medium text-white/50">{idx + 2}</span>
                         </div>
-
-                        <div className="flex-1 min-w-0">
-                          <span className="text-xs text-cyan-400/70 block mb-1">אפשרות {idx + 2}</span>
-                          <p className="text-sm font-semibold text-white/90 line-clamp-2">{result.issue}</p>
-                        </div>
+                        <span className="text-xs text-white/40">אפשרות נוספת</span>
+                        {typeof result.probability === 'number' && (
+                          <span className="mr-auto px-1.5 py-0.5 rounded bg-white/10 text-xs text-white/50">
+                            {pct(result.probability)}%
+                          </span>
+                        )}
                       </div>
+                      <p className="text-sm font-medium text-white/70">{result.issue}</p>
                     </motion.div>
                   ))}
                 </div>
               )}
 
-              {/* Self-Fix Actions - Only show when there are actions */}
-              {normalizedSelfFix.length > 0 && (
-                <motion.div
-                  variants={itemVariants}
-                  className="rounded-2xl p-5 bg-white/[0.03] border border-white/10"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/15 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                      <Wrench size={18} className="text-emerald-400" />
-                    </div>
-                    <h4 className="text-base font-semibold text-white/80">מה ניתן לעשות כרגע?</h4>
+              {/* Self-Fix Actions */}
+              <motion.div
+                variants={itemVariants}
+                className="rounded-2xl p-5 bg-white/[0.03] border border-white/10"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/15 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                    <Wrench size={18} className="text-emerald-400" />
                   </div>
-                  <ul className="space-y-3">
-                    {(showAllSelfFix ? normalizedSelfFix : normalizedSelfFix.slice(0, 4)).map((item: any, idx: number) => {
-                      const ActionIcon = actionTypeIcons[item.actionType || 'inspect'] || Eye;
-                      return (
-                        <li key={idx} className="flex items-start gap-4 flex-row-reverse">
-                          <ActionIcon size={18} className="text-emerald-400/60 mt-1 flex-shrink-0" />
-                          <div className="flex-1 pt-0.5 text-right">
-                            <span className="text-sm text-white/70 leading-relaxed">{item.step}</span>
-                          </div>
-                          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                            <span className="text-xs font-semibold text-emerald-400/80">{idx + 1}</span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {normalizedSelfFix.length > 4 && (
-                    <button
-                      onClick={() => setShowAllSelfFix(!showAllSelfFix)}
-                      className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
-                    >
-                      {showAllSelfFix ? 'הסתר' : `ראה עוד (${normalizedSelfFix.length - 4})`}
-                    </button>
-                  )}
-                </motion.div>
-              )}
+                  <h4 className="text-base font-semibold text-white/80">מה ניתן לעשות כרגע?</h4>
+                </div>
+                {normalizedSelfFix.length > 0 ? (
+                  <>
+                    <ul className="space-y-3">
+                      {(showAllSelfFix ? normalizedSelfFix : normalizedSelfFix.slice(0, 4)).map((item: any, idx: number) => {
+                        const ActionIcon = actionTypeIcons[item.actionType || 'inspect'] || Eye;
+                        return (
+                          <li key={idx} className="flex items-start gap-4 flex-row-reverse">
+                            <ActionIcon size={18} className="text-emerald-400/60 mt-1 flex-shrink-0" />
+                            <div className="flex-1 pt-0.5 text-right">
+                              <span className="text-sm text-white/70 leading-relaxed">{item.step}</span>
+                            </div>
+                            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                              <span className="text-xs font-semibold text-emerald-400/80">{idx + 1}</span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {normalizedSelfFix.length > 4 && (
+                      <button
+                        onClick={() => setShowAllSelfFix(!showAllSelfFix)}
+                        className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        {showAllSelfFix ? 'הסתר' : `ראה עוד (${normalizedSelfFix.length - 4})`}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-white/50">אין פעולות בטוחות לביצוע עצמאי כרגע. מומלץ לפנות למוסך או לסיוע דרך.</p>
+                )}
+              </motion.div>
 
               {/* Next Steps */}
               {nextSteps && (
@@ -706,62 +663,47 @@ export default function FinalDiagnosisCard({
                 </motion.div>
               )}
 
-              {/* Recommendations - Timeline Style Checklist */}
+              {/* Recommendations - only show if meaningful items exist */}
               {filteredRecommendations.length > 0 && (
                 <motion.div
                   variants={itemVariants}
-                  className="rounded-2xl p-5 bg-gradient-to-br from-slate-800/50 to-slate-900/30 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.05)]"
+                  className="rounded-xl p-4 bg-white/[0.02] border border-white/5"
                 >
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="p-2.5 rounded-xl bg-amber-500/15 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-                      <Eye size={18} className="text-amber-400" />
-                    </div>
-                    <h4 className="text-lg font-bold text-white/90">בדיקות מומלצות להמשך</h4>
+                  <div className="flex items-center gap-2 mb-3 text-white/50">
+                    <Wrench size={14} />
+                    <span className="text-xs font-medium">בדיקות מומלצות להמשך</span>
                   </div>
-
-                  {/* Timeline List */}
-                  <div className="relative mr-4">
-                    {/* Vertical connecting line */}
-                    <div className="absolute right-3.5 top-4 bottom-4 w-0.5 bg-gradient-to-b from-amber-500/40 via-amber-500/20 to-transparent" />
-
-                    <ul className="space-y-4">
-                      {filteredRecommendations.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-4 relative">
-                          {/* Numbered Circle */}
-                          <div className="relative z-10 flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-amber-500/30 to-amber-600/20 border border-amber-500/40 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                            <span className="text-xs font-bold text-amber-300">{idx + 1}</span>
-                          </div>
-
-                          {/* Text */}
-                          <div className="flex-1 pt-0.5">
-                            <span className="text-sm text-white/70 leading-relaxed">{item}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ul className="space-y-2">
+                    {filteredRecommendations.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-sm text-white/40">
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/20 mt-2 flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </motion.div>
               )}
 
-              {/* Action Buttons - Premium Style */}
-              <motion.div variants={itemVariants} className="flex gap-3 pt-6">
+              {/* Action Buttons - hide mechanic button when resolved */}
+              <motion.div variants={itemVariants} className="flex gap-3 pt-2">
                 {status?.color !== 'green' && (
                   <button
                     onClick={onOpenMechanicRequest}
-                    className="flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-lg transition-all shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(59,130,246,0.5)]"
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
                   >
-                    <Wrench size={20} />
                     <span>פתח פנייה למוסך</span>
+                    <Wrench size={18} />
                   </button>
                 )}
-                {/* Tow button - Frosted Glass */}
-                <button
-                  onClick={() => setShowTowingModal(true)}
-                  className="flex items-center justify-center gap-2 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/20 text-white/90 hover:text-white font-bold transition-all border border-white/20 hover:border-white/40"
-                >
-                  <Truck size={20} />
-                  <span>הזמן גרר</span>
-                </button>
+                {shouldShowTow && (
+                  <button
+                    onClick={() => setShowTowingModal(true)}
+                    className="flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium transition-colors border border-white/20"
+                  >
+                    <span>התקשר לגרר</span>
+                    <Truck size={18} />
+                  </button>
+                )}
               </motion.div>
             </div>
 

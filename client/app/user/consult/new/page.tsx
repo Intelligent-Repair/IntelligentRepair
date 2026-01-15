@@ -22,7 +22,7 @@ export default function NewConsultationPage() {
       window.sessionStorage.removeItem("draft_images");
       window.sessionStorage.removeItem("draft_messages");
       window.sessionStorage.removeItem("consult_questions_state");
-
+      
       // ALWAYS generate a new UUID for this consultation
       const newDraftId = crypto.randomUUID();
       window.sessionStorage.setItem("draft_id", newDraftId);
@@ -98,8 +98,7 @@ export default function NewConsultationPage() {
   };
 
   const handleAddNew = () => {
-    // Navigate to add new vehicle page
-    router.push("/maintenance/add");
+    console.log("Add new vehicle clicked from /user/consult/new");
   };
 
   if (loading) {

@@ -17,70 +17,84 @@ export async function GET(req: Request) {
       );
     }
 
-    // Fetch closed requests (completed consultations) for this user
-    // This is the actual repair history - requests that were completed
-    const { data, error } = await supabase
+    // First, get all request IDs for this user
+    const { data: userRequests, error: requestsError } = await supabase
       .from("requests")
-      .select(`
-        id,
-        description,
-        status,
-        created_at,
-        car_id,
-        car:people_cars (
-          id,
-          license_plate,
-          vehicle_catalog:vehicle_catalog_id (
-            manufacturer,
-            model
-          )
-        )
-      `)
-      .eq("user_id", user_id)
-      .eq("status", "completed")
-      .order("created_at", { ascending: false });
+      .select("id")
+      .eq("user_id", user_id);
 
-    if (error) {
-      console.error("[repairs/by-user] Error fetching closed requests:", error);
-      console.error("[repairs/by-user] Error details:", JSON.stringify(error, null, 2));
+    if (requestsError) {
       return NextResponse.json(
         {
           success: false,
-          message: "שגיאה בטעינת היסטוריית הטיפולים",
+          message: "Failed to fetch user requests",
+          error: requestsError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!userRequests || userRequests.length === 0) {
+      return NextResponse.json({
+        success: true,
+        repairs: [],
+      });
+    }
+
+    const requestIds = userRequests.map((r) => r.id);
+
+    // Get repairs for these requests
+    const { data, error } = await supabase
+      .from("repairs")
+      .select(`
+        id,
+        ai_summary,
+        mechanic_notes,
+        final_issue_type,
+        created_at,
+        request:requests (
+          id,
+          description,
+          status,
+          created_at,
+          car_id,
+          car:people_cars (
+            id,
+            license_plate,
+            vehicle_catalog:vehicle_catalog_id (
+              manufacturer,
+              model
+            )
+          )
+        ),
+        garage:garages (
+          id,
+          name
+        )
+      `)
+      .in("request_id", requestIds)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to fetch user repairs",
           error: error.message,
         },
         { status: 500 }
       );
     }
 
-    // Transform data to match expected format for the repairs page
-    const repairs = (data || []).map((request) => ({
-      id: request.id,
-      ai_summary: request.description || null,
-      mechanic_notes: null,
-      final_issue_type: null,
-      created_at: request.created_at,
-      request: {
-        id: request.id,
-        description: request.description,
-        status: request.status,
-        created_at: request.created_at,
-        car_id: request.car_id,
-        car: request.car,
-      },
-      garage: null,
-    }));
-
     return NextResponse.json({
       success: true,
-      repairs: repairs,
+      repairs: data,
     });
   } catch (err) {
-    console.error("[repairs/by-user] Server error:", err);
     return NextResponse.json(
       {
         success: false,
-        message: "שגיאת שרת",
+        message: "Server error",
         error: (err as Error).message,
       },
       { status: 500 }

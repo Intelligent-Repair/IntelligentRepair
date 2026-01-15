@@ -195,34 +195,12 @@ export async function POST(req: Request) {
 
         // Ensure category is set in mechanic_summary for display
         if (mechanicSummary && !(mechanicSummary as any).category) {
-            // Try to derive a meaningful category from AI data
-            const summary = mechanicSummary as any;
-            let derivedCategory = "";
-
-            // Priority 1: Use top diagnosis name if available
-            if (summary.diagnoses && Array.isArray(summary.diagnoses) && summary.diagnoses.length > 0) {
-                derivedCategory = summary.diagnoses[0].issue || "";
-            }
-            // Priority 2: Use topDiagnosis if available (legacy format)
-            else if (summary.topDiagnosis && Array.isArray(summary.topDiagnosis) && summary.topDiagnosis.length > 0) {
-                derivedCategory = summary.topDiagnosis[0].name || "";
-            }
-            // Priority 3: Use originalComplaint if available
-            else if (summary.originalComplaint && summary.originalComplaint !== "לא ידוע") {
-                derivedCategory = summary.originalComplaint.substring(0, 50).trim();
-            }
-            // Priority 4: Use AI diagnosis text
-            else if (reqRow.ai_diagnosis) {
-                derivedCategory = String(reqRow.ai_diagnosis).substring(0, 50).trim();
-            }
-            // Priority 5: Use user description
-            else if (reqRow.description) {
-                derivedCategory = String(reqRow.description).substring(0, 50).trim();
-            }
-
+            // Try to extract category from description or diagnosis
+            const categorySource = reqRow.description || reqRow.ai_diagnosis || "";
+            const shortCategory = categorySource.substring(0, 50).trim();
             mechanicSummary = {
                 ...mechanicSummary,
-                category: derivedCategory || "בעיה ברכב"
+                category: shortCategory || "בעיה ברכב"
             };
         }
 

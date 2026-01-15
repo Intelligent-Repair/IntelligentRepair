@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench, Home, Trash2, ChevronLeft, User, Bot, Shield } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, Clock, Search, Loader2, AlertCircle, X, Phone, Car, FileText, Wrench, Home, Trash2 } from 'lucide-react';
 
 interface GarageRequest {
     id: string;
@@ -20,22 +20,10 @@ interface GarageRequest {
         license_plate?: string;
     } | null;
     mechanic_summary: {
-        // New schema (v2)
-        schemaVersion?: number;
-        vehicleType?: string;
-        originalComplaint?: string;
-        conversationNarrative?: string;
-        driverFindings?: string[];
-        diagnoses?: Array<{ issue: string; probability: number }>;
-        recommendations?: string[];
-        recommendedActions?: string[];
-        needsTow?: boolean;
-        urgency?: 'low' | 'medium' | 'high' | 'critical';
-        category?: string;
-        formattedText?: string;
-        // Legacy schema
-        topDiagnosis?: Array<{ name?: string; issue?: string; recommendation?: string; probability?: number }>;
+        topDiagnosis?: Array<{ name: string; recommendation?: string }>;
         shortDescription?: string;
+        formattedText?: string;
+        category?: string;
     } | null;
 }
 
@@ -200,52 +188,23 @@ export default function GarageInquiriesPage() {
         }
     };
 
-    // Get status display with capsule badge styles
+    // Get status display
     const getStatusDisplay = (status: string) => {
         switch (status) {
             case 'pending':
-                return {
-                    label: 'חדש',
-                    bgClass: 'bg-red-500/10',
-                    dotClass: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse',
-                    textClass: 'text-red-400'
-                };
+                return { label: 'חדש', className: 'bg-red-900/50 text-red-300' };
             case 'viewed':
-                return {
-                    label: 'בטיפול',
-                    bgClass: 'bg-amber-500/10',
-                    dotClass: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
-                    textClass: 'text-amber-400'
-                };
+                return { label: 'נצפה', className: 'bg-yellow-900/50 text-yellow-300' };
             case 'answered':
-                return {
-                    label: 'נענה',
-                    bgClass: 'bg-emerald-500/10',
-                    dotClass: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
-                    textClass: 'text-emerald-400'
-                };
+                return { label: 'נענה', className: 'bg-green-900/50 text-green-300' };
             case 'completed':
-            case 'closed_yes':
-                return {
-                    label: 'טופל',
-                    bgClass: 'bg-emerald-500/10',
-                    dotClass: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
-                    textClass: 'text-emerald-400'
-                };
+                return { label: 'הושלם', className: 'bg-green-900/50 text-green-300' };
             case 'closed_no':
-                return {
-                    label: 'סגור',
-                    bgClass: 'bg-slate-500/10',
-                    dotClass: 'bg-slate-500',
-                    textClass: 'text-slate-400'
-                };
+                return { label: 'סיים ללא טיפול', className: 'bg-gray-900/50 text-gray-300' };
+            case 'closed_yes':
+                return { label: 'הושלם', className: 'bg-green-900/50 text-green-300' };
             default:
-                return {
-                    label: status || 'לא ידוע',
-                    bgClass: 'bg-slate-500/10',
-                    dotClass: 'bg-slate-500',
-                    textClass: 'text-slate-400'
-                };
+                return { label: status || 'לא ידוע', className: 'bg-gray-900/50 text-gray-300' };
         }
     };
 
@@ -390,10 +349,10 @@ export default function GarageInquiriesPage() {
                 {/* Header with back button */}
                 <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
                     <div>
-                        <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-white">
-                            מרכז הפניות
+                        <h1 className="text-4xl font-extrabold text-white">
+                            פניות מלקוחות (Inbox)
                         </h1>
-                        <p className="text-sm text-slate-400 mt-1" suppressHydrationWarning>
+                        <p className="text-sm text-slate-400 mt-1">
                             עדכון אחרון: {lastRefresh.toLocaleTimeString('he-IL')} • רענון אוטומטי כל 30 שניות
                         </p>
                     </div>
@@ -415,8 +374,8 @@ export default function GarageInquiriesPage() {
                     </div>
                 </div>
 
-                {/* Filters - Segmented Control */}
-                <section className="flex flex-wrap gap-3 mb-8">
+                {/* Filters */}
+                <section className="flex flex-wrap gap-4 mb-8">
                     {filters.map(filter => {
                         const Icon = filter.icon;
                         const isActive = activeFilter === filter.key;
@@ -433,17 +392,16 @@ export default function GarageInquiriesPage() {
                                 key={filter.key}
                                 onClick={() => setActiveFilter(filter.key)}
                                 className={`
-                                    flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300
+                                    flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition duration-300 backdrop-blur-xl
                                     ${isActive
-                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]'
-                                        : 'bg-transparent border border-white/10 text-slate-400 hover:bg-white/5 hover:text-white hover:border-white/20'
+                                        ? 'bg-sky-500 text-slate-900 shadow-sky-500/40 hover:bg-sky-400'
+                                        : 'bg-white/10 border border-white/10 text-white hover:bg-white/20'
                                     }
                                 `}
                             >
-                                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                                {filter.label}
+                                <Icon className="w-5 h-5" /> {filter.label}
                                 {count > 0 && (
-                                    <span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? 'bg-white/20' : 'bg-white/10'}`}>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? 'bg-slate-900/30' : 'bg-white/20'}`}>
                                         {count}
                                     </span>
                                 )}
@@ -489,326 +447,119 @@ export default function GarageInquiriesPage() {
                             <p className="mt-4 text-slate-400">אין פניות להצגה</p>
                         </div>
                     ) : (
-                        /* Floating Cards List */
-                        <div className="p-4 space-y-3">
-                            {filteredRequests.map((item, index) => {
-                                const statusDisplay = getStatusDisplay(item.status);
-                                const initials = item.client.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                const manufacturer = item.vehicle_info?.manufacturer?.toLowerCase() || '';
-
-                                return (
-                                    <div
-                                        key={item.id}
-                                        onClick={() => handleOpenDetails(item)}
-                                        className="group cursor-pointer rounded-xl p-4 bg-slate-800/40 backdrop-blur-sm border border-white/5 hover:border-blue-500/50 hover:bg-slate-800/70 transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.15)]"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            {/* Avatar */}
-                                            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center">
-                                                <span className="text-sm font-bold text-cyan-300">{initials}</span>
-                                            </div>
-
-                                            {/* Main Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-3 mb-1">
-                                                    <h3 className="text-base font-bold text-white truncate">{item.client}</h3>
-                                                </div>
-                                                <div className="flex items-center gap-4 text-sm">
-                                                    {/* Car with brand hint */}
-                                                    <span className="text-slate-300 flex items-center gap-1.5">
-                                                        <Car className="w-4 h-4 text-cyan-400" />
-                                                        {getVehicleDisplay(item)}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-right text-sm">
+                                <thead>
+                                    <tr className="border-b border-zinc-700 text-slate-400 bg-zinc-800/50">
+                                        <th className="py-3 px-4 font-normal">שם לקוח</th>
+                                        <th className="py-3 px-4 font-normal">רכב</th>
+                                        <th className="py-3 px-4 font-normal">קטגוריית תקלה</th>
+                                        <th className="py-3 px-4 font-normal">תאריך פנייה</th>
+                                        <th className="py-3 px-4 font-normal">סטטוס</th>
+                                        <th className="py-3 px-4 font-normal">פרטי פנייה</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredRequests.map((item) => {
+                                        const statusDisplay = getStatusDisplay(item.status);
+                                        return (
+                                            <tr
+                                                key={item.id}
+                                                className="border-b border-white/5 hover:bg-white/10 transition"
+                                            >
+                                                <td className="py-3 px-4">
+                                                    <div className="font-semibold text-slate-100">{item.client}</div>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-300">
+                                                    {getVehicleDisplay(item)}
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-300">
+                                                    {getFaultCategory(item)}
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-400">{item.date}</td>
+                                                <td className="py-3 px-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusDisplay.className}`}>
+                                                        {statusDisplay.label}
                                                     </span>
-                                                    {/* Category */}
-                                                    <span className="text-slate-500 hidden sm:inline text-xs">
-                                                        {getFaultCategory(item)}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Date */}
-                                            <div className="hidden md:block text-xs text-slate-600 min-w-[80px]">
-                                                {item.date}
-                                            </div>
-
-                                            {/* Status Capsule Badge */}
-                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${statusDisplay.bgClass} min-w-[90px] justify-center`}>
-                                                <div className={`w-2 h-2 rounded-full ${statusDisplay.dotClass}`} />
-                                                <span className={`text-xs font-semibold ${statusDisplay.textClass}`}>
-                                                    {statusDisplay.label}
-                                                </span>
-                                            </div>
-
-                                            {/* Arrow */}
-                                            <ChevronLeft className="w-5 h-5 text-slate-600 group-hover:text-blue-400 transition-colors" />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <button
+                                                        onClick={() => handleOpenDetails(item)}
+                                                        className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+                                                    >
+                                                        <FileText className="w-4 h-4" />
+                                                        צפה בפרטים
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </section>
             </main>
 
-            {/* Popup Modal - Digital Diagnostic Briefing */}
+            {/* Popup Modal */}
             {selectedRequest && (
-                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-blue-500/30 shadow-2xl shadow-blue-500/10 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-
-                        {/* ===== HEADER SECTION - Client Identity ===== */}
-                        <div className="p-6 bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-b border-cyan-500/20">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-white">
-                                    פרטי פנייה
-                                </h2>
-                                <button
-                                    onClick={() => {
-                                        setSelectedRequest(null);
-                                        setShowDeleteConfirm(false);
-                                    }}
-                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            {/* Client Info Row */}
-                            <div className="flex items-center justify-between gap-4" dir="rtl">
-                                {/* Right: Avatar + Name */}
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/30 to-indigo-500/30 border border-cyan-500/30 flex items-center justify-center">
-                                        <span className="text-lg font-bold text-cyan-300">
-                                            {selectedRequest.client.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-white text-lg">{selectedRequest.client}</p>
-                                        <p className="text-xs text-slate-500">לקוח</p>
-                                    </div>
-                                </div>
-
-                                {/* Center: Phone with Call Action */}
-                                <div className="flex items-center gap-2">
-                                    <span className="text-white font-mono text-lg" dir="ltr">
-                                        {selectedRequest.phone || '---'}
-                                    </span>
-                                    {selectedRequest.phone && (
-                                        <a
-                                            href={`tel:${selectedRequest.phone}`}
-                                            className="px-3 py-1.5 rounded-full bg-transparent border border-white/10 text-cyan-400 hover:bg-white/5 transition flex items-center gap-1.5 text-sm font-medium"
-                                        >
-                                            <Phone className="w-4 h-4" />
-                                            התקשר
-                                        </a>
-                                    )}
-                                </div>
-
-                                {/* Left: Car Badge */}
-                                <div className="px-4 py-2 rounded-xl bg-slate-800/80 backdrop-blur border border-slate-700/50 text-center">
-                                    <div className="flex items-center gap-2 justify-center">
-                                        <Car className="w-5 h-5 text-cyan-400" />
-                                        <div>
-                                            <p className="font-medium text-white text-sm">{getVehicleDisplay(selectedRequest)}</p>
-                                            {selectedRequest.vehicle_info?.license_plate && (
-                                                <p className="text-xs text-slate-500 text-center" dir="ltr">{selectedRequest.vehicle_info.license_plate}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Glowing Divider */}
-                            <div className="mt-4 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-gradient-to-b from-[#0a1628] to-[#071226] rounded-2xl border border-white/20 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center p-6 border-b border-white/10">
+                            <h2 className="text-2xl font-bold text-white">פרטי פנייה</h2>
+                            <button
+                                onClick={() => {
+                                    setSelectedRequest(null);
+                                    setShowDeleteConfirm(false);
+                                }}
+                                className="text-slate-400 hover:text-white transition"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
                         </div>
 
-                        <div
-                            className="flex-1 overflow-y-auto p-6 modal-scrollbar"
-                            dir="rtl"
-                            style={{
-                                scrollbarWidth: 'thin',
-                                scrollbarColor: '#334155 #0f172a'
-                            }}
-                        >
-                            {/* Urgency Tag - Top Right */}
-                            {(() => {
-                                const urgency = (selectedRequest.mechanic_summary as any)?.urgency || 'medium';
-                                const urgencyConfig: Record<string, { label: string; bgClass: string; textClass: string; icon: string }> = {
-                                    critical: { label: 'דחיפות קריטית', bgClass: 'bg-red-500/20', textClass: 'text-red-400', icon: '🔥' },
-                                    high: { label: 'דחיפות גבוהה', bgClass: 'bg-orange-500/20', textClass: 'text-orange-400', icon: '⚠️' },
-                                    medium: { label: 'דחיפות בינונית', bgClass: 'bg-amber-500/20', textClass: 'text-amber-400', icon: '⏱️' },
-                                    low: { label: 'דחיפות נמוכה', bgClass: 'bg-emerald-500/20', textClass: 'text-emerald-400', icon: '✓' }
-                                };
-                                const config = urgencyConfig[urgency] || urgencyConfig.medium;
-                                return (
-                                    <div className={`mb-4 px-3 py-1.5 rounded-full ${config.bgClass} w-fit flex items-center gap-2`}>
-                                        <span>{config.icon}</span>
-                                        <span className={`text-sm font-semibold ${config.textClass}`}>{config.label}</span>
+                        {/* Modal Content */}
+                        <div className="p-6 overflow-y-auto max-h-[60vh]" dir="rtl">
+                            {/* Customer Info */}
+                            <div className="mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
+                                <h3 className="text-lg font-semibold text-cyan-300 mb-3">פרטי לקוח</h3>
+                                <div className="grid grid-cols-2 gap-4 text-slate-300">
+                                    <div>
+                                        <span className="text-slate-500">שם:</span>
+                                        <span className="mr-2 font-medium">{selectedRequest.client}</span>
                                     </div>
-                                );
-                            })()}
-
-                            {/* Section 1: Driver Findings - סיכום תשאול הנהג */}
-                            {(() => {
-                                const summary = selectedRequest.mechanic_summary as any;
-                                if (!summary) return null;
-
-                                // Try to get narrative from various sources
-                                let displayText: string | null = null;
-
-                                // 1. New unified format: conversationNarrative
-                                if (summary.conversationNarrative && summary.conversationNarrative !== 'לא זמין') {
-                                    displayText = summary.conversationNarrative;
-                                }
-                                // 2. KB format: formattedText (extract the narrative section)
-                                else if (summary.formattedText) {
-                                    // Extract just the narrative part from formattedText (before אבחון/diagnoses)
-                                    const text = summary.formattedText as string;
-                                    // Remove markdown headers and format nicely
-                                    let cleaned = text
-                                        .replace(/📋[^\n]*/g, '') // Remove header
-                                        .replace(/═+/g, '') // Remove separator
-                                        .replace(/🚗[^\n]*/g, '') // Remove vehicle line
-                                        .replace(/🔴[^\n]*/g, '') // Keep light info
-                                        .replace(/📍[^\n]*/g, '') // Keep scenario
-                                        .split('📝 מהלך השיחה:')[1]?.split('🔍')[0] || ''; // Get conversation section
-
-                                    // If we got conversation text, format it
-                                    if (cleaned.trim()) {
-                                        displayText = cleaned.replace(/•/g, '').trim().split('\n').filter(l => l.trim()).join(' ');
-                                    } else {
-                                        // Fallback to originalComplaint or scenarioDescription
-                                        displayText = summary.originalComplaint || summary.scenarioDescription;
-                                    }
-                                }
-                                // 3. KB format: build from conversationLog
-                                else if (summary.conversationLog && Array.isArray(summary.conversationLog) && summary.conversationLog.length > 0) {
-                                    const answers = summary.conversationLog.map((item: any) => item.userAnswer).filter(Boolean);
-                                    if (answers.length > 0) {
-                                        displayText = `הלקוח דיווח: ${answers.join('. ')}`;
-                                    }
-                                }
-                                // 4. Fallback to originalComplaint
-                                else if (summary.originalComplaint && summary.originalComplaint !== 'לא צוין') {
-                                    displayText = summary.originalComplaint;
-                                }
-
-                                // Also check for driverFindings array
-                                const driverFindings = summary.driverFindings || [];
-
-                                // If no data at all, skip
-                                if (!displayText && driverFindings.length === 0) return null;
-
-                                return (
-                                    <div className="mb-6 p-4 rounded-lg bg-slate-900/50 backdrop-blur-sm border-r-[3px] border-r-cyan-500">
-                                        <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                                            <FileText className="w-4 h-4 text-cyan-400" />
-                                            ממצאי תשאול הנהג
-                                        </h4>
-                                        {driverFindings.length > 0 ? (
-                                            <ul className="space-y-2">
-                                                {driverFindings.map((finding: string, idx: number) => (
-                                                    <li key={idx} className="text-slate-300 text-sm flex items-start gap-2">
-                                                        <span className="text-cyan-400 mt-1">•</span>
-                                                        <span>{finding}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : displayText ? (
-                                            <p className="text-slate-300 text-sm leading-relaxed">{displayText}</p>
-                                        ) : null}
+                                    <div>
+                                        <Phone className="w-4 h-4 inline-block ml-2 text-slate-500" />
+                                        <span>{selectedRequest.phone || 'לא צוין'}</span>
                                     </div>
-                                );
-                            })()}
-
-                            {/* Section 2: Probabilistic Analysis with Progress Bars */}
-                            {(() => {
-                                const summary = selectedRequest.mechanic_summary as any;
-                                const diagnoses = summary?.diagnoses || summary?.topDiagnosis || [];
-                                console.log('🔍 DIAGNOSES:', diagnoses);
-
-                                if (diagnoses.length === 0) return null;
-
-                                return (
-                                    <div className="mb-6 p-4 rounded-lg bg-slate-900/50 backdrop-blur-sm border-r-[3px] border-r-cyan-500">
-                                        <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                                            <Bot className="w-4 h-4 text-cyan-400" />
-                                            ניתוח הסתברותי
-                                        </h4>
-                                        <div className="space-y-3">
-                                            {diagnoses.map((d: any, idx: number) => {
-                                                const name = d.issue || d.name || 'אבחון';
-                                                const prob = d.probability != null ? d.probability : (idx === 0 ? 0.75 : 0.25);
-                                                console.log(`  Diagnosis ${idx}: name="${name}", prob=${d.probability}, usedProb=${prob}`);
-                                                const percentage = Math.round(prob * 100);
-                                                const isHighPriority = idx === 0;
-
-                                                return (
-                                                    <div key={idx} className="p-3 rounded-lg bg-slate-800/60">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className={`font-medium ${isHighPriority ? 'text-orange-300' : 'text-amber-300'}`}>
-                                                                {name}
-                                                            </span>
-                                                            <span className={`text-sm font-bold ${isHighPriority ? 'text-orange-400' : 'text-amber-400'}`}>
-                                                                {percentage}%
-                                                            </span>
-                                                        </div>
-                                                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                                            <div
-                                                                className={`h-full rounded-full transition-all duration-500 ${isHighPriority
-                                                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]'
-                                                                    : 'bg-gradient-to-r from-amber-500 to-yellow-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
-                                                                    }`}
-                                                                style={{ width: `${percentage}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                    <div className="col-span-2">
+                                        <Car className="w-4 h-4 inline-block ml-2 text-slate-500" />
+                                        <span>{getVehicleDisplay(selectedRequest)}</span>
+                                        {selectedRequest.vehicle_info?.license_plate && (
+                                            <span className="mr-4 text-slate-500">
+                                                ({selectedRequest.vehicle_info.license_plate})
+                                            </span>
+                                        )}
                                     </div>
-                                );
-                            })()}
+                                </div>
+                            </div>
 
-                            {/* Section 3: Recommended Actions */}
-                            {(() => {
-                                const summary = selectedRequest.mechanic_summary as any;
-                                let actions = summary?.recommendedActions || summary?.recommendations || [];
-
-                                // Fallback for single recommendation string
-                                if (actions.length === 0 && summary?.recommendation) {
-                                    actions = [summary.recommendation];
-                                }
-
-                                if (actions.length === 0) return null;
-
-                                return (
-                                    <div className="p-4 rounded-lg bg-slate-900/50 backdrop-blur-sm border-r-[3px] border-r-cyan-500">
-                                        <h4 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
-                                            <Wrench className="w-4 h-4 text-cyan-400" />
-                                            פעולות מומלצות לצוות
-                                        </h4>
-                                        <ol className="space-y-2">
-                                            {actions.map((action: string, idx: number) => (
-                                                <li key={idx} className="text-slate-300 text-sm flex items-start gap-2">
-                                                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold">
-                                                        {idx + 1}
-                                                    </span>
-                                                    <span>{action}</span>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    </div>
-                                );
-                            })()}
+                            {/* AI Summary */}
+                            <div className="mb-6 p-4 rounded-xl bg-sky-900/20 border border-sky-400/30">
+                                <h3 className="text-lg font-semibold text-sky-300 mb-3">סיכום אבחון AI</h3>
+                                <div className="text-sky-100 whitespace-pre-wrap leading-relaxed">
+                                    {formatMechanicSummary(selectedRequest.mechanic_summary)}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-6 border-t border-white/10 bg-slate-900/50">
+                        <div className="p-6 border-t border-white/10">
                             {/* Delete Confirmation */}
                             {showDeleteConfirm ? (
-                                <div className="flex items-center justify-between bg-red-900/30 border border-red-500/40 rounded-xl p-4">
-                                    <span className="text-red-300">האם אתה בטוח שברצונך למחוק?</span>
+                                <div className="flex items-center justify-between bg-red-900/30 border border-red-500/50 rounded-lg p-4">
+                                    <span className="text-red-300">האם אתה בטוח שברצונך למחוק פנייה זו?</span>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setShowDeleteConfirm(false)}
@@ -821,24 +572,29 @@ export default function GarageInquiriesPage() {
                                             disabled={deleting}
                                             className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
                                         >
-                                            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                            מחק
+                                            {deleting ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4" />
+                                            )}
+                                            אישור מחיקה
                                         </button>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex justify-between items-center">
-                                    {/* Delete - De-emphasized */}
+                                <div className="flex justify-between">
+                                    {/* Delete Button - Left side */}
                                     <button
                                         onClick={() => setShowDeleteConfirm(true)}
-                                        className="text-red-400/70 hover:text-red-400 transition flex items-center gap-1.5 text-sm"
+                                        className="px-4 py-2 rounded-lg bg-red-900/50 text-red-300 hover:bg-red-900/70 transition flex items-center gap-2"
                                     >
                                         <Trash2 className="w-4 h-4" />
-                                        מחק
+                                        מחק פנייה
                                     </button>
 
-                                    {/* Main Actions */}
-                                    <div className="flex gap-3">
+                                    {/* Right side buttons */}
+                                    <div className="flex gap-4">
+                                        {/* Show action buttons only for pending or viewed status */}
                                         {(selectedRequest.status === 'pending' || selectedRequest.status === 'viewed') && (
                                             <>
                                                 <button
@@ -847,14 +603,20 @@ export default function GarageInquiriesPage() {
                                                         setSelectedRequest(null);
                                                     }}
                                                     disabled={updatingStatus}
-                                                    className="px-5 py-2.5 rounded-xl bg-transparent border border-slate-600 text-slate-300 font-medium hover:bg-slate-800 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50"
+                                                    className="px-6 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition flex items-center gap-2 disabled:opacity-50"
                                                 >
-                                                    {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                                                    {updatingStatus ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <X className="w-4 h-4" />
+                                                    )}
                                                     סיים ללא טיפול
                                                 </button>
                                                 <button
-                                                    onClick={() => router.push(`/garage/requests/${selectedRequest.id}/report`)}
-                                                    className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] flex items-center gap-2"
+                                                    onClick={() => {
+                                                        router.push(`/garage/requests/${selectedRequest.id}/report`);
+                                                    }}
+                                                    className="px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition flex items-center gap-2"
                                                 >
                                                     <Wrench className="w-4 h-4" />
                                                     דווח על סיום טיפול
@@ -871,3 +633,4 @@ export default function GarageInquiriesPage() {
         </div>
     );
 }
+
