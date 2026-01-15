@@ -208,13 +208,6 @@ export function useHybridFlow() {
 
       // --- D. Diagnosis Report ---
       if (data.type === "diagnosis_report" || data.type === "diagnosis") {
-        console.log('[useHybridFlow] 📊 DIAGNOSIS_REPORT received:', {
-          type: data.type,
-          hasConversationSummaries: !!data.conversationSummaries,
-          conversationSummaries: data.conversationSummaries,
-          keys: Object.keys(data)
-        });
-
         const diagnosisData = data.diagnosis || data;
         let summaryText = "אבחון הושלם";
         if (typeof data.summary === 'string') {
@@ -244,18 +237,15 @@ export function useHybridFlow() {
         const isInstruction = data.type === "instruction";
         const text = isInstruction ? (data.instruction || data.text) : (data.question || data.message || data.text || data.content);
         const options = data.options || [];
-        const hasInstructionContent = isInstruction && (data.steps?.length > 0 || data.meta?.steps?.length > 0 || data.instruction);
+        const hasInstructionContent = isInstruction && (data.steps?.length > 0 || data.instruction);
 
         // Build meta with self-fix info if available
-        // FIX: Properly extract steps from nested meta object
-        const stepsArray = data.steps || data.meta?.steps || [];
         const instructionMeta = hasInstructionContent ? {
           actionType: data.actionType || data.meta?.actionType,
           actionId: data.actionId || data.meta?.actionId,
-          steps: stepsArray,
-          name: data.meta?.name || data.name || data.instruction,
+          steps: data.steps || data.meta?.steps,
+          name: data.name || data.instruction,
           rawText: text,
-          isCritical: data.isCritical || data.meta?.isCritical,
           // Self-fix metadata (NEW)
           difficulty: data.meta?.difficulty,
           timeEstimate: data.meta?.timeEstimate,
@@ -280,14 +270,10 @@ export function useHybridFlow() {
             setState(prev => ({ ...prev, status: "WAITING_USER", currentOptions: data.options || ['הצלחתי', 'לא הצלחתי', 'צריך עזרה'], context: nextContext }));
           }, 1500);
         } else {
-          // Use server-sent options for instructions (includes oil level options), fallback to defaults
-          const instructionOptions = isInstruction
-            ? (options.length > 0 ? options : ['ביצעתי את הבדיקה', 'אני לא יכול לבדוק', 'מעדיף מוסך'])
-            : options;
           setState(prev => ({
             ...prev,
             status: "WAITING_USER",
-            currentOptions: instructionOptions,
+            currentOptions: isInstruction ? ['ביצעתי את הבדיקה', 'אני לא יכול לבדוק', 'מעדיף מוסך'] : options,
             context: nextContext
           }));
         }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { CarFront, ArrowRight, Home } from "lucide-react";
+import { CarFront, ArrowRight } from "lucide-react";
 
 // Components
 import ChatBubble from "./components/ChatBubble";
@@ -30,7 +30,7 @@ interface Vehicle {
 const DRAFT_IMAGES_KEY = "draft_images";
 
 export default function QuestionsClient() {
-  const searchParams = useSearchParams();
+    const searchParams = useSearchParams();
   const router = useRouter();
 
   // URL Params
@@ -186,21 +186,12 @@ export default function QuestionsClient() {
       }}
     >
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-center">
-        {/* Back/Home Button - Top Right */}
-        <button
-          onClick={() => router.push("/user")}
-          className="absolute right-4 top-4 p-2.5 rounded-xl bg-slate-900/80 backdrop-blur-xl border border-white/10 hover:bg-slate-800/80 transition-all duration-200 text-white/70 hover:text-white"
-          title="חזרה לדף הבית"
-        >
-          <Home size={20} />
-        </button>
-
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-center pointer-events-none">
         {vehicle && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-fit max-w-2xl rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-2xl px-6 py-2 flex items-center gap-3"
+            className="w-fit max-w-2xl rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-2xl px-6 py-2 flex items-center gap-3 pointer-events-auto"
           >
             <div className="p-2 bg-blue-500/20 rounded-full text-blue-400">
               <CarFront size={18} />
@@ -265,7 +256,6 @@ export default function QuestionsClient() {
                     towConditions={diagnosisData.towConditions}
                     mechanicReport={diagnosisData.mechanicReport}
                     conversationSummaries={diagnosisData.conversationSummaries}
-                    userReportSummary={diagnosisData.conversationSummaries?.user?.shortDescription || diagnosisData.userSummary}
                     onOpenMechanicRequest={() => handleSaveRequest("MECHANIC")}
                   />
                 );

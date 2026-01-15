@@ -1,28 +1,14 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/ffc53cfd-5750-4bfc-8fcf-eeaa1b241560.png";
 
-// Separate component for the success message that uses useSearchParams
-function RegistrationSuccessMessage() {
-  const searchParams = useSearchParams();
-  const justRegistered = searchParams.get("registered") === "true";
-
-  if (!justRegistered) return null;
-
-  return (
-    <div
-      className="mb-6 p-4 rounded-xl bg-green-500/20 border border-green-500/50 text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2"
-    >
-      ההרשמה הושלמה בהצלחה! 🎉 כעת ניתן להתחבר למערכת
-    </div>
-  );
-}
+type UserType = "driver" | "garage";
 
 export default function LoginPage() {
+  const [userType, setUserType] = useState<UserType>("driver");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -75,11 +61,6 @@ export default function LoginPage() {
         התחברות למערכת
       </h1>
 
-      {/* Success Message - wrapped in Suspense for useSearchParams */}
-      <Suspense fallback={null}>
-        <RegistrationSuccessMessage />
-      </Suspense>
-
       {/* Error Message */}
       {error && (
         <div
@@ -88,6 +69,37 @@ export default function LoginPage() {
           {error}
         </div>
       )}
+
+      {/* User Type Selection */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-slate-300 mb-3">
+          בחירת סוג משתמש
+        </label>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="userType"
+              value="driver"
+              checked={userType === "driver"}
+              onChange={(e) => setUserType(e.target.value as UserType)}
+              className="w-4 h-4 text-sky-500 bg-white/10 border-white/20 focus:ring-sky-500 focus:ring-2"
+            />
+            <span className="text-white">משתמש פרטי</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="userType"
+              value="garage"
+              checked={userType === "garage"}
+              onChange={(e) => setUserType(e.target.value as UserType)}
+              className="w-4 h-4 text-sky-500 bg-white/10 border-white/20 focus:ring-sky-500 focus:ring-2"
+            />
+            <span className="text-white">מוסך</span>
+          </label>
+        </div>
+      </div>
 
       {/* Login Form */}
       <form onSubmit={handleLogin} className="space-y-5">
@@ -150,3 +162,4 @@ export default function LoginPage() {
     </>
   );
 }
+

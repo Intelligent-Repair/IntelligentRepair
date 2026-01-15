@@ -40,8 +40,8 @@ export default function ConsultPage() {
   };
 
   const handleAddNew = () => {
-    // Navigate to add new vehicle page
-    router.push("/maintenance/add");
+    // TODO: Implement add new vehicle flow
+    console.log("Add new vehicle clicked");
   };
 
   if (loading) {

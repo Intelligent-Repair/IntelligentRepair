@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, CheckCircle, AlertCircle, Wrench, FileText, Clock, Car, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Wrench, FileText, Clock, Gauge } from 'lucide-react';
 
 // Issue type options with Hebrew labels
 const ISSUE_TYPES = [
@@ -23,25 +23,13 @@ const ISSUE_TYPES = [
     { value: 'exhaust', label: 'פליטה (אגזוז)' },
     { value: 'tires', label: 'צמיגים' },
     { value: 'steering', label: 'היגוי' },
-    { value: 'oil_system', label: 'מערכת שמן' },
-    { value: 'sensors', label: 'חיישנים' },
     { value: 'other', label: 'אחר' },
 ] as const;
-
-// Quick tags for common fixes
-const QUICK_TAGS = [
-    'החלפת חיישן',
-    'החלפת שמן',
-    'איפוס קוד שגיאה',
-    'החלפת פילטר',
-    'תיקון חשמלי',
-    'החלפת חלק',
-    'בדיקה ותיקון',
-];
 
 // Extract values for zod enum
 const issueTypeValues = ISSUE_TYPES.map(t => t.value) as [string, ...string[]];
 
+// Validation schema
 const repairFormSchema = z.object({
     mechanic_notes: z.string()
         .min(20, 'תיאור חייב להכיל לפחות 20 תווים')
@@ -50,6 +38,10 @@ const repairFormSchema = z.object({
     labor_hours: z.number()
         .min(0.5, 'מינימום חצי שעה')
         .max(100, 'מקסימום 100 שעות'),
+    mileage: z.number()
+        .min(0, 'קילומטראז לא יכול להיות שלילי')
+        .max(1000000, 'קילומטראז לא תקין')
+        .optional(),
 });
 
 type RepairFormData = z.infer<typeof repairFormSchema>;
@@ -64,15 +56,13 @@ interface RepairCompletionFormProps {
         year?: number;
         license_plate?: string;
     };
-    primaryDiagnosis?: string;
 }
 
 export default function RepairCompletionForm({
     requestId,
     garageId,
     garageRequestId,
-    vehicleInfo,
-    primaryDiagnosis
+    vehicleInfo
 }: RepairCompletionFormProps) {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,24 +73,16 @@ export default function RepairCompletionForm({
         handleSubmit,
         formState: { errors },
         watch,
-        setValue,
-        getValues,
     } = useForm<RepairFormData>({
         resolver: zodResolver(repairFormSchema),
         defaultValues: {
             mechanic_notes: '',
             labor_hours: 1,
+            mileage: undefined,
         },
     });
 
     const mechanicNotes = watch('mechanic_notes');
-
-    // Handle quick tag click - append tag to notes
-    const handleQuickTag = (tag: string) => {
-        const current = getValues('mechanic_notes');
-        const prefix = current.trim() ? current.trim() + '\n' : '';
-        setValue('mechanic_notes', prefix + `• ${tag}`);
-    };
 
     const onSubmit = async (data: RepairFormData) => {
         setIsSubmitting(true);
@@ -116,11 +98,14 @@ export default function RepairCompletionForm({
                     garage_id: garageId,
                     garage_request_id: garageRequestId,
                     mechanic_notes: data.mechanic_notes,
-                    problem_category: null,
+                    problem_category: null, // Not used anymore
                     final_issue_type: data.final_issue_type,
                     labor_hours: data.labor_hours,
                     status: 'completed',
-                    vehicle_info: vehicleInfo,
+                    vehicle_info: {
+                        ...vehicleInfo,
+                        current_mileage: data.mileage,
+                    },
                 }),
             });
 
@@ -151,10 +136,6 @@ export default function RepairCompletionForm({
         }
     };
 
-    // Glass input styles - lighter background
-    const inputClass = "w-full p-3 bg-slate-800/50 border border-white/10 rounded-xl text-white text-right placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all";
-    const selectClass = "w-full p-3 bg-slate-800/50 border border-white/10 rounded-xl text-white text-right focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all";
-
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Error Alert */}
@@ -165,60 +146,36 @@ export default function RepairCompletionForm({
                 </div>
             )}
 
-            {/* ===== Job Context Card - Centered ===== */}
-            <div className="p-5 rounded-xl bg-slate-800/60 border border-cyan-500/30 backdrop-blur-sm text-center">
-                {/* Vehicle Info - Centered */}
-                <div className="flex flex-col items-center gap-2 mb-4">
-                    <div className="p-3 rounded-full bg-cyan-500/20">
-                        <Car className="w-6 h-6 text-cyan-400" />
+            {/* Vehicle Info Banner (Read-only) */}
+            {vehicleInfo && (
+                <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+                    <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                        <Gauge className="w-4 h-4" />
+                        פרטי רכב
                     </div>
-                    <p className="text-xl font-bold text-white">
-                        {vehicleInfo?.manufacturer} {vehicleInfo?.model} {vehicleInfo?.year && `(${vehicleInfo.year})`}
-                    </p>
-                    {vehicleInfo?.license_plate && (
-                        <p className="text-sm text-slate-400 font-mono" dir="ltr">{vehicleInfo.license_plate}</p>
-                    )}
+                    <div className="text-white font-medium">
+                        {vehicleInfo.manufacturer} {vehicleInfo.model} {vehicleInfo.year && `(${vehicleInfo.year})`}
+                        {vehicleInfo.license_plate && (
+                            <span className="text-cyan-400 mr-2">• {vehicleInfo.license_plate}</span>
+                        )}
+                    </div>
                 </div>
+            )}
 
-                {/* Diagnosis - Centered */}
-                {primaryDiagnosis && (
-                    <div className="flex items-center justify-center gap-2 pt-3 border-t border-slate-700/50">
-                        <AlertTriangle className="w-4 h-4 text-orange-400" />
-                        <span className="text-sm text-slate-400">תקלה מדווחת:</span>
-                        <span className="text-gray-100 font-bold">{primaryDiagnosis}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* ===== Mechanic Notes with Quick Tags ===== */}
+            {/* Mechanic Notes - Full Width */}
             <div>
-                <label className="block text-right text-sm text-slate-300 font-semibold mb-2">
-                    <FileText className="w-4 h-4 text-cyan-400 inline-block ml-2" />
-                    תיאור העבודה שבוצעה
+                <label className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                    <FileText className="w-4 h-4" />
+                    תיאור העבודה שבוצעה *
                 </label>
                 <textarea
                     {...register('mechanic_notes')}
-                    rows={5}
-                    className={`${inputClass} resize-none`}
+                    rows={6}
+                    className="w-full p-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
                     dir="rtl"
                     placeholder="תאר בפירוט את התקלה שזוהתה ואת העבודה שבוצעה..."
                 />
-
-                {/* Quick Tags - Ghost style, Centered */}
-                <div className="flex flex-wrap gap-2 mt-3 justify-center">
-                    {QUICK_TAGS.map((tag) => (
-                        <button
-                            key={tag}
-                            type="button"
-                            onClick={() => handleQuickTag(tag)}
-                            className="px-3 py-1 rounded-full bg-transparent border border-slate-600 text-slate-400 text-xs hover:bg-cyan-500/20 hover:border-cyan-500 hover:text-cyan-300 transition-all"
-                        >
-                            {tag}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex justify-between mt-2">
+                <div className="flex justify-between mt-1">
                     {errors.mechanic_notes && (
                         <span className="text-red-400 text-sm">{errors.mechanic_notes.message}</span>
                     )}
@@ -226,17 +183,17 @@ export default function RepairCompletionForm({
                 </div>
             </div>
 
-            {/* ===== Issue Type & Labor Hours (2 columns - RTL) ===== */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="rtl">
-                {/* Final Issue Type - First in DOM = Right side for RTL */}
+            {/* Issue Type & Labor Hours Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Final Issue Type */}
                 <div>
-                    <label className="block text-right text-sm text-slate-300 font-semibold mb-2">
-                        <Wrench className="w-4 h-4 text-cyan-400 inline-block ml-2" />
-                        סוג תקלה
+                    <label className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                        <Wrench className="w-4 h-4" />
+                        סוג תקלה *
                     </label>
                     <select
                         {...register('final_issue_type')}
-                        className={selectClass}
+                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         dir="rtl"
                     >
                         <option value="">בחר סוג...</option>
@@ -245,44 +202,62 @@ export default function RepairCompletionForm({
                         ))}
                     </select>
                     {errors.final_issue_type && (
-                        <span className="text-red-400 text-sm mt-1 block text-right">{errors.final_issue_type.message}</span>
+                        <span className="text-red-400 text-sm mt-1 block">{errors.final_issue_type.message}</span>
                     )}
                 </div>
 
-                {/* Labor Hours - Second in DOM = Left side for RTL */}
+                {/* Labor Hours */}
                 <div>
-                    <label className="block text-right text-sm text-slate-300 font-semibold mb-2">
-                        <Clock className="w-4 h-4 text-cyan-400 inline-block ml-2" />
-                        שעות עבודה
+                    <label className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                        <Clock className="w-4 h-4" />
+                        שעות עבודה *
                     </label>
                     <input
                         type="number"
                         step="0.5"
                         min="0.5"
                         {...register('labor_hours', { valueAsNumber: true })}
-                        className={`${inputClass} text-left`}
+                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         dir="ltr"
                     />
                     {errors.labor_hours && (
-                        <span className="text-red-400 text-sm mt-1 block text-right">{errors.labor_hours.message}</span>
+                        <span className="text-red-400 text-sm mt-1 block">{errors.labor_hours.message}</span>
                     )}
                 </div>
             </div>
 
-            {/* ===== Submit Buttons ===== */}
-            <div className="flex items-center gap-6 pt-4">
+            {/* Mileage - Full Width */}
+            <div>
+                <label className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                    <Gauge className="w-4 h-4" />
+                    קילומטראז נוכחי (אופציונלי)
+                </label>
+                <input
+                    type="number"
+                    {...register('mileage', { valueAsNumber: true })}
+                    className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    dir="ltr"
+                    placeholder="הזן קילומטראז..."
+                />
+                {errors.mileage && (
+                    <span className="text-red-400 text-sm mt-1 block">{errors.mileage.message}</span>
+                )}
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="flex gap-4 pt-4">
                 <button
                     type="button"
                     onClick={() => router.back()}
                     disabled={isSubmitting}
-                    className="text-slate-400 hover:text-white transition disabled:opacity-50"
+                    className="px-6 py-3 rounded-xl bg-slate-700 text-white hover:bg-slate-600 transition disabled:opacity-50"
                 >
                     ביטול
                 </button>
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] hover:from-blue-500 hover:to-indigo-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                     {isSubmitting ? (
                         <>

@@ -34,19 +34,7 @@ export interface AIDiagnosisResult {
     disclaimer: string;
     conversationSummaries?: {
         user?: { shortDescription: string; topIssue: string; nextAction: string };
-        mechanic?: {
-            schemaVersion?: number;
-            vehicleType?: string;
-            originalComplaint?: string;
-            conversationNarrative?: string;
-            diagnoses?: Array<{ issue: string; probability: number }>;
-            recommendations?: string[];
-            recommendedActions?: string[];
-            needsTow?: boolean;
-            urgency?: 'low' | 'medium' | 'high' | 'critical';
-            category?: string;
-            formattedText?: string;
-        };
+        mechanic?: { formattedText: string };
     };
 }
 
@@ -189,14 +177,6 @@ function buildDiagnosisReport(lightType: string, lightName: string, aiResult: an
     const confidence = Math.min(0.92, (topDiag.probability || 0.5) * 0.9 + 0.1);
     const confidenceLevel: 'low' | 'medium' | 'high' = confidence >= 0.7 ? 'high' : confidence >= 0.5 ? 'medium' : 'low';
 
-    // Build full mechanic summary for garage dashboard
-    const diagnosesForMechanic = results.map(r => ({
-        issue: r.issue,
-        probability: r.probability
-    }));
-
-    const recommendationsForMechanic = recommendations.filter(r => typeof r === 'string') as string[];
-
     return {
         type: 'diagnosis_report',
         title: `אבחון: ${lightName}`,
@@ -220,19 +200,9 @@ function buildDiagnosisReport(lightType: string, lightName: string, aiResult: an
                 topIssue: topDiag.issue || 'לא ידוע',
                 nextAction: aiResult.recommendation || 'בדוק במוסך'
             },
-            mechanic: {
-                schemaVersion: 2,
-                vehicleType: 'לא ידוע',
-                originalComplaint: lightName,
-                conversationNarrative: aiResult.mechanicSummary || `הלקוח דיווח על ${lightName}. ${topDiag.explanation || ''}`,
-                diagnoses: diagnosesForMechanic,
-                recommendations: recommendationsForMechanic,
-                recommendedActions: recommendationsForMechanic,
-                needsTow: aiResult.needsTow === true,
-                urgency: severity as 'low' | 'medium' | 'high' | 'critical',
-                category: lightName,
-                formattedText: aiResult.mechanicSummary || `אבחון: ${topDiag.issue || lightName}`
-            }
+            mechanic: aiResult.mechanicSummary ? {
+                formattedText: aiResult.mechanicSummary
+            } : undefined
         }
     };
 }
@@ -280,13 +250,6 @@ function fallbackDiagnosis(lightType: string, answers: UserAnswer[]): NextRespon
 
     const topIssue = results[0]?.issue || lightName;
 
-    const diagnosesForMechanic = results.map(r => ({
-        issue: r.issue,
-        probability: r.probability
-    }));
-
-    const fallbackRecommendations = ['מומלץ לפנות למוסך לקריאת קודי שגיאה', 'בדוק אם יש נוזלים דולפים'];
-
     return NextResponse.json({
         type: 'diagnosis_report',
         title: `אבחון: ${topIssue}`,
@@ -300,31 +263,10 @@ function fallbackDiagnosis(lightType: string, answers: UserAnswer[]): NextRespon
         },
         selfFix: [],
         nextSteps: 'פנה למוסך לאבחון מקצועי.',
-        recommendations: fallbackRecommendations,
+        recommendations: ['מומלץ לפנות למוסך לקריאת קודי שגיאה', 'בדוק אם יש נוזלים דולפים'],
         disclaimer: 'האבחון מבוסס על מידע חלקי. נדרשת בדיקה מקצועית.',
         detectedLightType: lightType,
         endConversation: true,
-        kbSource: true,
-        // Add conversationSummaries for garage dashboard
-        conversationSummaries: {
-            user: {
-                shortDescription: topIssue,
-                topIssue: topIssue,
-                nextAction: 'פנה למוסך לאבחון מקצועי'
-            },
-            mechanic: {
-                schemaVersion: 2,
-                vehicleType: 'לא ידוע',
-                originalComplaint: lightName,
-                conversationNarrative: `הלקוח דיווח על ${lightName}. לא היה מספיק מידע לאבחון מדויק.`,
-                diagnoses: diagnosesForMechanic,
-                recommendations: fallbackRecommendations,
-                recommendedActions: fallbackRecommendations,
-                needsTow: false,
-                urgency: 'medium',
-                category: lightName,
-                formattedText: `אבחון: ${topIssue}`
-            }
-        }
+        kbSource: true
     });
 }

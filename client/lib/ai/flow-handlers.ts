@@ -48,16 +48,6 @@ const mergeContext = (base: any, patch: any) => {
     return out;
 };
 
-// Tow conditions for critical lights - used to show tow button for dangerous scenarios
-function getCriticalLightTowConditions(lightType: string): string[] {
-    const conditions: Record<string, string[]> = {
-        'oil_pressure_light': ['נורת שמן אדומה דולקת', 'רעש מתכתי מהמנוע', 'אין לחץ שמן'],
-        'coolant_temperature_light': ['מנוע מתחמם מעבר לנורמלי', 'קיטור מהמנוע', 'נוזל קירור דולף'],
-        'brake_light': ['בלמים לא מגיבים', 'דוושה שוקעת לרצפה', 'רעש חריג בבלימה']
-    };
-    return conditions[lightType] || ['מצב חירום'];
-}
-
 // Deterministic option selection: number input or exact match only
 function normalizeSelection(userText: string, options: string[]): { selected: string | null } {
     const t = (userText ?? '').trim();
@@ -758,12 +748,6 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
         const userDiag = unifiedDiag.userDiagnosis;
         const mechSummary = unifiedDiag.mechanicSummary;
 
-        // CRITICAL LIGHTS FIX: Force tow button for dangerous lights
-        const isCriticalLight = (CRITICAL_LIGHTS as readonly string[]).includes(lightType);
-        const shouldShowTow = userDiag.needsTow || (isCriticalLight && userDiag.severity !== 'low');
-        const effectiveSeverity = isCriticalLight ? 'critical' : userDiag.severity;
-        const towConditions = isCriticalLight ? getCriticalLightTowConditions(lightType) : undefined;
-
         return {
             handled: true,
             response: NextResponse.json({
@@ -777,7 +761,7 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                     explanation: userDiag.explanation
                 })),
                 status: {
-                    color: effectiveSeverity === 'critical' ? 'red' : effectiveSeverity === 'high' ? 'orange' : 'yellow',
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
                     text: userDiag.topIssue,
                     instruction: userDiag.nextAction
                 },
@@ -785,9 +769,7 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 nextSteps: userDiag.nextAction,
                 recommendations: userDiag.recommendations,
                 endConversation: true,
-                showTowButton: shouldShowTow,
-                severity: effectiveSeverity,
-                towConditions,
+                showTowButton: userDiag.needsTow,
                 // Include conversationSummaries for frontend to save
                 conversationSummaries: {
                     mechanic: mechSummary,
@@ -901,12 +883,6 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
     const userDiag = unifiedDiag.userDiagnosis;
     const mechSummary = unifiedDiag.mechanicSummary;
 
-    // CRITICAL LIGHTS FIX: Force tow button for dangerous lights
-    const isCriticalLight = (CRITICAL_LIGHTS as readonly string[]).includes(lightType);
-    const shouldShowTow = userDiag.needsTow || (isCriticalLight && userDiag.severity !== 'low');
-    const effectiveSeverity = isCriticalLight ? 'critical' : userDiag.severity;
-    const towConditionsForLight = isCriticalLight ? getCriticalLightTowConditions(lightType) : undefined;
-
     return {
         handled: true,
         response: NextResponse.json({
@@ -920,7 +896,7 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
                 explanation: userDiag.explanation
             })),
             status: {
-                color: effectiveSeverity === 'critical' ? 'red' : effectiveSeverity === 'high' ? 'orange' : 'yellow',
+                color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
                 text: userDiag.topIssue,
                 instruction: userDiag.nextAction
             },
@@ -928,18 +904,14 @@ export async function handleKBFlow(req: RequestContext): Promise<FlowResult> {
             nextSteps: userDiag.nextAction,
             recommendations: userDiag.recommendations,
             endConversation: true,
-            showTowButton: shouldShowTow,
-            severity: effectiveSeverity,
-            towConditions: towConditionsForLight,
+            showTowButton: userDiag.needsTow,
             detectedLightType: lightType,
             kbSource: true,
-            // NEW: User's reported summary for displaying in diagnosis card
-            userSummary: userDiag.userSummary,
             // Include conversationSummaries for frontend to save
             conversationSummaries: {
                 mechanic: mechSummary,
                 user: {
-                    shortDescription: userDiag.userSummary || userDiag.explanation,
+                    shortDescription: userDiag.explanation,
                     topIssue: userDiag.topIssue,
                     nextAction: userDiag.nextAction
                 }
@@ -958,98 +930,6 @@ export async function callExpertAI(body: any): Promise<any> {
     const { message, description, answers = [], image_urls = [], context } = body;
     const currentInput = message || description || '';
     const detectedLight = context?.detectedLightType;
-
-    // EMERGENCY ACKNOWLEDGMENT HANDLER: If user acknowledged emergency warning, continue to questions
-    const emergencyLights = ['oil_pressure_light', 'coolant_temperature_light'];
-    const acknowledgedPhrases = ['הבנתי', 'עצרתי', 'כיביתי'];
-    const userAcknowledgedEmergency = acknowledgedPhrases.some(p => currentInput.includes(p));
-
-    if (detectedLight && emergencyLights.includes(detectedLight) &&
-        context?.emergencyWarningShown && !context?.emergencyAcknowledged && userAcknowledgedEmergency) {
-        console.log(`[Expert AI] User acknowledged emergency for ${detectedLight}, continuing to questions`);
-        return handleWarningLightDetection(detectedLight, 'danger', { ...context, emergencyAcknowledged: true });
-    }
-
-    // User said they can't stop - provide immediate help
-    if (detectedLight && emergencyLights.includes(detectedLight) &&
-        context?.emergencyWarningShown && currentInput.includes('לא יכול לעצור')) {
-        console.log(`[Expert AI] User cannot stop - providing emergency guidance`);
-        return NextResponse.json({
-            type: 'safety_instruction',
-            text: 'חפש מקום בטוח בהקדם האפשרי',
-            isInstruction: true,
-            isCritical: true,
-            meta: {
-                name: 'מצא מקום בטוח',
-                steps: [
-                    'הפעל אורות חירום',
-                    'חפש שוליים רחבים או חניון קרוב',
-                    'נסה להאט בהדרגה',
-                    'אם המנוע עדיין עובד - כבה אותו ברגע שתעצור'
-                ],
-                actionType: 'critical',
-                isCritical: true
-            },
-            options: ['מצאתי מקום ועצרתי', 'אני עדיין בתנועה'],
-            context: mergeContext(context, { emergencyAcknowledged: true })
-        });
-    }
-
-    // GROUP 2 CONDITIONAL EMERGENCY: Handle screening question response
-    const conditionalEmergencyLights = ['brake_light', 'battery_light', 'power_steering_light'];
-    const isConditionalLight = detectedLight && conditionalEmergencyLights.includes(detectedLight);
-    const hasConditionalContext = context?.conditionalEmergencyLight;
-
-    if (isConditionalLight && hasConditionalContext && !context?.drivingScreeningAnswered) {
-        // Detect "during driving" answers
-        const duringDrivingPhrases = ['בזמן נסיעה', 'כן, בזמן'];
-        const beforeStartPhrases = ['לפני הנעה', 'לא מצליח להניע', 'הבלם הידני מורם', 'לא, זה'];
-
-        const saidDuringDriving = duringDrivingPhrases.some(p => currentInput.includes(p));
-        const saidBeforeStart = beforeStartPhrases.some(p => currentInput.includes(p));
-
-        if (saidDuringDriving) {
-            console.log(`[Expert AI] ${detectedLight} during driving - showing emergency warning`);
-            return handleWarningLightDetection(detectedLight, 'danger', {
-                ...context,
-                drivingScreeningAnswered: true,
-                isDuringDriving: true
-            });
-        }
-
-        if (saidBeforeStart) {
-            console.log(`[Expert AI] ${detectedLight} before start - continuing normally`);
-            return handleWarningLightDetection(detectedLight, 'caution', {
-                ...context,
-                drivingScreeningAnswered: true,
-                isDuringDriving: false,
-                emergencyAcknowledged: true // Skip emergency for before-start scenario
-            });
-        }
-
-        // User said "לא בטוח" - ask again or continue cautiously
-        if (currentInput.includes('לא בטוח')) {
-            console.log(`[Expert AI] ${detectedLight} user unsure - continuing with caution`);
-            return handleWarningLightDetection(detectedLight, 'caution', {
-                ...context,
-                drivingScreeningAnswered: true,
-                isDuringDriving: false,
-                emergencyAcknowledged: true
-            });
-        }
-    }
-
-    // Handle acknowledgment of Group 2 warnings
-    const conditionalAcknowledgePhrases = ['הבנתי', 'אמשיך בזהירות', 'עוצר מיד'];
-    const userAcknowledgedConditional = conditionalAcknowledgePhrases.some(p => currentInput.includes(p));
-
-    if (isConditionalLight && context?.emergencyWarningShown && !context?.emergencyAcknowledged && userAcknowledgedConditional) {
-        console.log(`[Expert AI] User acknowledged conditional emergency for ${detectedLight}`);
-        return handleWarningLightDetection(detectedLight, 'caution', { ...context, emergencyAcknowledged: true });
-    }
-
-    // NOTE: Oil/coolant check instructions disabled to preserve AI flow stability
-    // The emergency warning before first question is still active for critical lights
 
     const pickedId = extractLightIdFromPicker(currentInput || '');
     // Route all lights to KB flow (HYBRID_LIGHTS will use AI for diagnosis only)
@@ -1126,28 +1006,17 @@ export async function callExpertAI(body: any): Promise<any> {
             lightType = null; // Clear false detection
         }
 
-        // CRITICAL FIX: Don't re-route to KB if we're already in an active light flow
-        // This prevents the duplicate question loop where handleWarningLightDetection is called again
-        // after the user already answered the first question
-        const alreadyInLightFlow = Boolean(context?.detectedLightType) && (context?.askedQuestionIds?.length > 0);
-
         // Route detected lights to KB flow (HYBRID_LIGHTS will use AI for diagnosis, but KB for questions)
-        // Only route if this is a NEW detection (not already in a light flow)
-        if (lightType && (warningLightsKB as any)[lightType] && candidateConfidence >= 0.6 && canRouteToKB && !alreadyInLightFlow) {
+        if (lightType && (warningLightsKB as any)[lightType] && candidateConfidence >= 0.6 && canRouteToKB) {
             const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
             console.log(`[Expert AI] Detected light from candidate: ${lightType} (confidence: ${candidateConfidence}) - routing to KB flow`);
             return handleWarningLightDetection(lightType, severity, context);
         }
 
-        // Direct detection without candidate (only if valid and not already in flow)
-        if (lightType && (warningLightsKB as any)[lightType] && !result.candidate && canRouteToKB && !alreadyInLightFlow) {
+        // Direct detection without candidate (only if valid)
+        if (lightType && (warningLightsKB as any)[lightType] && !result.candidate && canRouteToKB) {
             const severity = (CRITICAL_LIGHTS as any).includes(lightType) ? 'danger' : (context?.lightSeverity || 'caution');
             return handleWarningLightDetection(lightType, severity, context);
-        }
-
-        // Log if we skipped KB routing because already in flow
-        if (alreadyInLightFlow && lightType) {
-            console.log(`[Expert AI] Already in light flow for ${context?.detectedLightType}, continuing with AI response`);
         }
 
         if (!lightType && bridgeCount >= 3 && !context?.lightPickerShown) {
@@ -1160,73 +1029,8 @@ export async function callExpertAI(body: any): Promise<any> {
         }
 
         // Handle diagnosis_report - this is a valid final state
-        // IMPORTANT: Ensure conversationSummaries is always included for garage dashboard
         if (result.type === 'diagnosis_report') {
-            // Check if we already have AI-processed conversationSummaries
-            if (result.conversationSummaries?.mechanic?.conversationNarrative) {
-                // Already has AI-processed summary - use it
-                return NextResponse.json({
-                    ...result,
-                    endConversation: true,
-                    context: mergeContext(context, result?.context)
-                });
-            }
-
-            // Need to generate AI-processed mechanic summary
-            console.log('[Expert AI] Generating AI-processed mechanic summary for diagnosis_report');
-
-            const conversationHistory = answers.map((a: any) => ({
-                role: 'user' as const,
-                content: `${a.question || 'שאלה'} → ${a.answer}`
-            }));
-
-            const unifiedDiag = await generateUnifiedDiagnosis({
-                requestDescription: result.title || currentInput,
-                conversationHistory,
-                vehicleInfo: context?.vehicleInfo,
-                lightType: context?.detectedLightType,
-                answers
-            });
-
-            const aiNarrative = unifiedDiag.mechanicSummary.conversationNarrative;
-            const userExplanation = unifiedDiag.userDiagnosis.explanation;
-
-            // CRITICAL: Preserve ORIGINAL diagnosis results from the result, don't use AI-generated ones!
-            // This ensures user and garage see the exact same percentages
-            const originalDiagnoses = (result.results || []).map((r: any) => ({
-                issue: r.issue || 'לא ידוע',
-                probability: r.probability ?? 0.5
-            }));
-
-            // Build mechanic summary using ORIGINAL diagnoses but AI narrative
-            const preservedMechSummary = {
-                schemaVersion: 2,
-                vehicleType: context?.vehicleInfo?.manufacturer || 'לא ידוע',
-                originalComplaint: result.title || 'לא צוין',
-                conversationNarrative: aiNarrative,
-                diagnoses: originalDiagnoses,  // ORIGINAL percentages!
-                recommendations: result.recommendations || unifiedDiag.userDiagnosis.recommendations || [],
-                recommendedActions: result.recommendations || unifiedDiag.mechanicSummary.recommendedActions || [],
-                needsTow: result.showTowButton === true,
-                urgency: result.severity || 'medium',
-                category: result.title || 'לא ידוע',
-                formattedText: aiNarrative
-            };
-
-            return NextResponse.json({
-                ...result,
-                endConversation: true,
-                userSummary: userExplanation,
-                conversationSummaries: {
-                    mechanic: preservedMechSummary,
-                    user: {
-                        shortDescription: userExplanation,
-                        topIssue: result.results?.[0]?.issue || result.title || '',
-                        nextAction: result.nextSteps || 'פנה למוסך'
-                    }
-                },
-                context: mergeContext(context, result?.context)
-            });
+            return NextResponse.json({ ...result, endConversation: true, context: mergeContext(context, result?.context) });
         }
 
         // Handle ai_response - NEVER end conversation prematurely!
@@ -1306,13 +1110,6 @@ export async function callExpertAI(body: any): Promise<any> {
             const userDiag = unifiedDiag.userDiagnosis;
             const mechSummary = unifiedDiag.mechanicSummary;
 
-            // CRITICAL LIGHTS FIX: Force tow button for dangerous lights
-            const detectedLight = context?.detectedLightType;
-            const isCriticalLight = detectedLight && (CRITICAL_LIGHTS as readonly string[]).includes(detectedLight);
-            const shouldShowTow = userDiag.needsTow || (isCriticalLight && userDiag.severity !== 'low');
-            const effectiveSeverity = isCriticalLight ? 'critical' : userDiag.severity;
-            const towConditions = isCriticalLight ? getCriticalLightTowConditions(detectedLight) : undefined;
-
             return NextResponse.json({
                 type: 'diagnosis_report',
                 title: userDiag.title || 'אבחון תקלה',
@@ -1324,7 +1121,7 @@ export async function callExpertAI(body: any): Promise<any> {
                     explanation: userDiag.explanation
                 })),
                 status: {
-                    color: effectiveSeverity === 'critical' ? 'red' : effectiveSeverity === 'high' ? 'orange' : 'yellow',
+                    color: userDiag.severity === 'critical' ? 'red' : userDiag.severity === 'high' ? 'orange' : 'yellow',
                     text: userDiag.topIssue,
                     instruction: userDiag.nextAction
                 },
@@ -1333,9 +1130,7 @@ export async function callExpertAI(body: any): Promise<any> {
                 recommendations: userDiag.recommendations,
                 disclaimer: 'האבחון מבוסס על תיאור הבעיה. מומלץ אישור במוסך.',
                 endConversation: true,
-                showTowButton: shouldShowTow,
-                severity: effectiveSeverity,
-                towConditions,
+                showTowButton: userDiag.needsTow,
                 category: mechSummary.category,
                 // Include conversationSummaries in expected format for frontend
                 conversationSummaries: {
@@ -1367,209 +1162,15 @@ export async function callExpertAI(body: any): Promise<any> {
 }
 
 // Initial flow starters
-export function handleWarningLightDetection(lightId: string, severity: string, existingContext?: any): NextResponse {
+export function handleWarningLightDetection(lightId: string, severity: string, existingContext?: any): any {
     const lightData = (warningLightsKB as any)[lightId];
-
-    // Fallback Hebrew names for common lights (used when KB data is missing)
-    const hebrewNamesFallback: Record<string, string> = {
-        'oil_pressure_light': 'לחץ שמן',
-        'check_engine_light': 'מנוע (Check Engine)',
-        'battery_light': 'מצבר',
-        'coolant_temperature_light': 'חום מנוע',
-        'tpms_light': 'לחץ צמיגים',
-        'abs_light': 'ABS',
-        'airbag_light': 'כרית אוויר',
-        'brake_light': 'בלמים',
-        'power_steering_light': 'הגה כוח',
-        'fuel_level_light': 'דלק נמוך',
-        'transmission_temperature_light': 'תיבת הילוכים',
-        'esp_light': 'בקרת יציבות'
-    };
-
-    // Get Hebrew name with multiple fallbacks
-    const name = lightData?.names?.he?.[0] || lightData?.name_he || hebrewNamesFallback[lightId] || lightId;
-    const isCritical = (CRITICAL_LIGHTS as any).includes(lightId);
-
-    // GROUP 1 EMERGENCY LIGHTS: Show safety warning FIRST before any questions
-    // These lights require immediate stop and engine off
-    const emergencyLights = ['oil_pressure_light', 'coolant_temperature_light'];
-    const isEmergencyLight = emergencyLights.includes(lightId);
-    const alreadyAcknowledgedEmergency = existingContext?.emergencyAcknowledged === true;
-
-    if (isEmergencyLight && !alreadyAcknowledgedEmergency) {
-        console.log(`[handleWarningLightDetection] Emergency light ${lightId} - showing safety warning first`);
-
-        const emergencyMessages: Record<string, { title: string; instruction: string }> = {
-            'oil_pressure_light': {
-                title: 'עצור מיד במקום בטוח!',
-                instruction: 'כבה את המנוע מיידית! המשך נסיעה עלול לגרום לנזק בלתי הפיך למנוע.'
-            },
-            'coolant_temperature_light': {
-                title: 'עצור מיד במקום בטוח!',
-                instruction: 'כבה את המנוע ואל תפתח את מכסה המנוע! סכנת כוויות מקיטור.'
-            }
-        };
-
-        const emergency = emergencyMessages[lightId];
-
-        return NextResponse.json({
-            type: 'safety_instruction',
-            text: emergency.title,
-            isInstruction: true,
-            isCritical: true,
-            meta: {
-                name: emergency.title,
-                steps: [emergency.instruction],
-                actionType: 'critical',
-                isCritical: true
-            },
-            options: ['הבנתי, עצרתי וכיביתי את המנוע', 'אני לא יכול לעצור כרגע'],
-            detectedLightType: lightId,
-            lightSeverity: 'danger',
-            context: {
-                ...(existingContext ?? {}),
-                detectedLightType: lightId,
-                lightSeverity: 'danger',
-                isLightContext: true,
-                emergencyWarningShown: true,
-                activeFlow: 'AI' as const
-            }
-        });
-    }
-
-    // GROUP 2 CONDITIONAL EMERGENCY LIGHTS: Need screening question first
-    // These lights are dangerous ONLY if they appear during driving (not before starting)
-    const conditionalEmergencyLights = ['brake_light', 'battery_light', 'power_steering_light'];
-    const isConditionalEmergency = conditionalEmergencyLights.includes(lightId);
-    const screeningAnswered = existingContext?.drivingScreeningAnswered === true;
-    const isDuringDriving = existingContext?.isDuringDriving === true;
-
-    // Step 1: Ask screening question (if not yet answered)
-    if (isConditionalEmergency && !screeningAnswered) {
-        console.log(`[handleWarningLightDetection] Conditional emergency ${lightId} - asking screening question`);
-
-        const screeningQuestions: Record<string, { question: string; duringDrivingOption: string; beforeStartOption: string }> = {
-            'brake_light': {
-                question: `זיהיתי נורת בלמים. האם הנורה נדלקה בזמן נסיעה (והבלם הידני מורד)?`,
-                duringDrivingOption: 'כן, בזמן נסיעה והבלם הידני מורד',
-                beforeStartOption: 'לא, זה לפני הנעה או שהבלם הידני מורם'
-            },
-            'battery_light': {
-                question: `זיהיתי נורת מצבר/טעינה. האם הנורה נדלקה בזמן נסיעה, או שאתה לא מצליח להניע את הרכב?`,
-                duringDrivingOption: 'כן, בזמן נסיעה',
-                beforeStartOption: 'לא מצליח להניע את הרכב'
-            },
-            'power_steering_light': {
-                question: `זיהיתי נורת הגה כוח. האם הנורה נדלקה בזמן נסיעה או לפני הנעה?`,
-                duringDrivingOption: 'כן, בזמן נסיעה',
-                beforeStartOption: 'לפני הנעה'
-            }
-        };
-
-        const screening = screeningQuestions[lightId];
-
-        return NextResponse.json({
-            type: 'question',
-            text: screening.question,
-            options: [screening.duringDrivingOption, screening.beforeStartOption, 'לא בטוח'],
-            detectedLightType: lightId,
-            lightSeverity: 'caution',
-            context: {
-                ...(existingContext ?? {}),
-                detectedLightType: lightId,
-                isLightContext: true,
-                conditionalEmergencyLight: lightId,
-                activeFlow: 'AI' as const
-            }
-        });
-    }
-
-    // Step 2: If user said "during driving" - show emergency warning
-    if (isConditionalEmergency && screeningAnswered && isDuringDriving && !alreadyAcknowledgedEmergency) {
-        console.log(`[handleWarningLightDetection] ${lightId} during driving - showing emergency warning`);
-
-        const conditionalEmergencyMessages: Record<string, { title: string; instruction: string }> = {
-            'brake_light': {
-                title: 'אזהרה! תקלה במערכת הבלימה',
-                instruction: 'ייתכן שחסר נוזל בלמים או שיש תקלה הידראולית. היכולת של הרכב לעצור נפגעה. נהג בזהירות רבה והאט בהדרגה.'
-            },
-            'battery_light': {
-                title: 'אזהרה! האלטרנטור לא מטעין',
-                instruction: 'המצבר מתרוקן בזמן נסיעה. כבה צרכני חשמל מיותרים (מזגן, רדיו) ונסה להגיע למוסך קרוב.'
-            },
-            'power_steering_light': {
-                title: 'אזהרה! תקלה בהגה כוח',
-                instruction: 'ההגה יהיה כבד יותר לסיבוב. המשך בזהירות, הפחת מהירות, והגע למוסך קרוב.'
-            }
-        };
-
-        const emergency = conditionalEmergencyMessages[lightId];
-
-        return NextResponse.json({
-            type: 'safety_instruction',
-            text: emergency.title,
-            isInstruction: true,
-            isCritical: true,
-            meta: {
-                name: emergency.title,
-                steps: [emergency.instruction],
-                actionType: 'warning',
-                isCritical: true
-            },
-            options: ['הבנתי, אמשיך בזהירות', 'אני עוצר מיד'],
-            detectedLightType: lightId,
-            lightSeverity: 'danger',
-            context: {
-                ...(existingContext ?? {}),
-                detectedLightType: lightId,
-                lightSeverity: 'danger',
-                isLightContext: true,
-                emergencyWarningShown: true,
-                emergencyAcknowledged: false,
-                activeFlow: 'AI' as const
-            }
-        });
-    }
-
-    // If user acknowledged emergency, continue to questions
-    // Mark emergency as acknowledged for subsequent calls
-    const updatedContext = {
-        ...(existingContext ?? {}),
-        emergencyAcknowledged: true
-    };
-
-    // CRITICAL FIX: Always return a valid response, never null
-    // If no first_question in KB, ask a fallback question about light behavior
-    if (!lightData?.first_question) {
-        console.log(`[handleWarningLightDetection] No first_question for ${lightId}, using fallback`);
-        const fallbackQuestion = `נראה שמדובר בנורת "${name}". ${isCritical ? 'זו נורה קריטית! ' : ''}האם הנורה דולקת קבוע או מהבהבת?`;
-        const fallbackOptions = ['דולקת קבוע', 'מהבהבת', 'דולקת ונכבית לסירוגין', 'לא בטוח'];
-
-        return NextResponse.json({
-            type: 'question',
-            text: fallbackQuestion,
-            options: fallbackOptions,
-            detectedLightType: lightId,
-            lightSeverity: isCritical ? 'danger' : severity,
-            kbSource: false, // Mark as fallback, not KB
-            context: {
-                ...updatedContext,
-                detectedLightType: lightId,
-                lightSeverity: isCritical ? 'danger' : severity,
-                isLightContext: true,
-                askedQuestionIds: ['first_question'],
-                currentQuestionId: 'first_question_fallback',
-                causeScores: {},
-                currentQuestionText: fallbackQuestion,
-                currentQuestionOptions: fallbackOptions,
-                activeFlow: 'AI' as const // Use AI flow since no KB entry
-            }
-        });
-    }
+    if (!lightData?.first_question) return null;
 
     const q = lightData.first_question;
+    const name = lightData.names?.he?.[0] || lightId;
+    const isCritical = (CRITICAL_LIGHTS as any).includes(lightId);
     const questionOptions = q.options?.map((o: any) => o.label || o) || ['כן', 'לא', 'לא בטוח'];
-    const questionText = `נראה שמדובר בנורת "${name}". ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text}`;
+    const questionText = `זיהיתי ${name}. ${isCritical ? 'זו נורה קריטית! ' : ''}${q.text}`;
 
     return NextResponse.json({
         type: 'question',
@@ -1578,7 +1179,7 @@ export function handleWarningLightDetection(lightId: string, severity: string, e
         detectedLightType: lightId,
         lightSeverity: isCritical ? 'danger' : severity,
         kbSource: true,
-        context: { ...updatedContext, detectedLightType: lightId, lightSeverity: isCritical ? 'danger' : severity, isLightContext: true, askedQuestionIds: ['first_question'], currentQuestionId: 'first_question', causeScores: {}, currentQuestionText: questionText, currentQuestionOptions: questionOptions, activeFlow: 'KB' as const }
+        context: { ...(existingContext ?? {}), detectedLightType: lightId, lightSeverity: isCritical ? 'danger' : severity, isLightContext: true, askedQuestionIds: ['first_question'], currentQuestionId: 'first_question', causeScores: {}, currentQuestionText: questionText, currentQuestionOptions: questionOptions, activeFlow: 'KB' as const }
     });
 }
 
