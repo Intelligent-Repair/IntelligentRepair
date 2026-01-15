@@ -350,3 +350,34 @@ ${safeDiagnosis}
 החזר JSON בלבד, ללא טקסט נוסף.
 `.trim();
 }
+
+// Build prompt for research mode
+export function buildResearchPrompt(description: string): string {
+  const safeDescription = sanitizeInput(description || '', 1000);
+
+  return `
+You are an expert automotive diagnostician.
+Analyze the following vehicle problem description and provide a structured research report.
+
+Problem Description:
+"${safeDescription}"
+
+Return a valid JSON object with the following structure:
+{
+  "top_causes": ["cause 1", "cause 2", "cause 3"],
+  "differentiating_factors": ["factor 1", "factor 2"],
+  "reasoning": "Detailed explanation of the analysis...",
+  "severity": "low" | "medium" | "high" | "critical",
+  "keywords": ["keyword1", "keyword2", "keyword3"]
+}
+
+Requirements:
+- "top_causes": List 3-5 potential causes for the problem.
+- "differentiating_factors": List 2-3 questions or checks that would help narrow down the cause.
+- "reasoning": Provide a concise but technical explanation of why these are the likely causes.
+- "severity": Estimate the severity/urgency of the problem.
+- "keywords": Extract 3-5 relevant keywords from the description and analysis.
+- Language: Hebrew.
+- Format: JSON only, no markdown.
+`.trim();
+}
