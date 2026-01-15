@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         const manufacturer = searchParams.get("manufacturer");
         const model = searchParams.get("model");
         const year = searchParams.get("year");
+        const licensePlate = searchParams.get("licensePlate");
         const issueType = searchParams.get("issueType");
         const dateRange = searchParams.get("dateRange") || "all";
         const offset = parseInt(searchParams.get("offset") || "0", 10);
@@ -146,6 +147,12 @@ export async function GET(request: Request) {
             const yearNum = parseInt(year, 10);
             filteredRepairs = filteredRepairs.filter((r: any) =>
                 r.vehicle_info?.year === yearNum
+            );
+        }
+
+        if (licensePlate) {
+            filteredRepairs = filteredRepairs.filter((r: any) =>
+                r.vehicle_info?.license_plate?.includes(licensePlate)
             );
         }
 

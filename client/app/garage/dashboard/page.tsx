@@ -55,6 +55,7 @@ export default function GarageKnowledgeBasePage() {
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedIssueType, setSelectedIssueType] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("all");
+  const [licensePlate, setLicensePlate] = useState<string>("");
 
   // Fetch repairs
   const fetchRepairs = useCallback(async () => {
@@ -69,6 +70,7 @@ export default function GarageKnowledgeBasePage() {
       if (selectedYear) params.set("year", selectedYear);
       if (selectedIssueType !== "all") params.set("issueType", selectedIssueType);
       if (dateRange !== "all") params.set("dateRange", dateRange);
+      if (licensePlate) params.set("licensePlate", licensePlate);
 
       const res = await fetch(`/api/garage/knowledge-base?${params.toString()}`);
       const data = await res.json();
@@ -88,7 +90,7 @@ export default function GarageKnowledgeBasePage() {
     } finally {
       setLoading(false);
     }
-  }, [mode, offset, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange]);
+  }, [mode, offset, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate]);
 
   // Initial load and reload on filter change
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function GarageKnowledgeBasePage() {
   // Reset offset when filters change
   useEffect(() => {
     setOffset(0);
-  }, [mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange]);
+  }, [mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate]);
 
   // Get available models based on selected manufacturer
   const availableModels = useMemo(() => {
@@ -274,7 +276,18 @@ export default function GarageKnowledgeBasePage() {
             סינון
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            {/* License Plate */}
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">מספר רכב</label>
+              <input
+                type="text"
+                value={licensePlate}
+                onChange={(e) => setLicensePlate(e.target.value)}
+                placeholder="חפש לוחית רישוי..."
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+              />
+            </div>
             {/* Manufacturer */}
             <div>
               <label className="text-sm text-slate-400 block mb-2">יצרן</label>
