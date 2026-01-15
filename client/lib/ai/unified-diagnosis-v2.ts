@@ -12,6 +12,7 @@ export interface UserDiagnosis {
     confidence: number;
     confidenceLevel: 'low' | 'medium' | 'high';
     topIssue: string;
+    userSummary?: string;  // NEW: Summary of what user reported (answers + free text)
     explanation: string;
     recommendations: string[];
     nextAction: string;
@@ -30,9 +31,11 @@ export interface MechanicSummary {
     schemaVersion: 2;
     vehicleType: string;
     originalComplaint: string;
-    conversationNarrative: string;
+    conversationNarrative?: string; // Legacy - kept for backward compat
+    driverFindings?: string[];      // NEW: bullet points from driver interview
     diagnoses: MechanicDiagnosis[];
-    recommendations: string[];
+    recommendations?: string[];     // Legacy
+    recommendedActions?: string[];  // NEW: technical actions for mechanic
     needsTow: boolean;
     urgency: 'low' | 'medium' | 'high' | 'critical';
     category?: string;
@@ -122,6 +125,7 @@ ${conversationText || 'לא זמינה'}
     "confidence": 0.75,
     "confidenceLevel": "medium",
     "topIssue": "הבעיה העיקרית שזוהתה",
+    "userSummary": "סיכום קצר של מה הלקוח דיווח - כולל התשובות שבחר וכל טקסט חופשי שכתב. לדוגמה: 'דיווחת על נורה דולקת קבוע, ציינת שאין רעשים חריגים, וכתבת שזה קרה לאחר תדלוק'",
     "explanation": "הסבר קצר ללקוח מה כנראה קורה - בשפה ידידותית ופשוטה",
     "recommendations": ["המלצה 1 ללקוח", "המלצה 2 ללקוח"],
     "nextAction": "הפעולה הבאה שהלקוח צריך לעשות",
@@ -133,24 +137,32 @@ ${conversationText || 'לא זמינה'}
   "mechanicSummary": {
     "schemaVersion": 2,
     "vehicleType": "${vehicleStr}",
-    "originalComplaint": "תלונת הלקוח המקורית בציטוט או פרפרזה קרובה",
-    "conversationNarrative": "סיכום מקצועי בגוף שלישי (4-6 משפטים). דוגמה: 'הלקוח דיווח על נורת צ'ק אנג'ין דולקת קבוע. נשאל האם המנוע רועד והשיב שלא. נשאל לגבי תפקוד האצה והשיב שהכל תקין. נתבקש לבדוק מכסה דלק והשיב שהמכסה היה רפוי. לאחר הידוק המכסה הנורה נשארה דולקת.'",
+    "originalComplaint": "תלונת הלקוח המקורית - מה הנהג תיאר כבעיה הראשונית",
+    "conversationNarrative": "סיכום נרטיבי של ממצאי תשאול הנהג - פסקה אחת שמתארת מה הלקוח דיווח, מה נמצא במהלך השאלות, ומה המצב הנוכחי. לדוגמה: הלקוח דיווח על נורת לחץ שמן דולקת קבוע. לאחר שנשאל, הוא השיב ששמע רעשים מוזרים מהמנוע ויש ירידה בכוח המנוע...",
     "diagnoses": [
-      {"issue": "חשד לחיישן חמצן תקול או בעיית פליטה", "probability": 0.65},
-      {"issue": "דליפת אוויר במערכת שאיפה", "probability": 0.25}
+      {"issue": "אבחון ראשי עם הסבר טכני קצר", "probability": 0.75},
+      {"issue": "אבחון משני אפשרי", "probability": 0.25}
     ],
-    "recommendations": ["לבצע קריאת קודים OBD2", "בדיקת חיישני פליטה", "בדיקת מערכת שאיבה"],
+    "recommendedActions": [
+      "פעולה טכנית 1 לצוות המוסך",
+      "פעולה טכנית 2",
+      "פעולה טכנית 3"
+    ],
     "needsTow": false,
-    "urgency": "medium"
+    "urgency": "low|medium|high|critical"
   }
 }
 
-## הנחיות נוספות לסיכום למכונאי (mechanicSummary):
-- כתוב בגוף שלישי ("הלקוח דיווח", "הלקוח השיב", "הלקוח ביצע")
-- השתמש בשפה מקצועית של מכונאים
-- כלול את כל הפרטים מהשיחה: מה נשאל, מה ענה, אילו פעולות ביצע, מה התוצאה
-- צן המלצות טכניות שמכונאי יכול לבצע (קריאת קודים, בדיקות ספציפיות)
-- האבחונים (diagnoses) צריכים להיות טכניים ומדויקים
+## הנחיות לסיכום למכונאי (mechanicSummary):
+חשוב מאוד: זהו דוח מבצעי טכני למוסך!
+
+- originalComplaint: תלונת הנהג המקורית בציטוט או פרפרזה קצרה
+- conversationNarrative: פסקה אחת (3-5 משפטים) שמסכמת את ממצאי תשאול הנהג. התחל ב"הלקוח דיווח על..." וכלול את כל המידע שנאסף: מה קרה, מתי, אילו תסמינים נוספים יש, מה הנהג עשה
+- diagnoses: אבחונים טכניים עם אחוזי הסתברות. הסכום צריך להיות עד 100%
+- recommendedActions: פעולות טכניות ספציפיות שהמכונאי צריך לבצע (3-5 פעולות)
+- urgency: רמת דחיפות ("low", "medium", "high", "critical")
+
+אל תשתמש בסימני Markdown כמו ##, **, - או * בתוך הטקסטים עצמם.
 `.trim();
 }
 
@@ -242,6 +254,7 @@ function normalizeUserDiagnosis(raw: any): UserDiagnosis {
         confidence: typeof raw.confidence === 'number' ? raw.confidence : 0.5,
         confidenceLevel: ['low', 'medium', 'high'].includes(raw.confidenceLevel) ? raw.confidenceLevel : 'medium',
         topIssue: raw.topIssue || raw.title || '',
+        userSummary: raw.userSummary || undefined,  // NEW: AI summary of what user reported
         explanation: raw.explanation || '',
         recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
         nextAction: raw.nextAction || 'פנה למוסך לבדיקה',
@@ -258,13 +271,18 @@ function normalizeMechanicSummary(raw: any, vehicleType: string): MechanicSummar
         vehicleType: raw.vehicleType || vehicleType,
         originalComplaint: raw.originalComplaint || 'לא צוין',
         conversationNarrative: raw.conversationNarrative || 'לא זמין',
+        driverFindings: Array.isArray(raw.driverFindings) ? raw.driverFindings : undefined,
         diagnoses: Array.isArray(raw.diagnoses)
             ? raw.diagnoses.map((d: any) => ({
                 issue: d.issue || 'לא ידוע',
                 probability: typeof d.probability === 'number' ? d.probability : 0.5
             }))
             : [],
+        // Support both recommendedActions (new) and recommendations (legacy)
         recommendations: Array.isArray(raw.recommendations) ? raw.recommendations : [],
+        recommendedActions: Array.isArray(raw.recommendedActions)
+            ? raw.recommendedActions
+            : (Array.isArray(raw.recommendations) ? raw.recommendations : undefined),
         needsTow: raw.needsTow === true,
         urgency: ['low', 'medium', 'high', 'critical'].includes(raw.urgency) ? raw.urgency : 'medium',
         category: raw.category
