@@ -2,401 +2,322 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Filter, Car, Wrench, ChevronLeft, ChevronRight, Loader2, FileText, AlertCircle, PieChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Pie } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import { Filter, Car, Wrench, Bot, ChevronLeft, ChevronRight, Loader2, Home, Database, Globe, X } from 'lucide-react';
 
-// Register Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend);
+interface ConsultationSummary {
+  shortDescription?: string;
+  formattedText?: string;
+  conversationLog?: string;
+  topDiagnosis?: Array<{ name: string; probability?: number; recommendation?: string }>;
+}
 
-// Types
-type TopVehicle = {
-  manufacturer: string;
-  model: string;
-  count: number;
-};
-
-type TopIssue = {
-  issue_description: string;
-  occurrences: number;
-};
-
-type PieData = {
-  label: string;
-  value: number;
-};
-
-type VehicleInfo = {
-  manufacturer?: string | null;
-  model?: string | null;
-  year?: number | null;
-  license_plate?: string | null;
-  current_mileage?: number | null;
-};
-
-type Repair = {
+interface Repair {
   id: string;
-  garage_request_id: string | null;
-  final_issue_type: string | null;
-  final_issue_type_label: string;
-  mechanic_notes: string | null;
-  mechanic_description_ai: string | null;
-  ai_summary: string | null;
-  labor_hours: number | null;
-  status: string;
-  created_at: string;
-  completed_at: string | null;
-  vehicle_info: VehicleInfo | null;
-};
+  vehicle: {
+    manufacturer: string;
+    model: string;
+    year: number | null;
+    licensePlate: string;
+  } | null;
+  issueType: string;
+  issueTypeLabel: string;
+  consultationSummary: ConsultationSummary | null;
+  mechanicSolution: string | null;
+  completedAt: string | null;
+}
 
-type FilterData = {
+interface FilterOptions {
   manufacturers: string[];
   modelsByManufacturer: Record<string, string[]>;
-};
+  issueTypes: Array<{ value: string; label: string }>;
+  years: number[];
+}
 
-export default function GarageDashboardPage() {
+export default function GarageKnowledgeBasePage() {
   const router = useRouter();
 
-  // Filter states
+  // State
   const [mode, setMode] = useState<"local" | "global">("local");
-  const [selectedManufacturers, setSelectedManufacturers] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<string>("monthly");
-  const [issueType, setIssueType] = useState<string>("all");
-  const [chartMode, setChartMode] = useState<string>("totalIssues");
-
-  // Filter options data
-  const [filterData, setFilterData] = useState<FilterData | null>(null);
-  const [filterDataLoading, setFilterDataLoading] = useState(true);
-
-  // Analytics data
-  const [topModelsLoading, setTopModelsLoading] = useState(true);
-  const [topModelsError, setTopModelsError] = useState<string | null>(null);
-  const [topModels, setTopModels] = useState<TopVehicle[]>([]);
-
-  const [topIssuesLoading, setTopIssuesLoading] = useState(true);
-  const [topIssuesError, setTopIssuesError] = useState<string | null>(null);
-  const [topIssues, setTopIssues] = useState<TopIssue[]>([]);
-
-  const [pieLoading, setPieLoading] = useState(true);
-  const [pieError, setPieError] = useState<string | null>(null);
-  const [pieData, setPieData] = useState<PieData[]>([]);
-
-  // Repairs data
-  const [repairsLoading, setRepairsLoading] = useState(true);
-  const [repairsError, setRepairsError] = useState<string | null>(null);
   const [repairs, setRepairs] = useState<Repair[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0);
   const [offset, setOffset] = useState(0);
 
-  // Fetch filter options
-  const fetchFilterData = useCallback(async () => {
-    setFilterDataLoading(true);
-    try {
-      const response = await fetch('/api/garage/dashboard/filters');
-      const data = await response.json();
-      if (response.ok) {
-        setFilterData(data);
-      }
-    } catch (err) {
-      console.error('Error fetching filter data:', err);
-    } finally {
-      setFilterDataLoading(false);
-    }
-  }, []);
+  // Modal state
+  const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
 
-  // Build query string for filters
-  const buildQueryString = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set('mode', mode);
-    if (selectedManufacturers.length > 0) {
-      params.set('manufacturers', selectedManufacturers.join(','));
-    }
-    if (selectedModels.length > 0) {
-      params.set('models', selectedModels.join(','));
-    }
-    if (dateRange) {
-      params.set('dateRange', dateRange);
-    }
-    if (issueType && issueType !== 'all') {
-      params.set('issueType', issueType);
-    }
-    return params.toString();
-  }, [mode, selectedManufacturers, selectedModels, dateRange, issueType]);
+  // Filters
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [selectedManufacturer, setSelectedManufacturer] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string>("");
+  const [selectedIssueType, setSelectedIssueType] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<string>("all");
 
-  // Fetch Top 5 models
-  const fetchTopModels = useCallback(async () => {
-    setTopModelsLoading(true);
-    setTopModelsError(null);
-    try {
-      const queryString = buildQueryString();
-      const response = await fetch(`/api/garage/dashboard/top-models?${queryString}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch top models');
-      }
-
-      setTopModels(data.top5 || []);
-    } catch (err) {
-      console.error('Error fetching top models:', err);
-      setTopModelsError(err instanceof Error ? err.message : 'Failed to load top models');
-    } finally {
-      setTopModelsLoading(false);
-    }
-  }, [buildQueryString]);
-
-  // Fetch Top 5 issues
-  const fetchTopIssues = useCallback(async () => {
-    setTopIssuesLoading(true);
-    setTopIssuesError(null);
-    try {
-      const queryString = buildQueryString();
-      const response = await fetch(`/api/garage/dashboard/top-issues?${queryString}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch top issues');
-      }
-
-      setTopIssues(data.top5 || []);
-    } catch (err) {
-      console.error('Error fetching top issues:', err);
-      setTopIssuesError(err instanceof Error ? err.message : 'Failed to load top issues');
-    } finally {
-      setTopIssuesLoading(false);
-    }
-  }, [buildQueryString]);
-
-  // Fetch pie chart data
-  const fetchPieData = useCallback(async () => {
-    setPieLoading(true);
-    setPieError(null);
-    try {
-      const queryString = buildQueryString();
-      const response = await fetch(`/api/garage/dashboard/pie?${queryString}&chartMode=${chartMode}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch pie data');
-      }
-
-      setPieData(data.data || []);
-    } catch (err) {
-      console.error('Error fetching pie data:', err);
-      setPieError(err instanceof Error ? err.message : 'Failed to load pie chart');
-    } finally {
-      setPieLoading(false);
-    }
-  }, [buildQueryString, chartMode]);
-
-  // Fetch repairs with pagination
+  // Fetch repairs
   const fetchRepairs = useCallback(async () => {
-    setRepairsLoading(true);
-    setRepairsError(null);
+    setLoading(true);
+    setError(null);
     try {
-      const queryString = buildQueryString();
-      const response = await fetch(`/api/garage/dashboard/repairs?${queryString}&offset=${offset}`);
-      const data = await response.json();
+      const params = new URLSearchParams();
+      params.set("mode", mode);
+      params.set("offset", offset.toString());
+      if (selectedManufacturer) params.set("manufacturer", selectedManufacturer);
+      if (selectedModel) params.set("model", selectedModel);
+      if (selectedYear) params.set("year", selectedYear);
+      if (selectedIssueType !== "all") params.set("issueType", selectedIssueType);
+      if (dateRange !== "all") params.set("dateRange", dateRange);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch repairs');
+      const res = await fetch(`/api/garage/knowledge-base?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch repairs");
       }
 
       setRepairs(data.repairs || []);
       setTotalCount(data.totalCount || 0);
+      if (data.filters) {
+        setFilterOptions(data.filters);
+      }
     } catch (err) {
-      console.error('Error fetching repairs:', err);
-      setRepairsError(err instanceof Error ? err.message : 'Failed to load repairs');
+      console.error('[KnowledgeBase] Error:', err);
+      setError(err instanceof Error ? err.message : "שגיאה בטעינת הנתונים");
     } finally {
-      setRepairsLoading(false);
+      setLoading(false);
     }
-  }, [buildQueryString, offset]);
+  }, [mode, offset, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange]);
 
-  // Load filter data on mount
+  // Initial load and reload on filter change
   useEffect(() => {
-    fetchFilterData();
-  }, [fetchFilterData]);
+    fetchRepairs();
+  }, [fetchRepairs]);
 
-  // Reload all data when filters change
+  // Reset offset when filters change
   useEffect(() => {
     setOffset(0);
-    setCurrentPage(0);
-    fetchTopModels();
-    fetchTopIssues();
-    fetchPieData();
-    fetchRepairs();
-  }, [mode, selectedManufacturers, selectedModels, dateRange, issueType, chartMode, fetchTopModels, fetchTopIssues, fetchPieData, fetchRepairs]);
+  }, [mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange]);
 
-  // Get available models based on selected manufacturers
+  // Get available models based on selected manufacturer
   const availableModels = useMemo(() => {
-    if (!filterData) return [];
-    if (selectedManufacturers.length === 0) {
-      // If no manufacturers selected, show all models
-      return Object.values(filterData.modelsByManufacturer).flat();
-    }
-    return selectedManufacturers
-      .flatMap(m => filterData.modelsByManufacturer[m] || [])
-      .filter((model, index, self) => self.indexOf(model) === index)
-      .sort();
-  }, [filterData, selectedManufacturers]);
+    if (!filterOptions || !selectedManufacturer) return [];
+    return filterOptions.modelsByManufacturer[selectedManufacturer] || [];
+  }, [filterOptions, selectedManufacturer]);
 
-  // Handle pagination
-  const handleNextPage = () => {
-    const newOffset = offset + 5;
-    setOffset(newOffset);
-    setCurrentPage(currentPage + 1);
+  // Reset model and year when manufacturer changes
+  useEffect(() => {
+    setSelectedModel("");
+    setSelectedYear("");
+  }, [selectedManufacturer]);
+
+  // Pagination
+  const handleNextPage = () => setOffset(prev => prev + 12);
+  const handlePrevPage = () => setOffset(prev => Math.max(0, prev - 12));
+
+  // Format date
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("he-IL");
   };
 
-  const handlePreviousPage = () => {
-    if (offset > 0) {
-      const newOffset = Math.max(0, offset - 5);
-      setOffset(newOffset);
-      setCurrentPage(Math.max(0, currentPage - 1));
+  // Format AI summary for display
+  const formatConsultationSummary = (summary: ConsultationSummary | null) => {
+    if (!summary) return null;
+
+    // Try to get the most useful summary text
+    if (summary.formattedText) return summary.formattedText;
+    if (summary.shortDescription) return summary.shortDescription;
+    if (summary.topDiagnosis && summary.topDiagnosis.length > 0) {
+      return summary.topDiagnosis.map(d =>
+        `• ${d.name}${d.probability ? ` (${Math.round(d.probability * 100)}%)` : ''}${d.recommendation ? ` - ${d.recommendation}` : ''}`
+      ).join('\n');
     }
+    return null;
   };
-
-  // Navigate to request details
-  const handleRowClick = (requestId: number | null) => {
-    if (requestId) {
-      router.push(`/garage/requests/${requestId}`);
-    }
-  };
-
-  // Prepare pie chart data
-  const chartData = useMemo(() => {
-    if (pieData.length === 0) {
-      return {
-        labels: ['אין נתונים'],
-        datasets: [{
-          data: [1],
-          backgroundColor: ['#64748b'],
-        }],
-      };
-    }
-
-    const colors = [
-      '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-      '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
-    ];
-
-    return {
-      labels: pieData.map(d => d.label),
-      datasets: [{
-        data: pieData.map(d => d.value),
-        backgroundColor: pieData.map((_, i) => colors[i % colors.length]),
-        borderColor: '#1e293b',
-        borderWidth: 2,
-      }],
-    };
-  }, [pieData]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#050816] via-[#071226] to-[#03050c] text-white">
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-sky-500/20 blur-[200px]" />
+        <div className="absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cyan-500/20 blur-[200px]" />
         <div className="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-b from-cyan-400/10 via-transparent to-indigo-500/10 blur-[180px]" />
       </div>
 
-      <main dir="rtl" className="relative mx-auto w-full max-w-7xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
-
-        <h1 className="text-4xl font-extrabold text-white mb-8 border-b border-white/10 pb-4 flex items-center gap-3">
-          <PieChart className="w-8 h-8 text-cyan-300" /> דשבורד מוסך
-        </h1>
-
-        {/* --- 1. Comprehensive Filter Bar --- */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md mb-10">
-          <h2 className="text-xl font-semibold text-cyan-300 flex items-center gap-2 mb-6">
-            <Filter className="w-5 h-5" /> סינון נתונים
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* View Mode */}
-            <div>
-              <label className="text-sm text-slate-400 block mb-2">מצב תצוגה</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setMode('local')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${mode === 'local'
-                    ? 'bg-cyan-500 text-white border-2 border-cyan-400'
-                    : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
-                    }`}
-                >
-                  תצוגת מוסך שלי
-                </button>
-                <button
-                  onClick={() => setMode('global')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition ${mode === 'global'
-                    ? 'bg-cyan-500 text-white border-2 border-cyan-400'
-                    : 'bg-zinc-800 text-slate-300 border-2 border-zinc-700 hover:border-zinc-600'
-                    }`}
-                >
-                  תצוגת כלל המוסכים
-                </button>
+      {/* Modal */}
+      {selectedRepair && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setSelectedRepair(null)}
+        >
+          <div
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#071226] border border-white/20 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-[#0a1628] border-b border-white/10 p-6 flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <Car className="w-8 h-8 text-cyan-400" />
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {selectedRepair.vehicle?.manufacturer || 'רכב לא ידוע'} {selectedRepair.vehicle?.model || ''}
+                    {selectedRepair.vehicle?.year && ` (${selectedRepair.vehicle.year})`}
+                  </h2>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 text-sm font-medium">
+                      {selectedRepair.issueTypeLabel}
+                    </span>
+                    {selectedRepair.completedAt && (
+                      <span className="text-slate-400 text-sm">
+                        {formatDate(selectedRepair.completedAt)}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
+              <button
+                onClick={() => setSelectedRepair(null)}
+                className="p-2 rounded-lg hover:bg-white/10 transition"
+              >
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
             </div>
 
-            {/* Manufacturer Multi-select */}
+            {/* Modal Content */}
+            <div className="p-6 space-y-6" dir="rtl">
+              {/* AI Consultation Summary */}
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-3">
+                  <Bot className="w-5 h-5" />
+                  סיכום ייעוץ AI
+                </h3>
+                <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
+                  {formatConsultationSummary(selectedRepair.consultationSummary) ? (
+                    <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+                      {formatConsultationSummary(selectedRepair.consultationSummary)}
+                    </p>
+                  ) : (
+                    <p className="text-slate-400 text-sm">לא קיים סיכום ייעוץ AI לתיקון זה</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Mechanic Solution */}
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-green-300 mb-3">
+                  <Wrench className="w-5 h-5" />
+                  פתרון המכונאי
+                </h3>
+                <div className="p-4 rounded-xl bg-green-900/20 border border-green-500/20">
+                  {selectedRepair.mechanicSolution ? (
+                    <p className="text-green-100 text-sm leading-relaxed whitespace-pre-wrap">
+                      {selectedRepair.mechanicSolution}
+                    </p>
+                  ) : (
+                    <p className="text-slate-400 text-sm">לא תועד פתרון לתיקון זה</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main dir="rtl" className="relative mx-auto w-full max-w-7xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <Database className="w-8 h-8 text-cyan-300" />
+            <div>
+              <h1 className="text-3xl font-extrabold text-white">מאגר ידע תיקונים</h1>
+              <p className="text-sm text-slate-400 mt-1">חפש פתרונות לתקלות מתיקונים קודמים</p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/garage')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-white"
+          >
+            <Home className="w-5 h-5" />
+            חזרה לתפריט
+          </button>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setMode('local')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${mode === 'local'
+              ? 'bg-cyan-500 text-slate-900 shadow-lg shadow-cyan-500/30'
+              : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+          >
+            <Wrench className="w-5 h-5" />
+            המוסך שלי
+          </button>
+          <button
+            onClick={() => setMode('global')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${mode === 'global'
+              ? 'bg-cyan-500 text-slate-900 shadow-lg shadow-cyan-500/30'
+              : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+          >
+            <Globe className="w-5 h-5" />
+            כל המוסכים
+          </button>
+        </div>
+
+        {/* Filters */}
+        <section className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md mb-8">
+          <h2 className="text-lg font-semibold text-cyan-300 flex items-center gap-2 mb-4">
+            <Filter className="w-5 h-5" />
+            סינון
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Manufacturer */}
             <div>
               <label className="text-sm text-slate-400 block mb-2">יצרן</label>
               <select
-                multiple
-                value={selectedManufacturers}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => option.value);
-                  setSelectedManufacturers(values);
-                  setSelectedModels([]); // Reset models when manufacturers change
-                }}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm min-h-[100px]"
-                disabled={filterDataLoading}
+                value={selectedManufacturer}
+                onChange={(e) => setSelectedManufacturer(e.target.value)}
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
               >
-                {filterData?.manufacturers.map(m => (
+                <option value="">כל היצרנים</option>
+                {filterOptions?.manufacturers.map(m => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <p className="text-xs text-slate-500 mt-1">החזק Ctrl/Cmd לבחירה מרובה</p>
             </div>
 
-            {/* Model Dropdown */}
+            {/* Model */}
             <div>
               <label className="text-sm text-slate-400 block mb-2">דגם</label>
               <select
-                multiple
-                value={selectedModels}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions, option => option.value);
-                  setSelectedModels(values);
-                }}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm min-h-[100px]"
-                disabled={filterDataLoading || availableModels.length === 0}
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={!selectedManufacturer}
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white disabled:opacity-50"
               >
+                <option value="">כל הדגמים</option>
                 {availableModels.map(m => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <p className="text-xs text-slate-500 mt-1">החזק Ctrl/Cmd לבחירה מרובה</p>
             </div>
 
-            {/* Time Range */}
+            {/* Year */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">טווח זמן</label>
+              <label className="text-sm text-slate-400 block mb-2">שנה</label>
               <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
               >
-                <option value="today">היום (24 שעות)</option>
-                <option value="weekly">שבוע אחרון (7 ימים)</option>
-                <option value="monthly">חודש אחרון (30 ימים)</option>
-                <option value="yearly">שנה אחרונה (365 ימים)</option>
+                <option value="">כל השנים</option>
+                {filterOptions?.years?.map(y => (
+                  <option key={y} value={y.toString()}>{y}</option>
+                ))}
               </select>
             </div>
 
@@ -404,308 +325,140 @@ export default function GarageDashboardPage() {
             <div>
               <label className="text-sm text-slate-400 block mb-2">סוג תקלה</label>
               <select
-                value={issueType}
-                onChange={(e) => setIssueType(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm"
+                value={selectedIssueType}
+                onChange={(e) => setSelectedIssueType(e.target.value)}
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
               >
                 <option value="all">כל הסוגים</option>
-                <option value="engine">מנוע</option>
-                <option value="brakes">בלמים</option>
-                <option value="electrical">חשמל</option>
-                <option value="ac">מיזוג אוויר</option>
-                <option value="starting">מערכת התנעה</option>
-                <option value="gearbox">תיבת הילוכים</option>
-                <option value="noise">רעש/רטט</option>
-                <option value="suspension">מתלים</option>
-                <option value="transmission">הנעה</option>
-                <option value="fuel_system">מערכת דלק</option>
-                <option value="cooling_system">מערכת קירור</option>
-                <option value="exhaust">פליטה</option>
-                <option value="tires">צמיגים</option>
-                <option value="steering">היגוי</option>
-                <option value="other">אחר</option>
+                {filterOptions?.issueTypes.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Range */}
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">טווח זמן</label>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
+              >
+                <option value="all">כל הזמנים</option>
+                <option value="weekly">שבוע אחרון</option>
+                <option value="monthly">חודש אחרון</option>
+                <option value="yearly">שנה אחרונה</option>
               </select>
             </div>
           </div>
         </section>
 
-        {/* --- 2. Pie Chart Section --- */}
-        <section className="mb-10">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
-              <PieChart className="w-6 h-6 text-cyan-300" /> תרשים עוגה
-            </h2>
-            <select
-              value={chartMode}
-              onChange={(e) => setChartMode(e.target.value)}
-              className="px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-sm"
-            >
-              <option value="totalIssues">סה״כ פניות</option>
-              <option value="resolvedIssues">פניות שנפתרו</option>
-              <option value="unresolvedIssues">פניות שלא נפתרו</option>
-              <option value="issuesByManufacturer">פניות לפי יצרן</option>
-              <option value="issuesByModel">פניות לפי דגם</option>
-            </select>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
-            {pieLoading && (
-              <div className="text-center py-20 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin mr-3" /> טוען תרשים...
-              </div>
-            )}
-            {pieError && (
-              <div className="text-center py-20 text-red-300">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                <p>{pieError}</p>
-              </div>
-            )}
-            {!pieLoading && !pieError && (
-              <div className="max-w-md mx-auto">
-                <Pie data={chartData} />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* --- 3. Two Analytics Boxes Side by Side --- */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-          {/* Box A: Top 5 Problematic Vehicle Models */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
-            <h2 className="text-xl font-extrabold text-white mb-6 flex items-center gap-3">
-              <Car className="w-6 h-6 text-cyan-300" /> 5 דגמי הרכבים הבעייתיים ביותר
-            </h2>
-
-            {topModelsLoading && (
-              <div className="text-center py-10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען נתונים...
-              </div>
-            )}
-
-            {topModelsError && (
-              <div className="rounded-lg border border-red-500/50 bg-red-900/20 p-4 text-red-300">
-                <p className="font-semibold text-sm">שגיאה:</p>
-                <p className="text-xs mt-1">{topModelsError}</p>
-              </div>
-            )}
-
-            {!topModelsLoading && !topModelsError && (
-              <>
-                {topModels.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <p>אין נתונים להצגה</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {topModels.map((vehicle, index) => (
-                      <div
-                        key={`${vehicle.manufacturer}-${vehicle.model}`}
-                        className="rounded-lg border border-white/10 bg-zinc-800/50 p-4 hover:border-cyan-500/50 transition"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-cyan-300 text-lg">{index + 1}.</span>
-                            <div>
-                              <p className="text-slate-200 font-semibold">{vehicle.manufacturer}</p>
-                              <p className="text-slate-400 text-sm">{vehicle.model}</p>
-                            </div>
-                          </div>
-                          <span className="text-sm font-bold text-red-400 bg-red-900/30 px-3 py-1 rounded-full">
-                            {vehicle.count} תקלות
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Box B: Top 5 Most Common Issues */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md">
-            <h2 className="text-xl font-extrabold text-white mb-6 flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-cyan-300" /> 5 הבעיות הנפוצות ביותר
-            </h2>
-
-            {topIssuesLoading && (
-              <div className="text-center py-10 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען נתונים...
-              </div>
-            )}
-
-            {topIssuesError && (
-              <div className="rounded-lg border border-red-500/50 bg-red-900/20 p-4 text-red-300">
-                <p className="font-semibold text-sm">שגיאה:</p>
-                <p className="text-xs mt-1">{topIssuesError}</p>
-              </div>
-            )}
-
-            {!topIssuesLoading && !topIssuesError && (
-              <>
-                {topIssues.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <p>אין נתונים להצגה</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {topIssues.map((issue, index) => (
-                      <div
-                        key={issue.issue_description}
-                        className="rounded-lg border border-white/10 bg-zinc-800/50 p-4 hover:border-cyan-500/50 transition"
-                      >
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="flex items-start gap-3 flex-1">
-                            <span className="font-bold text-cyan-300 text-lg">{index + 1}.</span>
-                            <p className="text-slate-200 text-sm flex-1">{issue.issue_description}</p>
-                          </div>
-                          <span className="text-sm font-bold text-red-400 bg-red-900/30 px-3 py-1 rounded-full whitespace-nowrap">
-                            {issue.occurrences} פניות
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* --- 4. Repairs Table With Pagination --- */}
-        <section className="mt-10">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
-              <Wrench className="w-6 h-6 text-cyan-300" /> רשימת תיקונים אחרונים
-            </h2>
-            {totalCount > 0 && (
-              <span className="text-slate-400 text-sm">סה״כ: {totalCount} תיקונים</span>
-            )}
-          </div>
-
-          {repairsLoading && (
-            <div className="text-center py-10 text-xl text-slate-400 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin mr-3" /> טוען תיקונים...
+        {/* Results */}
+        <section>
+          {/* Results count */}
+          {!loading && (
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-slate-400">
+                נמצאו {totalCount} תיקונים
+              </span>
+              <span className="text-slate-500 text-sm">לחץ על כרטיס לפרטים</span>
             </div>
           )}
 
-          {repairsError && (
-            <div className="rounded-xl border border-red-500/50 bg-red-900/20 p-6 text-red-300">
-              <p className="font-semibold">שגיאה בטעינת תיקונים:</p>
-              <p className="text-sm mt-2">{repairsError}</p>
+          {/* Loading */}
+          {loading && (
+            <div className="text-center py-20 flex flex-col items-center">
+              <Loader2 className="w-10 h-10 animate-spin text-cyan-400 mb-4" />
+              <span className="text-slate-400">טוען תיקונים...</span>
             </div>
           )}
 
-          {!repairsLoading && !repairsError && repairs.length === 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-slate-400">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>אין תיקונים להצגה</p>
+          {/* Error */}
+          {error && (
+            <div className="text-center py-20 text-red-400 bg-red-900/20 rounded-xl border border-red-500/30 p-6">
+              <p className="font-semibold mb-2">שגיאה</p>
+              <p className="text-sm">{error}</p>
             </div>
           )}
 
-          {!repairsLoading && !repairsError && repairs.length > 0 && (
-            <>
-              {/* Repair Cards Grid */}
-              <div className="space-y-4">
-                {repairs.map((repair) => (
-                  <div
-                    key={repair.id}
-                    className="rounded-xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-md hover:border-cyan-500/50 transition"
-                  >
-                    {/* Header Row */}
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <Car className="w-6 h-6 text-cyan-400" />
-                        <div>
-                          <h3 className="text-white font-semibold text-lg">
-                            {repair.vehicle_info?.manufacturer || 'לא ידוע'} {repair.vehicle_info?.model || ''}
-                            {repair.vehicle_info?.year && ` (${repair.vehicle_info.year})`}
-                          </h3>
-                          {repair.vehicle_info?.license_plate && (
-                            <span className="text-cyan-300 text-sm">{repair.vehicle_info.license_plate}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 font-medium">
-                          {repair.final_issue_type_label}
-                        </span>
-                        {repair.labor_hours && (
-                          <span className="text-slate-400">
-                            ⏱️ {repair.labor_hours} שעות
-                          </span>
-                        )}
-                        {repair.completed_at && (
-                          <span className="text-slate-500 text-xs">
-                            {new Date(repair.completed_at).toLocaleDateString('he-IL')}
-                          </span>
-                        )}
-                      </div>
+          {/* Empty state */}
+          {!loading && !error && repairs.length === 0 && (
+            <div className="text-center py-20 text-slate-400 bg-white/5 rounded-xl border border-white/10">
+              <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>לא נמצאו תיקונים התואמים לחיפוש</p>
+            </div>
+          )}
+
+          {/* Repair Cards - Clickable Grid */}
+          {!loading && !error && repairs.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {repairs.map((repair) => (
+                <div
+                  key={repair.id}
+                  onClick={() => setSelectedRepair(repair)}
+                  className="cursor-pointer rounded-xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-md hover:border-cyan-500/50 hover:bg-white/10 transition group"
+                >
+                  {/* Vehicle Info */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <Car className="w-6 h-6 text-cyan-400 group-hover:text-cyan-300" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold truncate">
+                        {repair.vehicle?.manufacturer || 'רכב לא ידוע'} {repair.vehicle?.model || ''}
+                      </h3>
+                      {repair.vehicle?.year && (
+                        <span className="text-slate-400 text-sm">{repair.vehicle.year}</span>
+                      )}
                     </div>
+                  </div>
 
-                    {/* AI Summary */}
-                    {repair.ai_summary && (
-                      <div className="mb-3 p-3 rounded-lg bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
-                        <div className="flex items-center gap-2 text-cyan-300 text-sm font-medium mb-1">
-                          <span>🤖</span> סיכום AI
-                        </div>
-                        <p className="text-white text-sm">{repair.ai_summary}</p>
-                      </div>
-                    )}
-
-                    {/* Technical Description */}
-                    {repair.mechanic_description_ai && (
-                      <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                        <div className="flex items-center gap-2 text-slate-400 text-sm font-medium mb-1">
-                          <Wrench className="w-4 h-4" /> תיאור טכני
-                        </div>
-                        <p className="text-slate-200 text-sm leading-relaxed">{repair.mechanic_description_ai}</p>
-                      </div>
-                    )}
-
-                    {/* Fallback: Show raw notes if no AI description */}
-                    {!repair.mechanic_description_ai && repair.mechanic_notes && (
-                      <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                        <div className="flex items-center gap-2 text-slate-400 text-sm font-medium mb-1">
-                          <FileText className="w-4 h-4" /> הערות מכונאי
-                        </div>
-                        <p className="text-slate-200 text-sm leading-relaxed">{repair.mechanic_notes}</p>
-                      </div>
+                  {/* Issue Type Badge */}
+                  <div className="flex items-center justify-between">
+                    <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 text-xs font-medium">
+                      {repair.issueTypeLabel}
+                    </span>
+                    {repair.completedAt && (
+                      <span className="text-slate-500 text-xs">
+                        {formatDate(repair.completedAt)}
+                      </span>
                     )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-              {/* Pagination Controls */}
-              <div className="flex justify-between items-center mt-6">
-                <button
-                  onClick={handlePreviousPage}
-                  disabled={offset === 0}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset === 0
-                    ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
-                    }`}
-                >
-                  <ChevronRight className="w-5 h-5" /> קודם
-                </button>
-                <span className="text-slate-400">
-                  עמוד {currentPage + 1} • {repairs.length} תיקונים בעמוד
-                </span>
-                <button
-                  onClick={handleNextPage}
-                  disabled={repairs.length < 10 || offset + 10 >= totalCount}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${repairs.length < 10 || offset + 10 >= totalCount
-                    ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-zinc-800 text-white border-2 border-zinc-700 hover:border-cyan-500'
-                    }`}
-                >
-                  הבא <ChevronLeft className="w-5 h-5" />
-                </button>
-              </div>
-            </>
+          {/* Pagination */}
+          {!loading && repairs.length > 0 && (
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={handlePrevPage}
+                disabled={offset === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset === 0
+                  ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-zinc-800 text-white border border-zinc-700 hover:border-cyan-500'
+                  }`}
+              >
+                <ChevronRight className="w-5 h-5" />
+                הקודם
+              </button>
+              <span className="text-slate-400">
+                עמוד {Math.floor(offset / 12) + 1}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={offset + 12 >= totalCount}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset + 12 >= totalCount
+                  ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-zinc-800 text-white border border-zinc-700 hover:border-cyan-500'
+                  }`}
+              >
+                הבא
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            </div>
           )}
         </section>
       </main>
-    </div>
+    </div >
   );
 }
