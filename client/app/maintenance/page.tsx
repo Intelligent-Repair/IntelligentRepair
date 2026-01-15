@@ -1,205 +1,317 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Plus, Car, Calendar, ArrowLeft, Home } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Car, Plus, ChevronLeft } from "lucide-react";
+import { createClientSupabase } from "@/lib/supabaseClient";
 
-// 1. הגדרת המבנה של המידע בטבלת הקטלוג
 interface VehicleCatalog {
-    manufacturer: string;
-    model: string;
-    year: number;
+    manufacturer: string | null;
+    model: string | null;
+    year: number | null;
 }
 
-// 2. הגדרת המבנה הגולמי שמגיע מ-Supabase (כולל הקינון)
-// זה מחליף את ה-any ומגדיר בדיוק מה מגיע מהשאילתה
-interface RawDatabaseRow {
-    id: string;
-    license_plate: string;
-    test_date?: string | null;
-    // כאן אנחנו אומרים ל-TS שזה יכול להיות אובייקט (אם נמצא רכב) או null
-    // או מערך (במקרים מסוימים של הגדרות Supabase)
-    vehicle_catalog: VehicleCatalog | VehicleCatalog[] | null;
-}
-
-// 3. הממשק של הרכב הסופי שמוצג באפליקציה (שטוח ונוח לשימוש)
 interface Vehicle {
     id: string;
+    license_plate: string | null;
     manufacturer: string;
     model: string;
-    year: number;
-    license_plate: string;
-    test_date?: string | null;
+    year: number | null;
 }
 
+// Brand Emblem Component - Etched Monogram Emblem style
+const BrandEmblem = ({ brand }: { brand: string }) => {
+    const getBrandInitial = (b: string) => {
+        const lowerBrand = b.toLowerCase();
+        if (lowerBrand.includes('toyota')) return 'T';
+        if (lowerBrand.includes('volkswagen') || lowerBrand.includes('vw')) return 'VW';
+        if (lowerBrand.includes('mazda')) return 'M';
+        if (lowerBrand.includes('honda')) return 'H';
+        if (lowerBrand.includes('hyundai')) return 'H';
+        if (lowerBrand.includes('kia')) return 'K';
+        if (lowerBrand.includes('mercedes')) return 'MB';
+        if (lowerBrand.includes('bmw')) return 'BMW';
+        if (lowerBrand.includes('audi')) return 'A';
+        if (lowerBrand.includes('ford')) return 'F';
+        if (lowerBrand.includes('chevrolet')) return 'C';
+        if (lowerBrand.includes('nissan')) return 'N';
+        if (lowerBrand.includes('subaru')) return 'S';
+        if (lowerBrand.includes('mitsubishi')) return 'M';
+        return b.charAt(0).toUpperCase();
+    };
+
+    const initial = getBrandInitial(brand);
+    // Adjust font size based on character count - larger for premium look
+    const fontSize = initial.length > 2 ? 'text-4xl' : initial.length > 1 ? 'text-5xl' : 'text-6xl';
+
+    return (
+        <div
+            className="absolute -left-10 top-1/2 pointer-events-none select-none"
+            style={{ transform: 'translateY(-50%) rotate(-12deg)' }}
+        >
+            {/* Large Emblem Container */}
+            <div
+                className="w-32 h-32 rounded-full flex items-center justify-center"
+                style={{
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%)',
+                    border: '2px solid rgba(255,255,255,0.08)',
+                    boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.02)'
+                }}
+            >
+                {/* Inner decorative ring */}
+                <div
+                    className="w-28 h-28 rounded-full flex items-center justify-center"
+                    style={{
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.4)'
+                    }}
+                >
+                    {/* The Letter - Premium serif typography */}
+                    <span
+                        className={`${fontSize} font-black tracking-tight`}
+                        style={{
+                            fontFamily: 'Georgia, "Times New Roman", serif',
+                            color: 'rgba(255,255,255,0.08)',
+                            textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.03)'
+                        }}
+                    >
+                        {initial}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Israeli License Plate Component - Compact with inset shadow
+const LicensePlate = ({ number }: { number: string }) => (
+    <div className="flex items-stretch rounded overflow-hidden shadow-lg w-fit">
+        {/* Blue IL Strip */}
+        <div className="bg-[#003399] px-1.5 py-1 flex flex-col items-center justify-center">
+            <span className="text-[7px] text-white font-bold leading-none">🇮🇱</span>
+            <span className="text-[8px] text-white font-bold leading-none mt-0.5">IL</span>
+        </div>
+        {/* Yellow Plate with inset shadow */}
+        <div
+            className="bg-[#FFCC00] px-3 py-1.5 flex items-center justify-center"
+            style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.3)' }}
+        >
+            <span className="text-black font-mono font-black text-base tracking-[0.12em]">
+                {number}
+            </span>
+        </div>
+    </div>
+);
+
 export default function MaintenancePage() {
-    const router = useRouter();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userName, setUserName] = useState('');
+    const [userName, setUserName] = useState("");
 
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                // 1. קבלת המשתמש הנוכחי
-                const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const supabase = createClientSupabase();
 
-                if (authError || !user) {
-                    router.push('/login');
-                    return;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: userData } = await supabase
+                    .from("users")
+                    .select("first_name")
+                    .eq("id", user.id)
+                    .single();
+
+                if (userData && userData.first_name) {
+                    setUserName(userData.first_name);
+                } else {
+                    setUserName(user.email?.split("@")[0] || "אורח");
                 }
 
-                // 2. עדכון שם המשתמש
-                const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'חבר';
-                setUserName(name);
-
-                // 3. משיכת הרכבים
-                const { data, error: vehiclesError } = await supabase
-                    .from('people_cars')
+                const { data: vehiclesData, error } = await supabase
+                    .from("people_cars")
                     .select(`
                         id,
                         license_plate,
-                        test_date,
-                        vehicle_catalog (
+                        vehicle_catalog:vehicle_catalog_id (
                             manufacturer,
                             model,
                             year
                         )
                     `)
-                    .eq('user_id', user.id);
+                    .eq("user_id", user.id);
 
-                if (vehiclesError) {
-                    console.error('Error fetching vehicles:', vehiclesError);
-                } else {
-                    // המרה בטוחה: אנחנו אומרים ל-TS להתייחס למידע כרשימה של RawDatabaseRow
-                    // השימוש ב-unknown הוא טכניקה בטוחה יותר מ-any להמרה יזומה
-                    const rawData = data as unknown as RawDatabaseRow[];
-
-                    const formattedVehicles: Vehicle[] = rawData.map((row) => {
-                        // טיפול במקרה ש-vehicle_catalog הוא מערך (קורה לפעמים ב-Joins)
-                        const catalogItem = Array.isArray(row.vehicle_catalog)
-                            ? row.vehicle_catalog[0]
-                            : row.vehicle_catalog;
-
+                if (vehiclesData && !error) {
+                    const transformedVehicles: Vehicle[] = vehiclesData.map((car: any) => {
+                        const catalog: VehicleCatalog = Array.isArray(car.vehicle_catalog)
+                            ? car.vehicle_catalog[0] || {}
+                            : car.vehicle_catalog || {};
                         return {
-                            id: row.id, // זה ה-ID שנשלח לדף הבא
-                            license_plate: row.license_plate,
-                            test_date: row.test_date,
-
-                            // שימוש בנתונים מהקטלוג אם קיימים
-                            manufacturer: catalogItem?.manufacturer || 'לא ידוע',
-                            model: catalogItem?.model || '',
-                            year: catalogItem?.year || 0,
+                            id: car.id,
+                            license_plate: car.license_plate,
+                            manufacturer: catalog.manufacturer || "",
+                            model: catalog.model || "",
+                            year: catalog.year,
                         };
                     });
-
-                    setVehicles(formattedVehicles);
+                    setVehicles(transformedVehicles);
                 }
-
-            } catch (error) {
-                console.error('Unexpected error:', error);
-            } finally {
-                setLoading(false);
             }
+            setLoading(false);
         };
 
         fetchData();
-    }, [router]);
+    }, []);
 
-    if (loading) {
-        return <div className="min-h-screen flex items-center justify-center text-white">טוען נתונים...</div>;
-    }
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.1 },
+        },
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+    };
 
     return (
-        <div dir="rtl" className="min-h-screen p-8 text-white relative">
+        <div dir="rtl" className="min-h-screen bg-[#0a0f1a] relative overflow-x-hidden text-slate-200">
 
-            {/* כפתור חזרה לאזור האישי */}
-            <div className="absolute top-6 right-6">
-                <Link href="/user" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 hover:bg-white/20">
-                    <Home className="w-4 h-4" />
-                    <span>חזרה לאזור האישי</span>
-                </Link>
+            {/* Radial Gradient Background */}
+            <div className="fixed inset-0 pointer-events-none">
+                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/8 rounded-full blur-[150px]" />
+                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px]" />
             </div>
 
-            {/* כותרת */}
-            <header className="max-w-6xl mx-auto mb-10 mt-16 pr-2">
-                <h1 className="text-5xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-l from-blue-400 to-white leading-tight">
-                    המוסך שלי 🚗
-                </h1>
-                <p className="text-white/60 text-xl font-light">
-                    שלום <span className="text-blue-300 font-medium">{userName}</span>, כאן מנהלים את התחזוקה בראש שקט.
-                </p>
-            </header>
+            {/* Main Container */}
+            <div className="relative z-10 max-w-4xl mx-auto px-6 pt-8 pb-12">
 
-            <main className="max-w-6xl mx-auto pb-24">
-
-                {/* רשימת הרכבים */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-                    {vehicles.map((vehicle) => (
-                        <Link key={vehicle.id} href={`/maintenance/${vehicle.id}`}>
-                            <div className="
-    group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7
-    hover:bg-white/10 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-300 shadow-lg cursor-pointer
-    flex flex-col justify-between min-h-[260px]
-">
-
-
-                                <div className="flex justify-between items-start mb-8">
-                                    <div>
-                                        <h2 className="text-3xl font-bold text-white mb-3 group-hover:text-blue-300 transition-colors">
-                                            {vehicle.manufacturer} {vehicle.model}
-                                        </h2>
-                                        <div className="inline-block bg-black/40 px-3 py-1.5 rounded-xl text-white/80 font-mono text-sm border border-white/5 shadow-inner tracking-widest">
-                                            {vehicle.license_plate} 🇮🇱
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/5 p-3 rounded-2xl group-hover:bg-blue-600/20 transition-colors">
-                                        <Car className="w-9 h-9 text-white/70 group-hover:text-blue-400 scale-x-[-1]" />
-                                    </div>
-                                </div>
-
-                                <div className="border-t border-white/10 pt-5 flex justify-between items-center text-sm text-white/50">
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-4 h-4" />
-                                        <span>מודל {vehicle.year}</span>
-                                    </div>
-                                    <div className="flex items-center text-blue-400 font-medium opacity-80 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                                        לפרטים ותחזוקה
-                                        <ArrowLeft className="w-4 h-4 mr-1" />
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-
-                {/* הודעה אם אין רכבים */}
-                {!loading && vehicles.length === 0 && (
-                    <div className="text-center py-16 mb-8 rounded-3xl bg-white/5 border border-white/5 border-dashed">
-                        <Car className="w-16 h-16 text-white/20 mx-auto mb-4 scale-x-[-1]" />
-                        <p className="text-white/40 text-xl">החניה ריקה. זה הזמן להוסיף רכב!</p>
+                {/* Header Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center mb-10"
+                >
+                    <div className="flex items-center justify-center gap-3 mb-3">
+                        <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-500/30">
+                            <Car size={32} className="text-white" />
+                        </div>
+                        <h1 className="text-4xl font-black bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                            המוסך שלי
+                        </h1>
                     </div>
+                    <p className="text-slate-400 text-lg">
+                        שלום {userName}, כאן תוכל לנהל את הרכבים שלך
+                    </p>
+                </motion.div>
+
+                {/* Vehicle Cards Grid */}
+                {loading ? (
+                    <div className="flex justify-center py-20">
+                        <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                    </div>
+                ) : vehicles.length > 0 ? (
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
+                    >
+                        {vehicles.map((vehicle) => (
+                            <motion.div key={vehicle.id} variants={itemVariants}>
+                                <Link href={`/maintenance/${vehicle.id}`} className="block">
+                                    <motion.div
+                                        whileHover={{ scale: 1.02 }}
+                                        transition={{ type: "spring", stiffness: 300 }}
+                                        className="relative cursor-pointer rounded-2xl bg-white/[0.03] backdrop-blur-md border-t border-white/10 border-x border-b border-white/5 hover:border-cyan-500/30 hover:shadow-[0_8px_32px_rgba(6,182,212,0.12)] transition-all duration-300 p-5 group overflow-hidden"
+                                    >
+                                        {/* Brand Emblem - Etched monogram on LEFT */}
+                                        <BrandEmblem brand={vehicle.manufacturer} />
+
+                                        {/* Content - Aligned to RIGHT (start in RTL) */}
+                                        <div className="relative z-10 flex items-start justify-between">
+                                            {/* Information Block - Vertically aligned */}
+                                            <div className="flex flex-col gap-3">
+                                                {/* Car Name + Year Tag */}
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="text-lg font-bold text-white">
+                                                        {vehicle.manufacturer} {vehicle.model}
+                                                    </h3>
+                                                    {vehicle.year && (
+                                                        <span className="text-[10px] bg-slate-700/60 text-slate-300 px-2 py-0.5 rounded">
+                                                            {vehicle.year}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* License Plate - Below name */}
+                                                {vehicle.license_plate && (
+                                                    <LicensePlate number={vehicle.license_plate} />
+                                                )}
+                                            </div>
+
+                                            {/* Arrow - Shows clickability */}
+                                            <ChevronLeft size={18} className="text-slate-600 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all mt-1" />
+                                        </div>
+                                    </motion.div>
+                                </Link>
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center py-12 mb-8"
+                    >
+                        <div className="p-4 bg-slate-800/50 rounded-full w-fit mx-auto mb-4">
+                            <Car size={40} className="text-slate-500" />
+                        </div>
+                        <p className="text-slate-400 text-lg">עדיין לא הוספת רכבים</p>
+                        <p className="text-slate-500 text-sm">הוסף רכב חדש כדי להתחיל לעקוב אחרי התחזוקה</p>
+                    </motion.div>
                 )}
 
-                {/* כפתור הוספה למטה */}
-                <Link href="/maintenance/add">
-                    <div className="
-                        group p-8 rounded-3xl border border-dashed border-white/20 bg-gradient-to-r from-white/5 to-white/0
-                        hover:bg-white/10 hover:border-blue-400/40 backdrop-blur-sm transition-all duration-300 cursor-pointer
-                        flex flex-col items-center justify-center gap-4
-                    ">
-                        <div className="bg-blue-600/20 p-4 rounded-full group-hover:bg-blue-500 group-hover:scale-110 group-hover:rotate-90 transition-all duration-500 shadow-lg">
-                            <Plus className="w-8 h-8 text-blue-400 group-hover:text-white" />
-                        </div>
-                        <span className="text-xl font-medium text-white/70 group-hover:text-white transition-colors">
-                            לחץ להוספת רכב חדש
-                        </span>
-                    </div>
-                </Link>
+                {/* Add New Vehicle Button */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                >
+                    <Link href="/maintenance/add" className="block group">
+                        <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.02] hover:border-cyan-500/50 hover:bg-cyan-500/5 hover:shadow-[0_0_30px_rgba(6,182,212,0.08)] transition-all duration-300 p-6 flex flex-col items-center justify-center gap-3">
 
-            </main>
+                            {/* Plus Icon */}
+                            <div className="p-3 bg-slate-800/40 rounded-full group-hover:bg-cyan-500/15 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300">
+                                <Plus size={24} className="text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                            </div>
+
+                            {/* Text */}
+                            <span className="text-sm font-medium text-slate-500 group-hover:text-cyan-300 transition-colors">
+                                הוסף רכב חדש
+                            </span>
+                        </div>
+                    </Link>
+                </motion.div>
+
+                {/* Back to User Menu */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-8 text-center"
+                >
+                    <Link
+                        href="/user"
+                        className="inline-flex items-center gap-2 text-slate-500 hover:text-white transition-colors"
+                    >
+                        <ChevronLeft size={16} className="rotate-180" />
+                        <span>חזרה לתפריט הראשי</span>
+                    </Link>
+                </motion.div>
+
+            </div>
         </div>
     );
 }

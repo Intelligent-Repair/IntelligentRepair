@@ -125,12 +125,12 @@ export default function UserSettingsPage() {
         ...prev,
         visualEffects: { ...prev.visualEffects, [effect]: value },
       };
-      
+
       // If nightMode changed, update theme
       if (effect === "nightMode" && mounted) {
         setTheme(value ? "dark" : "light");
       }
-      
+
       return newSettings;
     });
   };
@@ -234,11 +234,10 @@ export default function UserSettingsPage() {
               <button
                 key={size}
                 onClick={() => handleFontSizeChange(size)}
-                className={`px-6 py-3 rounded-xl font-medium transition-all ${
-                  settings.fontSize === size
+                className={`px-6 py-3 rounded-xl font-medium transition-all ${settings.fontSize === size
                     ? "bg-[#4A90E2] text-white"
                     : "bg-white/10 text-white/70 hover:bg-white/20"
-                }`}
+                  }`}
               >
                 {size === "small" ? "קטן" : size === "medium" ? "בינוני" : "גדול"}
               </button>
@@ -246,39 +245,7 @@ export default function UserSettingsPage() {
           </div>
         </div>
 
-        {/* Visual Effects */}
-        <div className="mb-8 pb-8 border-b border-white/20">
-          <h2 className="text-xl font-bold mb-4 text-white">אפקטים ויזואליים</h2>
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.visualEffects.blur}
-                onChange={(e) => handleVisualEffectChange("blur", e.target.checked)}
-                className="w-5 h-5 rounded accent-[#4A90E2] cursor-pointer"
-              />
-              <span className="text-white/90">אפקט טשטוש (Blur)</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.visualEffects.shadows}
-                onChange={(e) => handleVisualEffectChange("shadows", e.target.checked)}
-                className="w-5 h-5 rounded accent-[#4A90E2] cursor-pointer"
-              />
-              <span className="text-white/90">צללים</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.visualEffects.nightMode}
-                onChange={(e) => handleVisualEffectChange("nightMode", e.target.checked)}
-                className="w-5 h-5 rounded accent-[#4A90E2] cursor-pointer"
-              />
-              <span className="text-white/90">Night Mode</span>
-            </label>
-          </div>
-        </div>
+        {/* Visual Effects - defaults to ON, not shown in UI */}
 
         {/* Reset Settings */}
         <div className="mb-8 pb-8 border-b border-white/20">
