@@ -209,8 +209,8 @@ export default function GarageKnowledgeBasePage() {
   }, [selectedManufacturer]);
 
   // Pagination
-  const handleNextPage = () => setOffset(prev => prev + 12);
-  const handlePrevPage = () => setOffset(prev => Math.max(0, prev - 12));
+  const handleNextPage = () => setOffset(prev => prev + 6);
+  const handlePrevPage = () => setOffset(prev => Math.max(0, prev - 6));
 
   // Format date
   const formatDate = (dateString: string | null) => {
@@ -411,31 +411,33 @@ export default function GarageKnowledgeBasePage() {
       )}
 
       <main dir="rtl" className="relative mx-auto w-full max-w-7xl px-6 pb-16 pt-8 sm:px-10 lg:px-12">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
-            <Database className="w-8 h-8 text-cyan-300" />
+        {/* Header - Technical Style */}
+        <div className="flex items-center justify-between mb-10 border-b border-cyan-500/20 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+              <Database className="w-7 h-7 text-cyan-400" />
+            </div>
             <div>
-              <h1 className="text-3xl font-extrabold text-white">מאגר ידע תיקונים</h1>
-              <p className="text-sm text-slate-400 mt-1">חפש פתרונות לתקלות מתיקונים קודמים</p>
+              <h1 className="text-2xl font-bold text-white uppercase tracking-wider">מאגר ידע תיקונים</h1>
+              <p className="text-sm text-slate-500 mt-1 tracking-wide">חפש פתרונות לתקלות מתיקונים קודמים</p>
             </div>
           </div>
           <button
             onClick={() => router.push('/garage')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-white"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 text-white font-medium"
           >
             <Home className="w-5 h-5" />
             חזרה לתפריט
           </button>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex gap-4 mb-6">
+        {/* Mode Toggle - Neon Buttons */}
+        <div className="flex gap-4 mb-8">
           <button
             onClick={() => setMode('local')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${mode === 'local'
-              ? 'bg-cyan-500 text-slate-900 shadow-lg shadow-cyan-500/30'
-              : 'bg-white/10 text-white hover:bg-white/20'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold uppercase tracking-wide transition-all duration-300 ${mode === 'local'
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/40'
+              : 'bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-cyan-500/30'
               }`}
           >
             <Wrench className="w-5 h-5" />
@@ -443,9 +445,9 @@ export default function GarageKnowledgeBasePage() {
           </button>
           <button
             onClick={() => setMode('global')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition ${mode === 'global'
-              ? 'bg-cyan-500 text-slate-900 shadow-lg shadow-cyan-500/30'
-              : 'bg-white/10 text-white hover:bg-white/20'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold uppercase tracking-wide transition-all duration-300 ${mode === 'global'
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/40'
+              : 'bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-cyan-500/30'
               }`}
           >
             <Globe className="w-5 h-5" />
@@ -453,98 +455,98 @@ export default function GarageKnowledgeBasePage() {
           </button>
         </div>
 
-        {/* Filters */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md mb-8">
-          <h2 className="text-lg font-semibold text-cyan-300 flex items-center gap-2 mb-4">
-            <Filter className="w-5 h-5" />
+        {/* Filters - Glassmorphism Panel */}
+        <section className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-xl p-6 shadow-2xl shadow-cyan-500/5 mb-8">
+          <h2 className="text-sm font-bold text-cyan-400 flex items-center gap-2 mb-5 uppercase tracking-widest">
+            <Filter className="w-4 h-4" />
             סינון
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* License Plate */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">מספר רכב</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">מספר רכב</label>
               <input
                 type="text"
                 value={licensePlate}
                 onChange={(e) => setLicensePlate(e.target.value)}
                 placeholder="חפש לוחית רישוי..."
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 focus:bg-white/10 transition-all duration-200"
               />
             </div>
             {/* Manufacturer */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">יצרן</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">יצרן</label>
               <select
                 value={selectedManufacturer}
                 onChange={(e) => setSelectedManufacturer(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 cursor-pointer appearance-none"
               >
-                <option value="">כל היצרנים</option>
+                <option value="" className="bg-slate-900">כל היצרנים</option>
                 {filterOptions?.manufacturers.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m} className="bg-slate-900">{m}</option>
                 ))}
               </select>
             </div>
 
             {/* Model */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">דגם</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">דגם</label>
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 disabled={!selectedManufacturer}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white disabled:opacity-50"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 cursor-pointer appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <option value="">כל הדגמים</option>
+                <option value="" className="bg-slate-900">כל הדגמים</option>
                 {availableModels.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m} className="bg-slate-900">{m}</option>
                 ))}
               </select>
             </div>
 
             {/* Year */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">שנה</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">שנה</label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 cursor-pointer appearance-none"
               >
-                <option value="">כל השנים</option>
+                <option value="" className="bg-slate-900">כל השנים</option>
                 {filterOptions?.years?.map(y => (
-                  <option key={y} value={y.toString()}>{y}</option>
+                  <option key={y} value={y.toString()} className="bg-slate-900">{y}</option>
                 ))}
               </select>
             </div>
 
             {/* Issue Type */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">סוג תקלה</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">סוג תקלה</label>
               <select
                 value={selectedIssueType}
                 onChange={(e) => setSelectedIssueType(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 cursor-pointer appearance-none"
               >
-                <option value="all">כל הסוגים</option>
+                <option value="all" className="bg-slate-900">כל הסוגים</option>
                 {filterOptions?.issueTypes.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                  <option key={t.value} value={t.value} className="bg-slate-900">{t.label}</option>
                 ))}
               </select>
             </div>
 
             {/* Date Range */}
             <div>
-              <label className="text-sm text-slate-400 block mb-2">טווח זמן</label>
+              <label className="text-xs text-slate-500 uppercase tracking-wider block mb-2 font-medium">טווח זמן</label>
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 cursor-pointer appearance-none"
               >
-                <option value="all">כל הזמנים</option>
-                <option value="weekly">שבוע אחרון</option>
-                <option value="monthly">חודש אחרון</option>
-                <option value="yearly">שנה אחרונה</option>
+                <option value="all" className="bg-slate-900">כל הזמנים</option>
+                <option value="weekly" className="bg-slate-900">שבוע אחרון</option>
+                <option value="monthly" className="bg-slate-900">חודש אחרון</option>
+                <option value="yearly" className="bg-slate-900">שנה אחרונה</option>
               </select>
             </div>
           </div>
@@ -586,16 +588,16 @@ export default function GarageKnowledgeBasePage() {
             </div>
           )}
 
-          {/* Repair Cards - Clickable Grid */}
+          {/* Repair Cards - Futuristic Glassmorphism Grid */}
           {!loading && !error && repairs.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {repairs.map((repair) => {
-                // Status color configuration
-                const statusColors: Record<string, { border: string; bg: string; text: string }> = {
-                  completed: { border: 'border-r-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-                  in_progress: { border: 'border-r-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-400' },
-                  on_hold: { border: 'border-r-orange-500', bg: 'bg-orange-500/10', text: 'text-orange-400' },
-                  cancelled: { border: 'border-r-red-500', bg: 'bg-red-500/10', text: 'text-red-400' },
+                // Status color configuration with glow effects
+                const statusColors: Record<string, { border: string; glow: string; accent: string }> = {
+                  completed: { border: 'border-l-emerald-400', glow: 'hover:shadow-emerald-500/20', accent: 'text-emerald-400' },
+                  in_progress: { border: 'border-l-amber-400', glow: 'hover:shadow-amber-500/20', accent: 'text-amber-400' },
+                  on_hold: { border: 'border-l-orange-400', glow: 'hover:shadow-orange-500/20', accent: 'text-orange-400' },
+                  cancelled: { border: 'border-l-red-400', glow: 'hover:shadow-red-500/20', accent: 'text-red-400' },
                 };
                 const statusConfig = statusColors[repair.status] || statusColors.completed;
 
@@ -603,24 +605,35 @@ export default function GarageKnowledgeBasePage() {
                   <div
                     key={repair.id}
                     onClick={() => setSelectedRepair(repair)}
-                    className={`cursor-pointer rounded-xl border border-white/10 border-r-4 ${statusConfig.border} bg-white/5 p-4 shadow-xl backdrop-blur-md hover:border-cyan-500/50 hover:bg-white/10 transition group`}
+                    className={`
+                      cursor-pointer rounded-2xl 
+                      border border-white/10 border-l-4 ${statusConfig.border}
+                      bg-gradient-to-br from-slate-900/80 to-slate-950/60
+                      backdrop-blur-xl p-5
+                      shadow-xl ${statusConfig.glow}
+                      hover:shadow-2xl hover:border-cyan-500/40 hover:scale-[1.02]
+                      transition-all duration-300 ease-out
+                      group
+                    `}
                   >
-                    {/* Header: Vehicle Info + Status */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <Car className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300 flex-shrink-0" />
+                    {/* Header: Vehicle Info + License Plate */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="p-2 rounded-lg bg-cyan-500/10 group-hover:bg-cyan-500/20 transition-colors">
+                          <Car className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300" />
+                        </div>
                         <div className="min-w-0">
-                          <h3 className="text-white font-semibold truncate text-sm">
+                          <h3 className="text-white font-bold tracking-wide truncate">
                             {repair.vehicle?.manufacturer || 'רכב לא ידוע'} {repair.vehicle?.model || ''}
                           </h3>
                           {repair.vehicle?.year && (
-                            <span className="text-slate-500 text-xs">{repair.vehicle.year}</span>
+                            <span className="text-slate-500 text-xs font-medium">{repair.vehicle.year}</span>
                           )}
                         </div>
                       </div>
-                      {/* License Plate */}
+                      {/* License Plate Badge */}
                       {repair.vehicle?.licensePlate && (
-                        <span className="text-xs text-slate-400 font-mono bg-slate-800/50 px-2 py-0.5 rounded">
+                        <span className="text-xs text-cyan-300/80 font-mono bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
                           {repair.vehicle.licensePlate}
                         </span>
                       )}
@@ -628,28 +641,28 @@ export default function GarageKnowledgeBasePage() {
 
                     {/* AI Summary Preview */}
                     {repair.aiSummary && (
-                      <p className="text-slate-400 text-xs mb-3 line-clamp-2 leading-relaxed">
+                      <p className="text-slate-400 text-sm mb-4 line-clamp-2 leading-relaxed">
                         {repair.aiSummary}
                       </p>
                     )}
 
                     {/* Footer: Issue Type + Date + Labor Hours */}
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
-                      <span className="px-2 py-0.5 rounded-full bg-cyan-900/50 text-cyan-300 text-xs font-medium truncate">
+                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5">
+                      <span className="px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 to-teal-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold uppercase tracking-wider truncate">
                         {repair.issueTypeLabel}
                       </span>
 
-                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
                         {/* Labor Hours */}
                         {repair.laborHours && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 text-amber-400/80">
                             <Clock className="w-3.5 h-3.5" />
                             <span>{repair.laborHours}ש'</span>
                           </div>
                         )}
                         {/* Date */}
                         {repair.completedAt && (
-                          <span>{formatDate(repair.completedAt)}</span>
+                          <span className="text-slate-500">{formatDate(repair.completedAt)}</span>
                         )}
                       </div>
                     </div>
@@ -674,12 +687,12 @@ export default function GarageKnowledgeBasePage() {
                 הקודם
               </button>
               <span className="text-slate-400">
-                עמוד {Math.floor(offset / 12) + 1}
+                עמוד {Math.floor(offset / 6) + 1}
               </span>
               <button
                 onClick={handleNextPage}
-                disabled={offset + 12 >= totalCount}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset + 12 >= totalCount
+                disabled={offset + 6 >= totalCount}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${offset + 6 >= totalCount
                   ? 'bg-zinc-800 text-slate-500 cursor-not-allowed'
                   : 'bg-zinc-800 text-white border border-zinc-700 hover:border-cyan-500'
                   }`}
@@ -691,34 +704,34 @@ export default function GarageKnowledgeBasePage() {
           )}
         </section>
 
-        {/* Top Stats Section */}
+        {/* Top Stats Section - Matching Glassmorphism */}
         {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-14">
             {/* Top 5 Vehicles */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-xl backdrop-blur-md">
-              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Car className="w-6 h-6 text-purple-400" />
+            <div className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-xl p-6 shadow-2xl shadow-cyan-500/5">
+              <h3 className="text-sm font-bold text-cyan-400 mb-6 flex items-center gap-2 uppercase tracking-widest">
+                <Car className="w-5 h-5" />
                 5 הרכבים הנפוצים
               </h3>
               <div className="space-y-4">
                 {topVehicles.length > 0 ? (
                   topVehicles.map((vehicle, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition">
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-purple-500/20 text-purple-300 text-sm font-bold">
+                    <div key={index} className="flex justify-between items-center p-4 bg-white/[0.03] rounded-xl border border-white/5 hover:border-cyan-500/30 hover:bg-white/[0.06] transition-all duration-200 group backdrop-blur-sm">
+                      <div className="flex items-center gap-4">
+                        <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 text-sm font-bold border border-cyan-500/30">
                           {index + 1}
                         </span>
-                        <span className="text-white font-medium">
+                        <span className="text-white font-semibold tracking-wide group-hover:text-cyan-200 transition-colors">
                           {vehicle.manufacturer} {vehicle.model !== 'לא ידוע' ? vehicle.model : ''}
                         </span>
                       </div>
-                      <span className="text-slate-400 text-sm">
+                      <span className="text-cyan-300/80 text-sm font-medium bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 rounded-full">
                         {vehicle.count} תיקונים
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-slate-500 py-8">
+                  <div className="text-center text-slate-500 py-10 font-medium">
                     אין נתונים להצגה
                   </div>
                 )}
@@ -726,30 +739,30 @@ export default function GarageKnowledgeBasePage() {
             </div>
 
             {/* Top 5 Issues */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-xl backdrop-blur-md">
-              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Wrench className="w-6 h-6 text-pink-400" />
+            <div className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-xl p-6 shadow-2xl shadow-cyan-500/5">
+              <h3 className="text-sm font-bold text-cyan-400 mb-6 flex items-center gap-2 uppercase tracking-widest">
+                <Wrench className="w-5 h-5" />
                 5 התקלות הנפוצות
               </h3>
               <div className="space-y-4">
                 {topIssues.length > 0 ? (
                   topIssues.map((issue, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition">
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-pink-500/20 text-pink-300 text-sm font-bold">
+                    <div key={index} className="flex justify-between items-center p-4 bg-white/[0.03] rounded-xl border border-white/5 hover:border-cyan-500/30 hover:bg-white/[0.06] transition-all duration-200 group backdrop-blur-sm">
+                      <div className="flex items-center gap-4">
+                        <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 text-sm font-bold border border-cyan-500/30">
                           {index + 1}
                         </span>
-                        <span className="text-white font-medium">
+                        <span className="text-white font-semibold tracking-wide group-hover:text-cyan-200 transition-colors">
                           {issue.issue_description}
                         </span>
                       </div>
-                      <span className="text-slate-400 text-sm">
+                      <span className="text-cyan-300/80 text-sm font-medium bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 rounded-full">
                         {issue.occurrences} מקרים
                       </span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-slate-500 py-8">
+                  <div className="text-center text-slate-500 py-10 font-medium">
                     אין נתונים להצגה
                   </div>
                 )}

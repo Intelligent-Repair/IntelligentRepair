@@ -53,9 +53,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "local";
     const offset = parseInt(searchParams.get("offset") || "0", 10);
-    const limit = 10; // Increased to 10 for card view
+    const limit = 6; // Reduced for less dense display
     const dateRange = searchParams.get("dateRange");
     const issueType = searchParams.get("issueType");
+    const manufacturer = searchParams.get("manufacturer");
+    const model = searchParams.get("model");
+    const year = searchParams.get("year");
+    const licensePlate = searchParams.get("licensePlate");
 
     // Authenticate the user
     const {
@@ -140,6 +144,20 @@ export async function GET(request: Request) {
     // Filter by issue type
     if (issueType && issueType !== "all") {
       query = query.eq("final_issue_type", issueType);
+    }
+
+    // Filter by vehicle_info JSONB fields
+    if (manufacturer) {
+      query = query.eq("vehicle_info->>manufacturer", manufacturer);
+    }
+    if (model) {
+      query = query.eq("vehicle_info->>model", model);
+    }
+    if (year) {
+      query = query.eq("vehicle_info->>year", year);
+    }
+    if (licensePlate) {
+      query = query.ilike("vehicle_info->>license_plate", `%${licensePlate}%`);
     }
 
     // Apply pagination
