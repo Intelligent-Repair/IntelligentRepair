@@ -27,6 +27,13 @@ interface Repair {
   aiSummary: string | null;
   consultationSummary: ConsultationSummary | null;
   mechanicSolution: string | null;
+  mechanicSummary: {
+    conversationNarrative?: string;
+    driverFindings?: string[];
+    diagnoses?: Array<{ issue: string; probability: number }>;
+    recommendedActions?: string[];
+    urgency?: string;
+  } | null;
   completedAt: string | null;
 }
 
@@ -116,6 +123,7 @@ export default function GarageKnowledgeBasePage() {
         aiSummary: r.ai_summary || null,
         consultationSummary: r.ai_summary ? { shortDescription: r.ai_summary, formattedText: r.mechanic_description_ai } : null,
         mechanicSolution: r.mechanic_notes || null,
+        mechanicSummary: r.mechanic_summary || null,
         completedAt: r.completed_at || null,
       }));
 
@@ -128,6 +136,30 @@ export default function GarageKnowledgeBasePage() {
       setLoading(false);
     }
   }, [mode, offset, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate]);
+
+  // Fetch filter options from repairs data
+  const fetchFilters = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("mode", mode);
+
+      const res = await fetch(`/api/garage/dashboard/filters?${params.toString()}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setFilterOptions({
+          manufacturers: data.manufacturers || [],
+          modelsByManufacturer: data.modelsByManufacturer || {},
+          issueTypes: data.issueTypes || [],
+          years: data.years || [],
+        });
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error fetching filters:', err);
+    }
+  }, [mode]);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -156,7 +188,8 @@ export default function GarageKnowledgeBasePage() {
   useEffect(() => {
     fetchRepairs();
     fetchStats();
-  }, [fetchRepairs, fetchStats]);
+    fetchFilters();
+  }, [fetchRepairs, fetchStats, fetchFilters]);
 
   // Reset offset when filters change
   useEffect(() => {
@@ -215,7 +248,7 @@ export default function GarageKnowledgeBasePage() {
           onClick={() => setSelectedRepair(null)}
         >
           <div
-            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#071226] border border-white/20 shadow-2xl"
+            className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-gradient-to-b from-[#0a1628] to-[#071226] border border-white/20 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -255,8 +288,107 @@ export default function GarageKnowledgeBasePage() {
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6" dir="rtl">
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6" dir="rtl">
+              {/* תיאור התקלה - Issue Description from mechanic_summary */}
+              {selectedRepair.mechanicSummary && (
+                <div>
+                  <h3 className="flex items-center gap-2 text-lg font-semibold text-orange-300 mb-3">
+                    <Bot className="w-5 h-5" />
+                    תיאור התקלה
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Urgency Badge */}
+                    {selectedRepair.mechanicSummary.urgency && (() => {
+                      const urgencyConfig: Record<string, { label: string; bgClass: string; textClass: string }> = {
+                        critical: { label: 'דחיפות קריטית', bgClass: 'bg-red-500/20', textClass: 'text-red-400' },
+                        high: { label: 'דחיפות גבוהה', bgClass: 'bg-orange-500/20', textClass: 'text-orange-400' },
+                        medium: { label: 'דחיפות בינונית', bgClass: 'bg-amber-500/20', textClass: 'text-amber-400' },
+                        low: { label: 'דחיפות נמוכה', bgClass: 'bg-emerald-500/20', textClass: 'text-emerald-400' }
+                      };
+                      const config = urgencyConfig[selectedRepair.mechanicSummary.urgency!] || urgencyConfig.medium;
+                      return (
+                        <div className={`px-3 py-1.5 rounded-full ${config.bgClass} w-fit`}>
+                          <span className={`text-sm font-semibold ${config.textClass}`}>{config.label}</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Driver Findings / Conversation Narrative */}
+                    {(selectedRepair.mechanicSummary.conversationNarrative || selectedRepair.mechanicSummary.driverFindings) && (
+                      <div className="p-4 rounded-xl bg-slate-800/50 border border-orange-500/20">
+                        <h4 className="text-sm font-semibold text-orange-300 mb-2">ממצאי תשאול הנהג</h4>
+                        {selectedRepair.mechanicSummary.driverFindings && selectedRepair.mechanicSummary.driverFindings.length > 0 ? (
+                          <ul className="space-y-1">
+                            {selectedRepair.mechanicSummary.driverFindings.map((finding, idx) => (
+                              <li key={idx} className="text-slate-300 text-sm flex items-start gap-2">
+                                <span className="text-orange-400">•</span>
+                                <span>{finding}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-slate-300 text-sm leading-relaxed">
+                            {selectedRepair.mechanicSummary.conversationNarrative}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Probabilistic Analysis */}
+                    {selectedRepair.mechanicSummary.diagnoses && selectedRepair.mechanicSummary.diagnoses.length > 0 && (
+                      <div className="p-4 rounded-xl bg-slate-800/50 border border-orange-500/20">
+                        <h4 className="text-sm font-semibold text-orange-300 mb-3">ניתוח הסתברותי</h4>
+                        <div className="space-y-3">
+                          {selectedRepair.mechanicSummary.diagnoses.map((d, idx) => {
+                            const percentage = Math.round((d.probability || 0) * 100);
+                            const isHighPriority = idx === 0;
+                            return (
+                              <div key={idx} className="p-3 rounded-lg bg-slate-800/60">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className={`font-medium ${isHighPriority ? 'text-orange-300' : 'text-amber-300'}`}>
+                                    {d.issue}
+                                  </span>
+                                  <span className={`text-sm font-bold ${isHighPriority ? 'text-orange-400' : 'text-amber-400'}`}>
+                                    {percentage}%
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${isHighPriority
+                                      ? 'bg-gradient-to-r from-orange-500 to-red-500'
+                                      : 'bg-gradient-to-r from-amber-500 to-yellow-500'
+                                      }`}
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recommended Actions */}
+                    {selectedRepair.mechanicSummary.recommendedActions && selectedRepair.mechanicSummary.recommendedActions.length > 0 && (
+                      <div className="p-4 rounded-xl bg-slate-800/50 border border-orange-500/20">
+                        <h4 className="text-sm font-semibold text-orange-300 mb-2">פעולות מומלצות</h4>
+                        <ol className="space-y-2">
+                          {selectedRepair.mechanicSummary.recommendedActions.map((action, idx) => (
+                            <li key={idx} className="text-slate-300 text-sm flex items-start gap-2">
+                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-xs font-bold">
+                                {idx + 1}
+                              </span>
+                              <span>{action}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* אופן תיקון המוסך - Repair Method */}
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-3">

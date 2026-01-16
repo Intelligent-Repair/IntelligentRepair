@@ -255,7 +255,8 @@ export default function UserProfilePage() {
                 value={formData.phone}
                 onChange={handleInputChange}
                 required
-                className="w-full px-4 py-3 bg-black/20 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                dir="rtl"
+                className="w-full px-4 py-3 bg-black/20 border border-white/20 rounded-xl text-white text-right placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                 placeholder="מספר טלפון"
               />
             </div>

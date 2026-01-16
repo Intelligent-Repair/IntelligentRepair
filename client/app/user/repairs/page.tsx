@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Car, Calendar, Wrench, TrendingUp, Filter } from "lucide-react";
+import { Car, Calendar, Wrench, TrendingUp, Filter, CheckCircle } from "lucide-react";
 
 type Repair = {
   id: string;
@@ -89,7 +89,11 @@ export default function UserRepairsPage() {
             completed_at,
             vehicle_info,
             garage_request:garage_requests!garage_request_id (
-              mechanic_summary
+              mechanic_summary,
+              garage:garages!garage_id (
+                id,
+                garage_name
+              )
             )
           `)
           .in("request_id", requestIds)
@@ -138,6 +142,10 @@ export default function UserRepairsPage() {
             ms?.originalComplaint ||
             null;
 
+          // Extract garage info from nested garage object
+          const garageData = garageReq?.garage;
+          const garageInfo = Array.isArray(garageData) ? garageData[0] : garageData;
+
           return {
             id: repair.id,
             ai_summary: repair.ai_summary || null,
@@ -166,7 +174,10 @@ export default function UserRepairsPage() {
                 }
               },
             } : null,
-            garage: null,
+            garage: garageInfo ? {
+              id: garageInfo.id,
+              name: garageInfo.garage_name || null,
+            } : null,
           };
         });
 
@@ -317,55 +328,66 @@ export default function UserRepairsPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {filteredRepairs.map((repair) => (
               <div
                 key={repair.id}
-                className="bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 transition-colors"
+                className="bg-gradient-to-br from-white/[0.07] to-white/[0.03] border border-white/10 rounded-2xl px-6 py-5 hover:border-white/20 hover:from-white/[0.09] hover:to-white/[0.05] transition-all duration-300 shadow-lg shadow-black/10"
+                dir="rtl"
               >
-                <div className="flex flex-wrap justify-between items-start gap-4">
-                  {/* Date and Vehicle */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-white/70">
-                      <Calendar size={16} />
-                      <span>{formatDate(repair.created_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white/90">
-                      <Car size={16} />
-                      <span>
-                        {repair.request?.car
-                          ? `${repair.request.car.vehicle_catalog?.manufacturer || ""} ${repair.request.car.vehicle_catalog?.model || ""} (${repair.request.car.license_plate || ""})`
-                          : "-"}
-                      </span>
-                    </div>
+                {/* Header Row */}
+                <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+                  {/* Right Side - Car Model & License Plate (Primary) */}
+                  <div className="flex items-center gap-2">
+                    <Car size={20} className="text-blue-400 flex-shrink-0" />
+                    <h3 className="text-lg font-bold text-white">
+                      {repair.request?.car
+                        ? `${repair.request.car.vehicle_catalog?.manufacturer || ""} ${repair.request.car.vehicle_catalog?.model || ""} (${repair.request.car.license_plate || ""})`
+                        : "רכב לא ידוע"}
+                    </h3>
                   </div>
 
-                  {/* Issue Type Badge */}
-                  {repair.final_issue_type && (
-                    <span className="px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 text-sm">
+                  {/* Left Side - Date & Garage (Secondary) */}
+                  <div className="flex items-center gap-2 text-sm text-gray-400" dir="ltr">
+                    <span>{formatDate(repair.created_at)}</span>
+                    {repair.garage?.name && (
+                      <>
+                        <span className="text-gray-600">•</span>
+                        <span className="text-gray-400">מוסך: {repair.garage.name}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Badge */}
+                {repair.final_issue_type && (
+                  <div className="mb-4">
+                    <span className="inline-flex items-center px-3 py-1 bg-purple-500/15 border border-purple-500/25 rounded-full text-purple-300 text-sm font-medium">
                       {issueTypeLabels[repair.final_issue_type] || repair.final_issue_type}
                     </span>
-                  )}
-                </div>
-
-                {/* תיאור תקלה - מ-mechanic_summary */}
-                <div className="mt-3">
-                  <span className="text-white/50 text-sm">תיאור תקלה: </span>
-                  <p className="text-white/80 mt-1">{repair.issue_description || repair.request?.description || "-"}</p>
-                </div>
-
-                {/* סיכום תיקון - ai_summary */}
-                {repair.ai_summary && (
-                  <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                    <span className="text-emerald-400 text-sm font-medium">סיכום תיקון: </span>
-                    <span className="text-emerald-200">{repair.ai_summary}</span>
                   </div>
                 )}
 
-                {/* Garage */}
-                {repair.garage?.name && (
-                  <div className="mt-3 text-white/50 text-sm">
-                    מוסך: {repair.garage.name}
+                {/* Issue Description */}
+                <div className="mb-4">
+                  <span className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
+                    תיאור תקלה
+                  </span>
+                  <p className="text-base text-gray-200 font-medium">
+                    {repair.issue_description || repair.request?.description || "-"}
+                  </p>
+                </div>
+
+                {/* Repair Summary */}
+                {repair.ai_summary && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
+                    <span className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
+                      סיכום תיקון
+                    </span>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle size={18} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-emerald-400 font-medium">{repair.ai_summary}</p>
+                    </div>
                   </div>
                 )}
               </div>

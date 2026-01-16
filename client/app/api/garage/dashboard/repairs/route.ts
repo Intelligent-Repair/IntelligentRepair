@@ -121,7 +121,10 @@ export async function GET(request: Request) {
         status,
         vehicle_info,
         created_at,
-        completed_at
+        completed_at,
+        garage_request:garage_requests!garage_request_id (
+          mechanic_summary
+        )
       `, { count: 'exact' })
       .order("completed_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
@@ -155,6 +158,11 @@ export async function GET(request: Request) {
     // Transform the data for frontend
     const transformedRepairs = (repairs || []).map((repair: any) => {
       const vehicleInfo = repair.vehicle_info || {};
+      // Handle garage_request as array or object from Supabase join
+      const garageReq = Array.isArray(repair.garage_request)
+        ? repair.garage_request[0]
+        : repair.garage_request;
+      const mechanicSummary = garageReq?.mechanic_summary || null;
 
       return {
         id: repair.id,
@@ -175,6 +183,8 @@ export async function GET(request: Request) {
           license_plate: vehicleInfo.license_plate || null,
           current_mileage: vehicleInfo.current_mileage || null,
         },
+        // הנתון החדש - סיכום הפנייה המלא (ממצאי תשאול, ניתוח הסתברותי, פעולות מומלצות)
+        mechanic_summary: mechanicSummary,
       };
     });
 

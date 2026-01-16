@@ -350,7 +350,6 @@ export default function GaragesClient() {
     // Filter chips configuration
     const filterChips = [
         { id: "nearest", label: "הכי קרוב", icon: "📍" },
-        { id: "rating", label: "דירוג גבוה", icon: "⭐" },
         { id: "open", label: "פתוח עכשיו", icon: "🟢" },
     ];
 
@@ -437,155 +436,182 @@ export default function GaragesClient() {
                 ) : (
                     <AnimatePresence mode="popLayout">
                         <div className="space-y-4">
-                            {garages.map((garage, index) => {
-                                const isSent = sentTo.includes(garage.id);
-                                const isSending = sendingTo === garage.id;
-                                const canSend = garage.hasOwner;  // Only garages with real owners can receive requests
-                                const isOpen = isGarageOpenNow(garage.operating_hours);
-                                const sameCity = isInUserCity(garage);
-                                const distance = getDistanceToGarage(garage);
+                            {garages
+                                // Filter by search query
+                                .filter(garage => {
+                                    if (!searchQuery.trim()) return true;
+                                    const query = searchQuery.toLowerCase().trim();
+                                    return (
+                                        garage.garage_name?.toLowerCase().includes(query) ||
+                                        garage.City?.toLowerCase().includes(query) ||
+                                        garage.Street?.toLowerCase().includes(query)
+                                    );
+                                })
+                                // Filter by active filter
+                                .filter(garage => {
+                                    if (activeFilter === "open") {
+                                        return isGarageOpenNow(garage.operating_hours);
+                                    }
+                                    return true;
+                                })
+                                // Sort by distance if "nearest" filter
+                                .sort((a, b) => {
+                                    if (activeFilter === "nearest") {
+                                        const distA = getDistanceToGarage(a) ?? 9999;
+                                        const distB = getDistanceToGarage(b) ?? 9999;
+                                        return distA - distB;
+                                    }
+                                    return 0;
+                                })
+                                .map((garage, index) => {
+                                    const isSent = sentTo.includes(garage.id);
+                                    const isSending = sendingTo === garage.id;
+                                    const canSend = garage.hasOwner;  // Only garages with real owners can receive requests
+                                    const isOpen = isGarageOpenNow(garage.operating_hours);
+                                    const sameCity = isInUserCity(garage);
+                                    const distance = getDistanceToGarage(garage);
 
-                                return (
-                                    <motion.div
-                                        key={garage.id}
-                                        initial={{ opacity: 0, y: 30 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -20 }}
-                                        transition={{ delay: index * 0.08, duration: 0.4 }}
-                                        className={`
+                                    return (
+                                        <motion.div
+                                            key={garage.id}
+                                            initial={{ opacity: 0, y: 30 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -20 }}
+                                            transition={{ delay: index * 0.08, duration: 0.4 }}
+                                            className={`
                                             relative overflow-hidden rounded-2xl backdrop-blur-xl
                                             ${isSent
-                                                ? "bg-emerald-500/10 border-2 border-emerald-500/40"
-                                                : "bg-slate-900/60 border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
-                                            }
+                                                    ? "bg-emerald-500/10 border-2 border-emerald-500/40"
+                                                    : "bg-slate-900/60 border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
+                                                }
                                             transition-all duration-300
                                         `}
-                                    >
-                                        <div className="p-5">
-                                            {/* Header Row - Name + Badges */}
-                                            <div className="flex items-start justify-between mb-4">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <h3 className="text-xl font-bold text-white">
-                                                            {garage.garage_name}
-                                                        </h3>
-                                                        {garage.hasOwner && (
-                                                            <BadgeCheck size={18} className="text-cyan-400" />
+                                        >
+                                            <div className="p-5">
+                                                {/* Header Row - Name + Badges */}
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-3 mb-2">
+                                                            <h3 className="text-xl font-bold text-white">
+                                                                {garage.garage_name}
+                                                            </h3>
+                                                            {garage.hasOwner && (
+                                                                <BadgeCheck size={18} className="text-cyan-400" />
+                                                            )}
+                                                        </div>
+
+                                                        {/* Same City Badge */}
+                                                        {sameCity && (
+                                                            <div className="flex items-center gap-1 mb-2">
+                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-400">
+                                                                    🏠 בעיר שלך
+                                                                </span>
+                                                            </div>
                                                         )}
                                                     </div>
 
-                                                    {/* Same City Badge */}
-                                                    {sameCity && (
-                                                        <div className="flex items-center gap-1 mb-2">
-                                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-400">
-                                                                🏠 בעיר שלך
+                                                    {/* Distance Badge + Status */}
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        {/* Distance/City Badge */}
+                                                        {garage.City && (
+                                                            <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-600/50 text-xs font-medium text-white/70">
+                                                                📍 {distance !== null ? `${distance.toFixed(1)} ק״מ` : garage.City}
                                                             </span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        )}
 
-                                                {/* Distance Badge + Status */}
-                                                <div className="flex flex-col items-end gap-2">
-                                                    {/* Distance/City Badge */}
-                                                    {garage.City && (
-                                                        <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-600/50 text-xs font-medium text-white/70">
-                                                            📍 {distance !== null ? `${distance.toFixed(1)} ק״מ` : garage.City}
-                                                        </span>
-                                                    )}
-
-                                                    {/* Open/Closed Status - Real calculation */}
-                                                    {garage.hasOwner && garage.operating_hours && (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]'}`} />
-                                                            <span className={`text-xs font-medium ${isOpen ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                                {isOpen ? 'פתוח כעת' : 'סגור'}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Address */}
-                                            <div className="flex items-center gap-2 text-white/60 mb-3">
-                                                <MapPin size={14} className="text-cyan-400/60 flex-shrink-0" />
-                                                <span className="text-sm">{formatAddress(garage)}</span>
-                                            </div>
-
-                                            {/* Phone */}
-                                            {garage.phone && (
-                                                <a
-                                                    href={formatPhoneLink(garage.phone)}
-                                                    className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors mb-3"
-                                                >
-                                                    <Phone size={14} />
-                                                    <span className="text-sm font-medium" dir="ltr">
-                                                        {garage.phone}
-                                                    </span>
-                                                </a>
-                                            )}
-
-                                            {/* Operating Hours */}
-                                            {garage.hasOwner && garage.operating_hours && (
-                                                <div className="mb-4 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <Clock size={14} className="text-white/50" />
-                                                        <span className="text-sm text-white/70">
-                                                            {formatOperatingHours(garage.operating_hours)}
-                                                        </span>
+                                                        {/* Open/Closed Status - Real calculation */}
+                                                        {garage.hasOwner && garage.operating_hours && (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]'}`} />
+                                                                <span className={`text-xs font-medium ${isOpen ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                    {isOpen ? 'פתוח כעת' : 'סגור'}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            )}
 
-                                            {/* Action Button - Gradient Pill Style */}
-                                            {canSend && (
-                                                <div className="mt-4 flex justify-start">
-                                                    <button
-                                                        onClick={() => handleSendRequest(garage)}
-                                                        disabled={isSending || isSent || !requestId}
-                                                        className={`
+                                                {/* Address */}
+                                                <div className="flex items-center gap-2 text-white/60 mb-3">
+                                                    <MapPin size={14} className="text-cyan-400/60 flex-shrink-0" />
+                                                    <span className="text-sm">{formatAddress(garage)}</span>
+                                                </div>
+
+                                                {/* Phone */}
+                                                {garage.phone && (
+                                                    <a
+                                                        href={formatPhoneLink(garage.phone)}
+                                                        className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors mb-3"
+                                                    >
+                                                        <Phone size={14} />
+                                                        <span className="text-sm font-medium" dir="ltr">
+                                                            {garage.phone}
+                                                        </span>
+                                                    </a>
+                                                )}
+
+                                                {/* Operating Hours */}
+                                                {garage.hasOwner && garage.operating_hours && (
+                                                    <div className="mb-4 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Clock size={14} className="text-white/50" />
+                                                            <span className="text-sm text-white/70">
+                                                                {formatOperatingHours(garage.operating_hours)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Action Button - Gradient Pill Style */}
+                                                {canSend && (
+                                                    <div className="mt-4 flex justify-start">
+                                                        <button
+                                                            onClick={() => handleSendRequest(garage)}
+                                                            disabled={isSending || isSent || !requestId}
+                                                            className={`
                                                             flex items-center gap-2 py-3 px-6 rounded-full font-bold transition-all
                                                             ${isSent
-                                                                ? "bg-emerald-500/20 text-emerald-400 cursor-default"
-                                                                : isSending
-                                                                    ? "bg-blue-500/50 text-white cursor-wait"
-                                                                    : !requestId
-                                                                        ? "bg-white/5 text-white/30 cursor-not-allowed"
-                                                                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
-                                                            }
+                                                                    ? "bg-emerald-500/20 text-emerald-400 cursor-default"
+                                                                    : isSending
+                                                                        ? "bg-blue-500/50 text-white cursor-wait"
+                                                                        : !requestId
+                                                                            ? "bg-white/5 text-white/30 cursor-not-allowed"
+                                                                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
+                                                                }
                                                         `}
-                                                    >
-                                                        {isSent ? (
-                                                            <>
-                                                                <CheckCircle2 size={18} />
-                                                                <span>נשלח בהצלחה!</span>
-                                                            </>
-                                                        ) : isSending ? (
-                                                            <>
-                                                                <Loader2 size={18} className="animate-spin" />
-                                                                <span>שולח...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Send size={18} />
-                                                                <span>שלח פנייה</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                                                        >
+                                                            {isSent ? (
+                                                                <>
+                                                                    <CheckCircle2 size={18} />
+                                                                    <span>נשלח בהצלחה!</span>
+                                                                </>
+                                                            ) : isSending ? (
+                                                                <>
+                                                                    <Loader2 size={18} className="animate-spin" />
+                                                                    <span>שולח...</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Send size={18} />
+                                                                    <span>שלח פנייה</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        {/* Success overlay */}
-                                        {isSent && (
-                                            <motion.div
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                className="absolute inset-0 bg-emerald-500/5 pointer-events-none"
-                                            />
-                                        )}
-                                    </motion.div>
-                                );
-                            })}
+                                            {/* Success overlay */}
+                                            {isSent && (
+                                                <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    className="absolute inset-0 bg-emerald-500/5 pointer-events-none"
+                                                />
+                                            )}
+                                        </motion.div>
+                                    );
+                                })}
                         </div>
                     </AnimatePresence>
                 )}
