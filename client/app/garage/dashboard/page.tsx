@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Filter, Car, Wrench, Bot, ChevronLeft, ChevronRight, Loader2, Home, Database, Globe, X } from 'lucide-react';
+import { Filter, Car, Wrench, Bot, ChevronLeft, ChevronRight, Loader2, Home, Database, Globe, X, Clock } from 'lucide-react';
 
 interface ConsultationSummary {
   shortDescription?: string;
@@ -22,6 +22,9 @@ interface Repair {
   } | null;
   issueType: string;
   issueTypeLabel: string;
+  laborHours: number | null;
+  status: 'in_progress' | 'completed' | 'on_hold' | 'cancelled' | string;
+  aiSummary: string | null;
   consultationSummary: ConsultationSummary | null;
   mechanicSolution: string | null;
   completedAt: string | null;
@@ -88,18 +91,36 @@ export default function GarageKnowledgeBasePage() {
       if (dateRange !== "all") params.set("dateRange", dateRange);
       if (licensePlate) params.set("licensePlate", licensePlate);
 
-      const res = await fetch(`/api/garage/knowledge-base?${params.toString()}`);
+      const res = await fetch(`/api/garage/dashboard/repairs?${params.toString()}`, {
+        credentials: 'include',
+      });
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to fetch repairs");
       }
 
-      setRepairs(data.repairs || []);
+      // Transform API response to match component's Repair interface
+      const transformedRepairs: Repair[] = (data.repairs || []).map((r: any) => ({
+        id: r.id,
+        vehicle: r.vehicle_info ? {
+          manufacturer: r.vehicle_info.manufacturer || 'לא ידוע',
+          model: r.vehicle_info.model || '',
+          year: r.vehicle_info.year || null,
+          licensePlate: r.vehicle_info.license_plate || '',
+        } : null,
+        issueType: r.final_issue_type || 'other',
+        issueTypeLabel: r.final_issue_type_label || 'אחר',
+        laborHours: r.labor_hours || null,
+        status: r.status || 'completed',
+        aiSummary: r.ai_summary || null,
+        consultationSummary: r.ai_summary ? { shortDescription: r.ai_summary, formattedText: r.mechanic_description_ai } : null,
+        mechanicSolution: r.mechanic_notes || null,
+        completedAt: r.completed_at || null,
+      }));
+
+      setRepairs(transformedRepairs);
       setTotalCount(data.totalCount || 0);
-      if (data.filters) {
-        setFilterOptions(data.filters);
-      }
     } catch (err) {
       console.error('[KnowledgeBase] Error:', err);
       setError(err instanceof Error ? err.message : "שגיאה בטעינת הנתונים");
@@ -206,13 +227,21 @@ export default function GarageKnowledgeBasePage() {
                     {selectedRepair.vehicle?.manufacturer || 'רכב לא ידוע'} {selectedRepair.vehicle?.model || ''}
                     {selectedRepair.vehicle?.year && ` (${selectedRepair.vehicle.year})`}
                   </h2>
-                  <div className="flex items-center gap-3 mt-1">
+                  {/* Meta Row: Category + Date + Labor Hours */}
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 text-sm font-medium">
                       {selectedRepair.issueTypeLabel}
                     </span>
                     {selectedRepair.completedAt && (
                       <span className="text-slate-400 text-sm">
                         {formatDate(selectedRepair.completedAt)}
+                      </span>
+                    )}
+                    {/* Labor Hours Badge */}
+                    {selectedRepair.laborHours && (
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-sm font-medium">
+                        <Clock className="w-4 h-4" />
+                        {selectedRepair.laborHours} שעות
                       </span>
                     )}
                   </div>
@@ -227,37 +256,20 @@ export default function GarageKnowledgeBasePage() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 space-y-6" dir="rtl">
-              {/* AI Consultation Summary */}
+            <div className="p-6" dir="rtl">
+              {/* אופן תיקון המוסך - Repair Method */}
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-3">
-                  <Bot className="w-5 h-5" />
-                  סיכום ייעוץ AI
-                </h3>
-                <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
-                  {formatConsultationSummary(selectedRepair.consultationSummary) ? (
-                    <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-                      {formatConsultationSummary(selectedRepair.consultationSummary)}
-                    </p>
-                  ) : (
-                    <p className="text-slate-400 text-sm">לא קיים סיכום ייעוץ AI לתיקון זה</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Mechanic Solution */}
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-green-300 mb-3">
                   <Wrench className="w-5 h-5" />
-                  פתרון המכונאי
+                  אופן תיקון המוסך
                 </h3>
-                <div className="p-4 rounded-xl bg-green-900/20 border border-green-500/20">
-                  {selectedRepair.mechanicSolution ? (
-                    <p className="text-green-100 text-sm leading-relaxed whitespace-pre-wrap">
-                      {selectedRepair.mechanicSolution}
+                <div className="p-5 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20">
+                  {(selectedRepair.aiSummary || formatConsultationSummary(selectedRepair.consultationSummary)) ? (
+                    <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
+                      {selectedRepair.aiSummary || formatConsultationSummary(selectedRepair.consultationSummary)}
                     </p>
                   ) : (
-                    <p className="text-slate-400 text-sm">לא תועד פתרון לתיקון זה</p>
+                    <p className="text-slate-400 text-sm">לא תועד אופן התיקון לטיפול זה</p>
                   )}
                 </div>
               </div>
@@ -445,38 +457,73 @@ export default function GarageKnowledgeBasePage() {
           {/* Repair Cards - Clickable Grid */}
           {!loading && !error && repairs.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {repairs.map((repair) => (
-                <div
-                  key={repair.id}
-                  onClick={() => setSelectedRepair(repair)}
-                  className="cursor-pointer rounded-xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-md hover:border-cyan-500/50 hover:bg-white/10 transition group"
-                >
-                  {/* Vehicle Info */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <Car className="w-6 h-6 text-cyan-400 group-hover:text-cyan-300" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-semibold truncate">
-                        {repair.vehicle?.manufacturer || 'רכב לא ידוע'} {repair.vehicle?.model || ''}
-                      </h3>
-                      {repair.vehicle?.year && (
-                        <span className="text-slate-400 text-sm">{repair.vehicle.year}</span>
+              {repairs.map((repair) => {
+                // Status color configuration
+                const statusColors: Record<string, { border: string; bg: string; text: string }> = {
+                  completed: { border: 'border-r-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+                  in_progress: { border: 'border-r-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-400' },
+                  on_hold: { border: 'border-r-orange-500', bg: 'bg-orange-500/10', text: 'text-orange-400' },
+                  cancelled: { border: 'border-r-red-500', bg: 'bg-red-500/10', text: 'text-red-400' },
+                };
+                const statusConfig = statusColors[repair.status] || statusColors.completed;
+
+                return (
+                  <div
+                    key={repair.id}
+                    onClick={() => setSelectedRepair(repair)}
+                    className={`cursor-pointer rounded-xl border border-white/10 border-r-4 ${statusConfig.border} bg-white/5 p-4 shadow-xl backdrop-blur-md hover:border-cyan-500/50 hover:bg-white/10 transition group`}
+                  >
+                    {/* Header: Vehicle Info + Status */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Car className="w-5 h-5 text-cyan-400 group-hover:text-cyan-300 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <h3 className="text-white font-semibold truncate text-sm">
+                            {repair.vehicle?.manufacturer || 'רכב לא ידוע'} {repair.vehicle?.model || ''}
+                          </h3>
+                          {repair.vehicle?.year && (
+                            <span className="text-slate-500 text-xs">{repair.vehicle.year}</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* License Plate */}
+                      {repair.vehicle?.licensePlate && (
+                        <span className="text-xs text-slate-400 font-mono bg-slate-800/50 px-2 py-0.5 rounded">
+                          {repair.vehicle.licensePlate}
+                        </span>
                       )}
                     </div>
-                  </div>
 
-                  {/* Issue Type Badge */}
-                  <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-cyan-900/50 text-cyan-300 text-xs font-medium">
-                      {repair.issueTypeLabel}
-                    </span>
-                    {repair.completedAt && (
-                      <span className="text-slate-500 text-xs">
-                        {formatDate(repair.completedAt)}
-                      </span>
+                    {/* AI Summary Preview */}
+                    {repair.aiSummary && (
+                      <p className="text-slate-400 text-xs mb-3 line-clamp-2 leading-relaxed">
+                        {repair.aiSummary}
+                      </p>
                     )}
+
+                    {/* Footer: Issue Type + Date + Labor Hours */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-900/50 text-cyan-300 text-xs font-medium truncate">
+                        {repair.issueTypeLabel}
+                      </span>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        {/* Labor Hours */}
+                        {repair.laborHours && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{repair.laborHours}ש'</span>
+                          </div>
+                        )}
+                        {/* Date */}
+                        {repair.completedAt && (
+                          <span>{formatDate(repair.completedAt)}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

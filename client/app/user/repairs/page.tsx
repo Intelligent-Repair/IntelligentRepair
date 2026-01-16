@@ -8,6 +8,7 @@ type Repair = {
   id: string;
   ai_summary: string | null;
   mechanic_notes: string | null;
+  issue_description: string | null; // תקלה מדווחת מ-mechanic_summary
   final_issue_type: string | null;
   created_at: string;
   request: {
@@ -56,14 +57,120 @@ export default function UserRepairsPage() {
           return;
         }
 
-        const response = await fetch(`/api/repairs/by-user?user_id=${user.id}`);
-        const data = await response.json();
+        // Step 1: Get all request IDs for this user
+        const { data: userRequests, error: requestsError } = await supabase
+          .from("requests")
+          .select("id")
+          .eq("user_id", user.id);
 
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || "שגיאה בטעינת הטיפולים");
+        if (requestsError) {
+          throw new Error("שגיאה בטעינת הנתונים");
         }
 
-        setRepairs(data.repairs || []);
+        const requestIds = (userRequests || []).map(r => r.id);
+
+        if (requestIds.length === 0) {
+          setRepairs([]);
+          setLoading(false);
+          return;
+        }
+
+        // Step 2: Fetch repairs directly from repairs table with garage_requests join
+        const { data: repairsData, error: repairsError } = await supabase
+          .from("repairs")
+          .select(`
+            id,
+            request_id,
+            garage_request_id,
+            mechanic_notes,
+            ai_summary,
+            final_issue_type,
+            created_at,
+            completed_at,
+            vehicle_info,
+            garage_request:garage_requests!garage_request_id (
+              mechanic_summary
+            )
+          `)
+          .in("request_id", requestIds)
+          .order("completed_at", { ascending: false, nullsFirst: false });
+
+        if (repairsError) {
+          throw new Error("שגיאה בטעינת היסטוריית הטיפולים");
+        }
+
+        // Step 3: Get car details
+        const { data: requestsWithCars } = await supabase
+          .from("requests")
+          .select(`
+            id,
+            description,
+            status,
+            created_at,
+            car_id,
+            car:people_cars (
+              id,
+              license_plate,
+              vehicle_catalog:vehicle_catalog_id (
+                manufacturer,
+                model
+              )
+            )
+          `)
+          .in("id", requestIds);
+
+        const requestMap = new Map((requestsWithCars || []).map(r => [r.id, r]));
+
+        // Transform data
+        const transformedRepairs: Repair[] = (repairsData || []).map((repair: any) => {
+          const request = requestMap.get(repair.request_id) as any;
+          const vehicleInfo = repair.vehicle_info || {};
+          // Supabase returns car as array, take first element
+          const carData = Array.isArray(request?.car) ? request.car[0] : request?.car;
+
+          // Extract issue description from mechanic_summary (like in report page)
+          const garageReq = Array.isArray(repair.garage_request) ? repair.garage_request[0] : repair.garage_request;
+          const ms = garageReq?.mechanic_summary;
+          const issueDescription =
+            ms?.diagnoses?.[0]?.issue ||
+            ms?.topDiagnosis?.[0]?.name ||
+            ms?.category ||
+            ms?.originalComplaint ||
+            null;
+
+          return {
+            id: repair.id,
+            ai_summary: repair.ai_summary || null,
+            mechanic_notes: repair.mechanic_notes || null,
+            issue_description: issueDescription,
+            final_issue_type: repair.final_issue_type || null,
+            created_at: repair.completed_at || repair.created_at,
+            request: request ? {
+              id: request.id,
+              description: repair.mechanic_notes || request.description,
+              status: request.status,
+              created_at: request.created_at,
+              car_id: request.car_id,
+              car: carData ? {
+                id: carData.id,
+                license_plate: carData.license_plate || null,
+                vehicle_catalog: Array.isArray(carData.vehicle_catalog)
+                  ? carData.vehicle_catalog[0] || null
+                  : carData.vehicle_catalog || null,
+              } : {
+                id: null,
+                license_plate: vehicleInfo.license_plate || null,
+                vehicle_catalog: {
+                  manufacturer: vehicleInfo.manufacturer || null,
+                  model: vehicleInfo.model || null,
+                }
+              },
+            } : null,
+            garage: null,
+          };
+        });
+
+        setRepairs(transformedRepairs);
       } catch (err) {
         console.error("Error fetching repairs:", err);
         setError(err instanceof Error ? err.message : "שגיאה בטעינת הטיפולים");
@@ -193,14 +300,6 @@ export default function UserRepairsPage() {
               <Wrench size={18} className="text-blue-400" />
               <span className="text-blue-300 font-medium">{stats.total} טיפולים</span>
             </div>
-            {stats.topIssue && (
-              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2">
-                <TrendingUp size={18} className="text-amber-400" />
-                <span className="text-amber-300 font-medium">
-                  הכי נפוץ: {issueTypeLabels[stats.topIssue.type] || stats.topIssue.type} ({stats.topIssue.count})
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -249,15 +348,16 @@ export default function UserRepairsPage() {
                   )}
                 </div>
 
-                {/* Description */}
+                {/* תיאור תקלה - מ-mechanic_summary */}
                 <div className="mt-3">
-                  <p className="text-white/80">{repair.request?.description || "-"}</p>
+                  <span className="text-white/50 text-sm">תיאור תקלה: </span>
+                  <p className="text-white/80 mt-1">{repair.issue_description || repair.request?.description || "-"}</p>
                 </div>
 
-                {/* AI Summary */}
+                {/* סיכום תיקון - ai_summary */}
                 {repair.ai_summary && (
                   <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                    <span className="text-emerald-400 text-sm font-medium">סיכום: </span>
+                    <span className="text-emerald-400 text-sm font-medium">סיכום תיקון: </span>
                     <span className="text-emerald-200">{repair.ai_summary}</span>
                   </div>
                 )}
