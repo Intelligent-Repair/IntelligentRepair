@@ -40,8 +40,8 @@ export default function ConsultPage() {
   };
 
   const handleAddNew = () => {
-    // Navigate to add new vehicle page
-    router.push("/maintenance/add");
+    // Navigate to add new vehicle page with return path to consultation
+    router.push("/maintenance/add?returnTo=consult");
   };
 
   if (loading) {

@@ -17,9 +17,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="absolute -bottom-24 left-0 h-80 w-80 rounded-full bg-indigo-600/20 blur-[180px]" />
       </div>
 
-      {/* Glass card container */}
-      <div className="relative w-full max-w-md">
-        <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-10">
+      {/* Glass card container - Responsive widths */}
+      <div className="relative w-full max-w-lg md:max-w-2xl">
+        <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-8 md:p-10">
           {children}
         </div>
       </div>

@@ -1,14 +1,17 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Car, Calendar, Factory, ArrowRight, Save, Sparkles } from 'lucide-react';
+import { Car, Calendar, Factory, ArrowRight, Save, Sparkles, MessageCircle } from 'lucide-react';
 
-export default function AddVehiclePage() {
+function AddVehicleContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const returnTo = searchParams.get('returnTo');
+    const isFromConsult = returnTo === 'consult';
     const [loading, setLoading] = useState(false);
 
     const [manufacturers, setManufacturers] = useState<string[]>([]);
@@ -146,7 +149,14 @@ export default function AddVehiclePage() {
             }
 
             alert('הרכב נוסף בהצלחה! 🚗');
-            router.push('/maintenance');
+
+            // Navigate based on where user came from
+            if (isFromConsult) {
+                // Go directly to vehicle select popup
+                router.push('/user/consult');
+            } else {
+                router.push('/maintenance');
+            }
             router.refresh();
 
         } catch (error) {
@@ -215,13 +225,20 @@ export default function AddVehiclePage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="w-full"
                 >
-                    {/* Back Link */}
+                    {/* Back Link - Dynamic based on context */}
                     <Link
-                        href="/maintenance"
+                        href={isFromConsult ? "/user/consult" : "/maintenance"}
                         className="inline-flex items-center text-slate-500 hover:text-white mb-8 transition-colors group"
                     >
                         <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                        חזרה למוסך שלי
+                        {isFromConsult ? (
+                            <>
+                                <MessageCircle className="w-4 h-4 ml-2" />
+                                חזרה לייעוץ חדש
+                            </>
+                        ) : (
+                            'חזרה למוסך שלי'
+                        )}
                     </Link>
 
                     {/* Glassmorphism Card */}
@@ -372,5 +389,18 @@ export default function AddVehiclePage() {
                 </motion.div>
             </div>
         </div>
+    );
+}
+
+// Wrapper component with Suspense for useSearchParams
+export default function AddVehiclePage() {
+    return (
+        <Suspense fallback={
+            <div dir="rtl" className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
+                <div className="text-white/70">טוען...</div>
+            </div>
+        }>
+            <AddVehicleContent />
+        </Suspense>
     );
 }
