@@ -16,10 +16,6 @@ const supabase = createClient(
 
 // Input types - matches new schema (2026-01-08)
 type RepairStatus = 'in_progress' | 'completed';
-type FinalIssueType =
-    | 'engine' | 'brakes' | 'electrical' | 'ac' | 'starting' | 'gearbox'
-    | 'noise' | 'suspension' | 'transmission' | 'fuel_system' | 'cooling_system'
-    | 'exhaust' | 'tires' | 'steering' | 'other';
 
 interface RepairInput {
     request_id: string;           // FK to requests
@@ -27,7 +23,7 @@ interface RepairInput {
     garage_request_id?: string;   // FK to garage_requests (the accepted quote)
     mechanic_notes: string;
     problem_category: string;     // FK to problem_categories(code)
-    final_issue_type: FinalIssueType;
+    final_issue_type: string;     // Dynamic from problem_categories table
     labor_hours: number;
     status: RepairStatus;
     vehicle_info?: Record<string, any>;  // JSONB
@@ -112,14 +108,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Status must be "in_progress" or "completed"' }, { status: 400 });
         }
 
-        // Validate final_issue_type - all 15 categories
-        const validIssueTypes: FinalIssueType[] = [
-            'engine', 'brakes', 'electrical', 'ac', 'starting', 'gearbox',
-            'noise', 'suspension', 'transmission', 'fuel_system', 'cooling_system',
-            'exhaust', 'tires', 'steering', 'other'
-        ];
-        if (!validIssueTypes.includes(body.final_issue_type)) {
-            return NextResponse.json({ error: `final_issue_type must be one of: ${validIssueTypes.join(', ')}` }, { status: 400 });
+        // Validate final_issue_type against problem_categories table
+        const { data: validCategories, error: catError } = await supabase
+            .from('problem_categories')
+            .select('code')
+            .eq('is_active', true);
+
+        if (catError) {
+            console.error('[API repairs/create] Error fetching categories:', catError);
+            // Fall through - don't block on category lookup failure
+        } else {
+            const validCodes = (validCategories || []).map(c => c.code);
+            if (validCodes.length > 0 && !validCodes.includes(body.final_issue_type)) {
+                return NextResponse.json({ error: `final_issue_type must be one of: ${validCodes.join(', ')}` }, { status: 400 });
+            }
         }
 
         console.log('[API repairs/create] Processing repair for request:', body.request_id);

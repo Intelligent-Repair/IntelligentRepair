@@ -1,32 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, CheckCircle, AlertCircle, Wrench, FileText, Clock, Car, AlertTriangle } from 'lucide-react';
 
-// Issue type options with Hebrew labels
-const ISSUE_TYPES = [
+// Type for issue type option
+interface IssueTypeOption {
+    value: string;
+    label: string;
+}
+
+// Fallback issue types if API fails
+const FALLBACK_ISSUE_TYPES: IssueTypeOption[] = [
     { value: 'engine', label: 'מנוע' },
     { value: 'brakes', label: 'בלמים' },
     { value: 'electrical', label: 'חשמל' },
-    { value: 'ac', label: 'מיזוג אוויר' },
-    { value: 'starting', label: 'מערכת התנעה' },
-    { value: 'gearbox', label: 'תיבת הילוכים' },
-    { value: 'noise', label: 'רעש/רטט' },
-    { value: 'suspension', label: 'מתלים' },
-    { value: 'transmission', label: 'הנעה (Transmission)' },
-    { value: 'fuel_system', label: 'מערכת דלק' },
-    { value: 'cooling_system', label: 'מערכת קירור' },
-    { value: 'exhaust', label: 'פליטה (אגזוז)' },
-    { value: 'tires', label: 'צמיגים' },
-    { value: 'steering', label: 'היגוי' },
-    { value: 'oil_system', label: 'מערכת שמן' },
-    { value: 'sensors', label: 'חיישנים' },
     { value: 'other', label: 'אחר' },
-] as const;
+];
 
 // Quick tags for common fixes
 const QUICK_TAGS = [
@@ -39,14 +32,12 @@ const QUICK_TAGS = [
     'בדיקה ותיקון',
 ];
 
-// Extract values for zod enum
-const issueTypeValues = ISSUE_TYPES.map(t => t.value) as [string, ...string[]];
-
+// Dynamic schema that validates against any string (API handles validation)
 const repairFormSchema = z.object({
     mechanic_notes: z.string()
         .min(20, 'תיאור חייב להכיל לפחות 20 תווים')
         .max(5000, 'תיאור ארוך מדי'),
-    final_issue_type: z.enum(issueTypeValues, { message: 'יש לבחור סוג תקלה' }),
+    final_issue_type: z.string().min(1, 'יש לבחור סוג תקלה'),
     labor_hours: z.number()
         .min(0.5, 'מינימום חצי שעה')
         .max(100, 'מקסימום 100 שעות'),
@@ -77,6 +68,34 @@ export default function RepairCompletionForm({
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [issueTypes, setIssueTypes] = useState<IssueTypeOption[]>(FALLBACK_ISSUE_TYPES);
+    const [loadingCategories, setLoadingCategories] = useState(true);
+
+    // Fetch categories from API on mount
+    useEffect(() => {
+        async function fetchCategories() {
+            try {
+                const res = await fetch('/api/problem-categories');
+                const data = await res.json();
+                if (data.categories && Array.isArray(data.categories)) {
+                    // Transform API response to match expected format
+                    const categories = data.categories.map((cat: any) => ({
+                        value: cat.code,
+                        label: cat.name_he
+                    }));
+                    if (categories.length > 0) {
+                        setIssueTypes(categories);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch categories:', err);
+                // Keep fallback categories
+            } finally {
+                setLoadingCategories(false);
+            }
+        }
+        fetchCategories();
+    }, []);
 
     const {
         register,
@@ -240,7 +259,7 @@ export default function RepairCompletionForm({
                         dir="rtl"
                     >
                         <option value="">בחר סוג...</option>
-                        {ISSUE_TYPES.map(opt => (
+                        {issueTypes.map((opt: IssueTypeOption) => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>

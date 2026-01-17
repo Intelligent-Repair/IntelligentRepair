@@ -216,7 +216,7 @@ export default function GarageRequestDetailsPage() {
                             <Car className="w-4 h-4 inline-block ml-2" /> <strong>רכב:</strong> {details.car}
                         </p>
                         {details.license_plate && (
-                            <p className="text-slate-300"><strong>מספר רכב:</strong> {details.license_plate}</p>
+                            <p className="text-slate-300"><strong>מספר רכב:</strong> <span dir="ltr">{details.license_plate}</span></p>
                         )}
                         <p className="text-slate-300"><strong>תאריך פנייה:</strong> {details.date}</p>
                     </div>

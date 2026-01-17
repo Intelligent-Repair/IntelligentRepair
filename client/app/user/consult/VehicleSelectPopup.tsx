@@ -78,11 +78,11 @@ export default function VehicleSelectPopup({
   const handleSelect = (vehicleId: string) => {
     console.log("[VehicleSelectPopup] Vehicle selected:", vehicleId);
     onSelect(vehicleId);
-  
+
     // ❗ חשוב: לא לסגור פה את המודאל
     // router.push יגרום ל-unmount אוטומטי
   };
-  
+
   if (!isOpen) return null;
 
   return (
@@ -184,7 +184,7 @@ export default function VehicleSelectPopup({
                         {vehicle.manufacturer} {vehicle.model}
                       </div>
                       <div className="text-sm text-slate-400">
-                        {vehicle.year || "לא צוין"} | {vehicle.license_plate}
+                        {vehicle.year || "לא צוין"} | <span dir="ltr">{vehicle.license_plate}</span>
                       </div>
                     </div>
 

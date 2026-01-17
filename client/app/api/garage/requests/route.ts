@@ -85,7 +85,8 @@ export async function GET(req: Request) {
             car: r.vehicle_info
                 ? `${r.vehicle_info.manufacturer || ""} ${r.vehicle_info.model || ""} (${r.vehicle_info.year || ""})`.trim()
                 : "רכב לא ידוע",
-            fault: r.mechanic_summary?.category
+            fault: r.customer_description
+                || r.mechanic_summary?.category
                 || r.mechanic_summary?.diagnoses?.[0]?.issue
                 || r.mechanic_summary?.topDiagnosis?.[0]?.name
                 || (r.mechanic_summary?.originalComplaint && r.mechanic_summary?.originalComplaint !== 'לא ידוע' ? r.mechanic_summary?.originalComplaint : null)

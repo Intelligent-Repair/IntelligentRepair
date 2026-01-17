@@ -200,6 +200,18 @@ function AddVehicleContent() {
                 throw new Error(insertError.message || 'שגיאה בהוספת הרכב');
             }
 
+            // Pre-fetch manual data in background (fire-and-forget)
+            // This ensures data is ready when user views vehicle details
+            fetch("/api/manuals/ensure", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    manufacturer: selectedManufacturer,
+                    model: selectedModel,
+                    year: parseInt(selectedYear)
+                }),
+            }).catch(() => { }); // Ignore errors - this is background work
+
             alert('הרכב נוסף בהצלחה! 🚗');
 
             // Navigate based on where user came from

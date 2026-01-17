@@ -126,8 +126,11 @@ export default function QuestionsClient() {
           draft_id: draftId,
           user_id: user.id,
           car_id: vehicle.id,
+          // Use diagnosis title for short description, fallback to first result issue
+          description: reportData.title || reportData.results?.[0]?.issue || "אבחון הושלם",
+          // Full diagnosis text for storage
           ai_diagnosis: reportMsg?.text || "אבחון הושלם",
-          ai_confidence: 1.0,
+          ai_confidence: reportData.confidence || 1.0,
           // Derive Q&A from actual message history
           ai_questions: state.messages
             .filter(m => m.sender === "ai" && m.type !== "mechanic_report")
@@ -210,7 +213,7 @@ export default function QuestionsClient() {
                 {vehicle.manufacturer} {vehicle.model}
               </h1>
               <span className="text-xs text-slate-400">
-                {vehicle.year} • {vehicle.license_plate}
+                {vehicle.year} • <span dir="ltr">{vehicle.license_plate}</span>
               </span>
             </div>
           </motion.div>

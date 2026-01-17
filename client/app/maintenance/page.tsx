@@ -145,6 +145,7 @@ const LicensePlate = ({ number }: { number: string }) => {
 
             {/* Yellow Plate Area - Compact */}
             <div
+                dir="ltr"
                 className="flex items-center justify-center px-2.5 py-1"
                 style={{
                     background: 'linear-gradient(180deg, #FFD700 0%, #FFCC00 50%, #FFB800 100%)',

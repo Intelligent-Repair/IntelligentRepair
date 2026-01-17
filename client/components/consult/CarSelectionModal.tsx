@@ -40,7 +40,7 @@ export default function CarSelectionModal({
       setLoading(true);
       setError(null);
       const response = await fetch(`/api/cars/list?user_id=${userId}`);
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch cars");
       }
@@ -140,7 +140,7 @@ export default function CarSelectionModal({
                       </div>
                       <div className="text-sm text-white/70 space-y-1">
                         <div>שנה: {car.year || "לא צוין"}</div>
-                        <div>מספר רישוי: {car.license_plate}</div>
+                        <div>מספר רישוי: <span dir="ltr">{car.license_plate}</span></div>
                       </div>
                     </div>
                   </motion.button>

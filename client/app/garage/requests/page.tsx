@@ -249,31 +249,31 @@ export default function GarageInquiriesPage() {
         }
     };
 
-    // Get fault category from mechanic_summary
+    // Get fault category from description or mechanic_summary
     const getFaultCategory = (request: GarageRequest) => {
-        // Priority 1: Use category if explicitly set
+        // Priority 1: Use fault field (now contains diagnosis title from frontend)
+        if (request.fault && request.fault !== 'לא צוין' && request.fault !== 'אבחון הושלם') {
+            return request.fault;
+        }
+        // Priority 2: Use category if explicitly set in mechanic_summary
         if (request.mechanic_summary?.category) {
             return request.mechanic_summary.category;
         }
-        // Priority 2: Use diagnoses[0].issue (new AI format)
+        // Priority 3: Use diagnoses[0].issue (new AI format)
         if (request.mechanic_summary?.diagnoses?.[0]?.issue) {
             return request.mechanic_summary.diagnoses[0].issue;
         }
-        // Priority 3: Use topDiagnosis[0].name (legacy format)
+        // Priority 4: Use topDiagnosis[0].name (legacy format)
         if (request.mechanic_summary?.topDiagnosis?.[0]?.name) {
             return request.mechanic_summary.topDiagnosis[0].name;
         }
-        // Priority 4: Use originalComplaint
+        // Priority 5: Use originalComplaint
         if (request.mechanic_summary?.originalComplaint && request.mechanic_summary.originalComplaint !== 'לא ידוע') {
             return request.mechanic_summary.originalComplaint.substring(0, 50);
         }
-        // Priority 5: Use shortDescription
+        // Priority 6: Use shortDescription
         if (request.mechanic_summary?.shortDescription) {
             return request.mechanic_summary.shortDescription.substring(0, 50);
-        }
-        // Priority 6: Use fault from API transform
-        if (request.fault && request.fault !== 'לא צוין') {
-            return request.fault;
         }
         return 'בעיה ברכב';
     };

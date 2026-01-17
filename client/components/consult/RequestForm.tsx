@@ -40,7 +40,7 @@ export default function RequestForm({ carId, userId }: RequestFormProps) {
     try {
       setLoading(true);
       const response = await fetch(`/api/cars/get?car_id=${carId}`);
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch car details");
       }
@@ -104,7 +104,7 @@ export default function RequestForm({ carId, userId }: RequestFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!description.trim()) {
       setError("אנא הזן תיאור התקלה");
       return;
@@ -138,7 +138,7 @@ export default function RequestForm({ carId, userId }: RequestFormProps) {
       }
 
       const data = await response.json();
-      
+
       // Redirect to AI consultation page
       router.push(`/user/consult/ai?request_id=${data.request_id}`);
     } catch (err) {
@@ -183,7 +183,7 @@ export default function RequestForm({ carId, userId }: RequestFormProps) {
           </div>
           <div>
             <div className="text-sm text-white/70 mb-1">מספר רישוי</div>
-            <div className="font-semibold">{car.license_plate}</div>
+            <div className="font-semibold" dir="ltr">{car.license_plate}</div>
           </div>
         </div>
       </div>

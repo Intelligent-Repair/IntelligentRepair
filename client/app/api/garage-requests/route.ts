@@ -227,6 +227,11 @@ export async function POST(req: Request) {
         }
 
         // Create garage_request with all customer and vehicle info
+        // Store description in mechanic_summary.category AND customer_description for display
+        if (mechanicSummary && reqRow.description) {
+            (mechanicSummary as any).category = (mechanicSummary as any).category || reqRow.description;
+        }
+
         const { data: insertData, error: insertError } = await supabase
             .from("garage_requests")
             .insert({
@@ -234,6 +239,7 @@ export async function POST(req: Request) {
                 request_id,
                 customer_name,
                 customer_phone,
+                customer_description: reqRow.description || null,
                 vehicle_info,
                 mechanic_summary: mechanicSummary,
                 status: "pending",

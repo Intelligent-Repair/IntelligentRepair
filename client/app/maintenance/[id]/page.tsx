@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Wrench, Bell, Save, Droplets, Wind, Thermometer } from 'lucide-react';
+import { ArrowRight, Wrench, Bell, Save, Droplets, Wind, Thermometer, Fuel, BatteryCharging, CircleDot, CloudRain } from 'lucide-react';
 
 // Interfaces
 interface CatalogData {
@@ -47,10 +47,19 @@ interface RemindersSnapshot {
 interface Manual {
     tire_pressure_front: string;
     tire_pressure_rear: string;
+    tire_size_front: string;
+    tire_size_rear: string;
     tire_instructions: string;
     oil_type: string;
     oil_instructions: string;
     coolant_type: string;
+    coolant_color: string;
+    coolant_instructions: string;
+    fuel_type: string;
+    fuel_tank_capacity: string;
+    wipers_front: string;
+    wiper_rear: string;
+    battery_specs: string;
 }
 
 // ============ COMPONENTS ============
@@ -113,6 +122,7 @@ const LicensePlate = ({ number }: { number: string }) => {
 
             {/* Yellow Plate Area */}
             <div
+                dir="ltr"
                 className="flex items-center justify-center px-4 py-2"
                 style={{
                     background: 'linear-gradient(180deg, #FFD700 0%, #FFCC00 50%, #FFB800 100%)',
@@ -493,59 +503,178 @@ export default function VehicleDetailsPage() {
                                     </div>
                                 </div>
 
-                                {/* ===== FLUIDS & OILS - GRID LAYOUT ===== */}
+                                {/* ===== CONSUMABLES & SPECS - 3 COLUMN CARD (חלקים ומידות) ===== */}
                                 <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-                                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-emerald-300">
-                                        <Droplets className="w-5 h-5" /> נוזלים ושמנים
-                                    </h3>
+                                    <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-5 font-semibold">חלקים ומידות</h3>
 
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {/* Card 1: Engine Oil */}
-                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-transform duration-200 hover:scale-105">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-white/10">
+                                        {/* Column 1: Wipers */}
+                                        <div className="py-6 md:py-4 md:px-6 flex flex-col items-center text-center">
+                                            <div
+                                                className="p-4 bg-cyan-500/10 rounded-2xl mb-4"
+                                                style={{ boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)' }}
+                                            >
+                                                <CloudRain className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                                            </div>
+                                            <span className="text-xs uppercase tracking-wider text-slate-400 mb-3">מגבים</span>
+                                            <div className="space-y-1">
+                                                <div>
+                                                    <span className="text-slate-500 text-xs block">קדמיים</span>
+                                                    <span className="text-xl font-bold text-white">
+                                                        {manual.wipers_front || '—'}
+                                                    </span>
+                                                </div>
+                                                {manual.wiper_rear && (
+                                                    <div className="mt-2">
+                                                        <span className="text-slate-500 text-xs block">אחורי</span>
+                                                        <span className="text-xl font-bold text-white">
+                                                            {manual.wiper_rear}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Column 2: Battery */}
+                                        <div className="py-6 md:py-4 md:px-6 flex flex-col items-center text-center">
+                                            <div
+                                                className="p-4 bg-yellow-500/10 rounded-2xl mb-4"
+                                                style={{ boxShadow: '0 0 20px rgba(234, 179, 8, 0.2)' }}
+                                            >
+                                                <BatteryCharging className="w-10 h-10 text-yellow-400 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+                                            </div>
+                                            <span className="text-xs uppercase tracking-wider text-slate-400 mb-3">מצבר</span>
+                                            <span className="text-2xl font-bold text-white">
+                                                {manual.battery_specs || '—'}
+                                            </span>
+                                        </div>
+
+                                        {/* Column 3: Tire Dimensions */}
+                                        <div className="py-6 md:py-4 md:px-6 flex flex-col items-center text-center">
+                                            <div
+                                                className="p-4 bg-emerald-500/10 rounded-2xl mb-4"
+                                                style={{ boxShadow: '0 0 20px rgba(16, 185, 129, 0.2)' }}
+                                            >
+                                                <CircleDot className="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                            </div>
+                                            <span className="text-xs uppercase tracking-wider text-slate-400 mb-3">מידות צמיג</span>
+                                            <span className="text-2xl font-bold text-white font-mono">
+                                                {manual.tire_size_front || '—'}
+                                            </span>
+                                            {manual.tire_size_rear && manual.tire_size_rear !== manual.tire_size_front && (
+                                                <span className="text-sm text-slate-400 mt-1">
+                                                    אחורי: <span className="font-mono">{manual.tire_size_rear}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ===== FLUIDS, OILS & FUEL - GRID LAYOUT ===== */}
+                                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+                                    <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-5 font-semibold">נוזלים ודלק</h3>
+
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        {/* Card 1: Engine Oil - Ghost Yellow Style */}
+                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 hover:border-yellow-500/30 h-full">
                                             <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-amber-500/10 rounded-xl">
+                                                <div
+                                                    className="p-3 bg-yellow-500/10 rounded-xl"
+                                                    style={{ boxShadow: '0 0 15px rgba(234, 179, 8, 0.15)' }}
+                                                >
                                                     <OilCanIcon />
                                                 </div>
-                                                <div className="flex-1">
-                                                    <span className="text-xs text-white/50 block mb-2">שמן מנוע מומלץ</span>
-                                                    <div className="inline-block px-4 py-2 bg-black/30 border border-amber-500/30 rounded-lg">
-                                                        <span className="text-xl font-mono font-bold text-amber-300">
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">שמן מנוע</span>
+                                                    {/* Ghost Yellow Badge */}
+                                                    <div className="inline-block px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
+                                                        <span className="text-lg font-bold text-yellow-400">
                                                             {manual.oil_type || 'לא צוין'}
                                                         </span>
                                                     </div>
                                                     <p className="text-xs text-white/40 mt-2 leading-relaxed">
                                                         {manual.oil_instructions || 'החלף בהתאם להמלצות היצרן.'}
                                                     </p>
-                                                    {/* Oil Life Progress Bar */}
-                                                    <div className="mt-4">
-                                                        <div className="flex justify-between text-[10px] text-white/40 mb-1">
-                                                            <span>Oil Life</span>
-                                                            <span>70%</span>
-                                                        </div>
-                                                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                            <div className="h-full w-[70%] bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"></div>
-                                                        </div>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Card 2: Coolant */}
-                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-transform duration-200 hover:scale-105">
+                                        {/* Card 2: Coolant - Dynamic Color */}
+                                        {(() => {
+                                            // Determine if coolant is Pink/Red for dynamic coloring
+                                            const coolantColor = manual.coolant_color?.toLowerCase() || '';
+                                            const isRedPink = coolantColor.includes('ורוד') || coolantColor.includes('אדום') || coolantColor.includes('pink') || coolantColor.includes('red');
+                                            const colorClasses = isRedPink
+                                                ? { bg: 'bg-rose-500/10', border: 'border-rose-500/30', text: 'text-rose-300', icon: 'text-rose-400', glow: 'rgba(244, 63, 94, 0.15)' }
+                                                : { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-300', icon: 'text-blue-400', glow: 'rgba(59, 130, 246, 0.15)' };
+
+                                            return (
+                                                <div className={`bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 hover:${colorClasses.border} h-full`}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div
+                                                            className={`p-3 ${colorClasses.bg} rounded-xl`}
+                                                            style={{ boxShadow: `0 0 15px ${colorClasses.glow}` }}
+                                                        >
+                                                            <Thermometer className={`w-10 h-10 ${colorClasses.icon}`} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">נוזל קירור</span>
+                                                            <div className={`inline-block px-3 py-1.5 bg-black/30 ${colorClasses.border} border rounded-lg max-w-full`}>
+                                                                <span className={`text-sm font-bold ${colorClasses.text} break-words`}>
+                                                                    {manual.coolant_type || 'לא צוין'}
+                                                                </span>
+                                                            </div>
+                                                            {manual.coolant_color && (
+                                                                <div className="mt-2 flex items-center gap-2">
+                                                                    <span className="text-xs text-slate-400">צבע:</span>
+                                                                    <span className={`text-sm font-medium ${isRedPink ? 'text-rose-200' : 'text-blue-200'}`}>
+                                                                        {manual.coolant_color}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <p className="text-xs text-white/40 mt-2 leading-relaxed">
+                                                                {manual.coolant_instructions || 'בדוק מפלס כשהמנוע קר. אין לפתוח כשהמנוע חם!'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Card 3: Fuel System */}
+                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 hover:border-orange-500/30 h-full">
                                             <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-500/10 rounded-xl">
-                                                    <Thermometer className="w-10 h-10 text-blue-400" />
+                                                <div
+                                                    className="p-3 bg-orange-500/10 rounded-xl"
+                                                    style={{ boxShadow: '0 0 15px rgba(249, 115, 22, 0.15)' }}
+                                                >
+                                                    <Fuel className="w-10 h-10 text-orange-400" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <span className="text-xs text-white/50 block mb-2">נוזל קירור</span>
-                                                    <div className="inline-block px-3 py-2 bg-black/30 border border-blue-500/30 rounded-lg max-w-full">
-                                                        <span className="text-sm font-mono font-bold text-blue-300 break-words">
-                                                            {manual.coolant_type || 'לא צוין'}
-                                                        </span>
+                                                    <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">דלק ומיכל</span>
+                                                    <div className="space-y-3">
+                                                        <div>
+                                                            <span className="text-xs text-slate-500 block">סוג דלק</span>
+                                                            <span className="text-xl font-bold text-orange-300">
+                                                                {manual.fuel_type || 'לא צוין'}
+                                                            </span>
+                                                        </div>
+                                                        {manual.fuel_tank_capacity && (
+                                                            <div>
+                                                                <span className="text-xs text-slate-500 block">נפח מיכל</span>
+                                                                <span className="text-lg text-white font-bold">
+                                                                    {manual.fuel_tank_capacity}
+                                                                </span>
+                                                                {/* Premium Tank Capacity Bar */}
+                                                                <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+                                                                        style={{ width: '100%' }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <p className="text-xs text-white/40 mt-3">
-                                                        בדוק רמה בעת שהמנוע קר.
-                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
