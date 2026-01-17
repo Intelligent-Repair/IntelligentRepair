@@ -154,8 +154,8 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setUserType("driver")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold transition-all duration-300 ${userType === "driver"
-                ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/30"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
+              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/30"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
           >
             <User className="w-4 h-4" />
@@ -165,8 +165,8 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setUserType("garage")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold transition-all duration-300 ${userType === "garage"
-                ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/30"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
+              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 shadow-lg shadow-cyan-500/30"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
           >
             <Wrench className="w-4 h-4" />
@@ -194,13 +194,13 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    שם פרטי
+                    שם פרטי <span className="text-red-400">*</span>
                   </label>
                   <input id="firstName" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputNormal} />
                 </div>
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    שם משפחה
+                    שם משפחה <span className="text-red-400">*</span>
                   </label>
                   <input id="lastName" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputNormal} />
                 </div>
@@ -222,7 +222,7 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="city" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    עיר מגורים
+                    עיר מגורים <span className="text-red-400">*</span>
                   </label>
                   <input id="city" type="text" value={city} onChange={(e) => setCity(e.target.value)} required className={inputNormal} />
                 </div>
@@ -235,7 +235,7 @@ export default function RegisterPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    אימייל
+                    אימייל <span className="text-red-400">*</span>
                   </label>
                   <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="example@mail.com" className={inputNormal} />
                 </div>
@@ -250,13 +250,13 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    סיסמה
+                    סיסמה <span className="text-red-400">*</span>
                   </label>
                   <input id="password" type="password" value={password} onChange={(e) => handlePasswordChange(e.target.value)} required minLength={6} placeholder="לפחות 6 תווים" className={passwordMismatch ? inputError : inputNormal} />
                 </div>
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    אישור סיסמה
+                    אישור סיסמה <span className="text-red-400">*</span>
                   </label>
                   <input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => handleConfirmPasswordChange(e.target.value)} required className={passwordMismatch ? inputError : inputNormal} />
                 </div>
@@ -274,13 +274,13 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
                   <label htmlFor="garageName" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    שם המוסך
+                    שם המוסך <span className="text-red-400">*</span>
                   </label>
                   <input id="garageName" type="text" value={garageName} onChange={(e) => setGarageName(e.target.value)} required className={inputNormal} />
                 </div>
                 <div>
                   <label htmlFor="licenseNumber" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    מספר רישיון מוסך
+                    מספר רישיון מוסך <span className="text-red-400">*</span>
                   </label>
                   <input id="licenseNumber" type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} required className={inputNormal} />
                 </div>
@@ -329,7 +329,7 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    אימייל
+                    אימייל <span className="text-red-400">*</span>
                   </label>
                   <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="example@mail.com" className={inputNormal} />
                 </div>
@@ -344,13 +344,13 @@ export default function RegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    סיסמה
+                    סיסמה <span className="text-red-400">*</span>
                   </label>
                   <input id="password" type="password" value={password} onChange={(e) => handlePasswordChange(e.target.value)} required minLength={6} placeholder="לפחות 6 תווים" className={passwordMismatch ? inputError : inputNormal} />
                 </div>
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1.5">
-                    אישור סיסמה
+                    אישור סיסמה <span className="text-red-400">*</span>
                   </label>
                   <input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => handleConfirmPasswordChange(e.target.value)} required className={passwordMismatch ? inputError : inputNormal} />
                 </div>
