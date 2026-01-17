@@ -575,33 +575,45 @@ export default function VehicleDetailsPage() {
                                     <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-5 font-semibold">נוזלים ודלק</h3>
 
                                     <div className="grid md:grid-cols-3 gap-4">
-                                        {/* Card 1: Engine Oil - Ghost Yellow Style */}
-                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 hover:border-yellow-500/30 h-full">
-                                            <div className="flex items-start gap-4">
-                                                <div
-                                                    className="p-3 bg-yellow-500/10 rounded-xl"
-                                                    style={{ boxShadow: '0 0 15px rgba(234, 179, 8, 0.15)' }}
-                                                >
-                                                    <OilCanIcon />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">שמן מנוע</span>
-                                                    {/* Ghost Yellow Badge */}
-                                                    <div className="inline-block px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
-                                                        <span className="text-lg font-bold text-yellow-400">
-                                                            {manual.oil_type || 'לא צוין'}
-                                                        </span>
+                                        {/* Card 1: Engine Oil - Disable for EVs */}
+                                        {(() => {
+                                            const isEV = manual.fuel_type?.toLowerCase().includes("חשמל") || manual.fuel_type?.toLowerCase().includes("electric") || (!manual.oil_type && !manual.fuel_tank_capacity);
+
+                                            return (
+                                                <div className={`bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 h-full ${isEV ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-yellow-500/30'}`}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div
+                                                            className={`p-3 rounded-xl ${isEV ? 'bg-white/10' : 'bg-yellow-500/10'}`}
+                                                            style={isEV ? {} : { boxShadow: '0 0 15px rgba(234, 179, 8, 0.15)' }}
+                                                        >
+                                                            <OilCanIcon />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">שמן מנוע</span>
+                                                            {isEV ? (
+                                                                <div className="inline-block px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
+                                                                    <span className="text-sm font-bold text-slate-400">
+                                                                        לא רלוונטי
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="inline-block px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
+                                                                    <span className="text-lg font-bold text-yellow-400">
+                                                                        {manual.oil_type || 'לא צוין'}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <p className="text-xs text-white/40 mt-2 leading-relaxed">
+                                                                {isEV ? '---' : (manual.oil_instructions || 'החלף בהתאם להמלצות היצרן.')}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-xs text-white/40 mt-2 leading-relaxed">
-                                                        {manual.oil_instructions || 'החלף בהתאם להמלצות היצרן.'}
-                                                    </p>
                                                 </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
 
                                         {/* Card 2: Coolant - Dynamic Color */}
                                         {(() => {
-                                            // Determine if coolant is Pink/Red for dynamic coloring
                                             const coolantColor = manual.coolant_color?.toLowerCase() || '';
                                             const isRedPink = coolantColor.includes('ורוד') || coolantColor.includes('אדום') || coolantColor.includes('pink') || coolantColor.includes('red');
                                             const colorClasses = isRedPink
@@ -641,43 +653,64 @@ export default function VehicleDetailsPage() {
                                             );
                                         })()}
 
-                                        {/* Card 3: Fuel System */}
-                                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 hover:border-orange-500/30 h-full">
-                                            <div className="flex items-start gap-4">
-                                                <div
-                                                    className="p-3 bg-orange-500/10 rounded-xl"
-                                                    style={{ boxShadow: '0 0 15px rgba(249, 115, 22, 0.15)' }}
-                                                >
-                                                    <Fuel className="w-10 h-10 text-orange-400" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">דלק ומיכל</span>
-                                                    <div className="space-y-3">
-                                                        <div>
-                                                            <span className="text-xs text-slate-500 block">סוג דלק</span>
-                                                            <span className="text-xl font-bold text-orange-300">
-                                                                {manual.fuel_type || 'לא צוין'}
-                                                            </span>
+                                        {/* Card 3: Fuel System - Disable for EVs */}
+                                        {(() => {
+                                            const isEV = manual.fuel_type?.toLowerCase().includes("חשמל") || manual.fuel_type?.toLowerCase().includes("electric") || (!manual.oil_type && !manual.fuel_tank_capacity);
+
+                                            return (
+                                                <div className={`bg-white/5 rounded-xl p-5 border border-white/5 transition-all duration-200 h-full ${isEV ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-orange-500/30'}`}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div
+                                                            className={`p-3 rounded-xl ${isEV ? 'bg-white/10' : 'bg-orange-500/10'}`}
+                                                            style={isEV ? {} : { boxShadow: '0 0 15px rgba(249, 115, 22, 0.15)' }}
+                                                        >
+                                                            <Fuel className={`w-10 h-10 ${isEV ? 'text-white/20' : 'text-orange-400'}`} />
                                                         </div>
-                                                        {manual.fuel_tank_capacity && (
-                                                            <div>
-                                                                <span className="text-xs text-slate-500 block">נפח מיכל</span>
-                                                                <span className="text-lg text-white font-bold">
-                                                                    {manual.fuel_tank_capacity}
-                                                                </span>
-                                                                {/* Premium Tank Capacity Bar */}
-                                                                <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                                                    <div
-                                                                        className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
-                                                                        style={{ width: '100%' }}
-                                                                    />
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className="text-xs uppercase tracking-wider text-slate-400 block mb-2">דלק ומיכל</span>
+                                                            {isEV ? (
+                                                                <div className="space-y-3">
+                                                                    <div>
+                                                                        <span className="text-xs text-slate-500 block">סוג דלק</span>
+                                                                        <span className="text-xl font-bold text-slate-500">
+                                                                            חשמלי (EV)
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-xs text-slate-500 block">נפח מיכל</span>
+                                                                        <span className="text-lg text-slate-600 font-bold">---</span>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            ) : (
+                                                                <div className="space-y-3">
+                                                                    <div>
+                                                                        <span className="text-xs text-slate-500 block">סוג דלק</span>
+                                                                        <span className="text-xl font-bold text-orange-300">
+                                                                            {manual.fuel_type || 'לא צוין'}
+                                                                        </span>
+                                                                    </div>
+                                                                    {manual.fuel_tank_capacity && (
+                                                                        <div>
+                                                                            <span className="text-xs text-slate-500 block">נפח מיכל</span>
+                                                                            <span className="text-lg text-white font-bold">
+                                                                                {manual.fuel_tank_capacity}
+                                                                            </span>
+                                                                            {/* Premium Tank Capacity Bar */}
+                                                                            <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                                                                <div
+                                                                                    className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+                                                                                    style={{ width: '100%' }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </>
