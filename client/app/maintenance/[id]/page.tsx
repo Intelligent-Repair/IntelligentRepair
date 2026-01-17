@@ -56,24 +56,83 @@ interface Manual {
 // ============ COMPONENTS ============
 
 // Israeli License Plate Component - Realistic Style
-const LicensePlate = ({ number }: { number: string }) => (
-    <div className="flex items-stretch rounded-lg overflow-hidden shadow-lg w-fit">
-        {/* Blue IL Strip */}
-        <div className="bg-[#003399] px-2 py-2 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-white font-bold leading-none">🇮🇱</span>
-            <span className="text-[10px] text-white font-bold leading-none mt-0.5">IL</span>
-        </div>
-        {/* Yellow Plate */}
+// Supports both 8-digit (XXX-XX-XXX) and 7-digit (XX-XXX-XX) formats
+const LicensePlate = ({ number }: { number: string }) => {
+    // Format the license plate number with dots
+    const formatPlateNumber = (num: string) => {
+        const digits = num.replace(/\D/g, ''); // Remove non-digits
+        if (digits.length === 8) {
+            // New format: XXX·XX·XXX
+            return `${digits.slice(0, 3)}·${digits.slice(3, 5)}·${digits.slice(5, 8)}`;
+        } else if (digits.length === 7) {
+            // Old format: XX·XXX·XX
+            return `${digits.slice(0, 2)}·${digits.slice(2, 5)}·${digits.slice(5, 7)}`;
+        }
+        return num; // Return as-is if different length
+    };
+
+    return (
         <div
-            className="bg-[#FFCC00] px-4 py-2 flex items-center justify-center"
-            style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.3)' }}
+            className="flex items-stretch overflow-hidden w-fit"
+            style={{
+                borderRadius: '6px',
+                border: '3px solid #1a1a1a',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+            }}
         >
-            <span className="text-black font-mono font-black text-lg tracking-[0.15em]">
-                {number}
-            </span>
+            {/* Blue IL Section - Israeli Standard */}
+            <div
+                className="flex flex-col items-center justify-center px-2.5 py-1.5"
+                style={{
+                    background: 'linear-gradient(180deg, #0047AB 0%, #003399 100%)',
+                    minWidth: '42px'
+                }}
+            >
+                {/* Israeli Flag with Star of David */}
+                <div className="flex flex-col items-center mb-0.5">
+                    <div
+                        className="w-6 h-4 flex items-center justify-center relative"
+                        style={{
+                            background: 'white',
+                            border: '1px solid rgba(0,0,0,0.1)'
+                        }}
+                    >
+                        {/* Blue stripes */}
+                        <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#0038b8]" />
+                        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0038b8]" />
+                        {/* Star of David */}
+                        <span className="text-[8px] text-[#0038b8] leading-none">✡</span>
+                    </div>
+                </div>
+                {/* IL text */}
+                <span className="text-[11px] text-white font-black leading-none tracking-wider">IL</span>
+                {/* Hebrew & Arabic */}
+                <span className="text-[6px] text-white/90 leading-none mt-0.5">ישראל</span>
+                <span className="text-[5px] text-white/80 leading-none" style={{ fontFamily: 'Arial' }}>إسرائيل</span>
+            </div>
+
+            {/* Yellow Plate Area */}
+            <div
+                className="flex items-center justify-center px-4 py-2"
+                style={{
+                    background: 'linear-gradient(180deg, #FFD700 0%, #FFCC00 50%, #FFB800 100%)',
+                    boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -2px 4px rgba(0,0,0,0.1)'
+                }}
+            >
+                <span
+                    className="font-black text-xl tracking-[0.08em]"
+                    style={{
+                        fontFamily: '"Arial Black", "Helvetica Neue", sans-serif',
+                        color: '#1a1a1a',
+                        textShadow: '0 1px 0 rgba(255,255,255,0.3)'
+                    }}
+                >
+                    {formatPlateNumber(number)}
+                </span>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // Car Silhouette SVG (Top-Down View)
 const CarSilhouette = () => (

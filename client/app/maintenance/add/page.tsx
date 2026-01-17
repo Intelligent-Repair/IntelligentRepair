@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Car, Calendar, Factory, ArrowRight, Save, Sparkles, MessageCircle } from 'lucide-react';
+import { Car, Calendar, Factory, ArrowRight, Save, Sparkles, MessageCircle, Check, Loader2, Camera } from 'lucide-react';
 
 function AddVehicleContent() {
     const router = useRouter();
@@ -22,6 +22,7 @@ function AddVehicleContent() {
     const [selectedModel, setSelectedModel] = useState('');
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [licensePlate, setLicensePlate] = useState('');
+    const [isOcrLoading, setIsOcrLoading] = useState(false);
 
     useEffect(() => {
         const fetchManufacturers = async () => {
@@ -100,6 +101,57 @@ function AddVehicleContent() {
             setLicensePlate('');
         }
     }, [selectedYear]);
+
+    // OCR - Extract license plate from image using ChatGPT Vision
+    const handleOcrExtraction = async (file: File) => {
+        setIsOcrLoading(true);
+
+        try {
+            // Convert file to base64
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve, reject) => {
+                reader.onload = () => {
+                    const result = reader.result as string;
+                    // Extract base64 data (remove data:image/...;base64, prefix)
+                    const base64 = result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+            });
+            reader.readAsDataURL(file);
+            const base64 = await base64Promise;
+
+            // Call OpenAI Vision API
+            const response = await fetch('/api/ai/ocr-plate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64 })
+            });
+
+            if (!response.ok) {
+                throw new Error('OCR failed');
+            }
+
+            const data = await response.json();
+
+            if (data.licensePlate) {
+                // Clean the result - only digits
+                const cleanedPlate = data.licensePlate.replace(/\D/g, '');
+                if (cleanedPlate.length >= 7 && cleanedPlate.length <= 8) {
+                    setLicensePlate(cleanedPlate);
+                } else {
+                    alert('לא זוהה מספר רישוי תקין בתמונה');
+                }
+            } else {
+                alert('לא זוהה מספר רישוי בתמונה');
+            }
+        } catch (error) {
+            console.error('OCR error:', error);
+            alert('שגיאה בזיהוי מספר הרישוי');
+        } finally {
+            setIsOcrLoading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -196,7 +248,7 @@ function AddVehicleContent() {
                     value={value}
                     onChange={onChange}
                     className={`
-                        w-full pr-12 pl-4 py-4 rounded-xl
+                        w-full h-14 pr-12 pl-4 rounded-xl
                         bg-white/5 backdrop-blur-sm border-0 border-b-2 border-transparent
                         text-white appearance-none cursor-pointer
                         focus:bg-white/10 focus:border-cyan-400 focus:ring-0
@@ -305,14 +357,84 @@ function AddVehicleContent() {
                                 ))}
                             </GlassSelect>
 
-                            {/* License Plate - Israeli Style Input */}
-                            <div className="space-y-2">
-                                <label className="text-sm text-slate-500 font-medium">לוחית רישוי</label>
-                                <div className="flex items-stretch rounded-lg overflow-hidden shadow-lg">
-                                    {/* Blue IL Strip - Static */}
-                                    <div className="bg-[#003399] w-10 flex flex-col items-center justify-center shrink-0">
-                                        <span className="text-[10px] text-white font-bold leading-none">🇮🇱</span>
-                                        <span className="text-[11px] text-white font-bold leading-none mt-0.5">IL</span>
+                            {/* License Plate Section - Separated from top fields */}
+                            <div className="mt-8 pt-6 border-t border-white/5">
+                                {/* Label Row with Camera Button */}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-sm text-slate-500 font-medium">לוחית רישוי</label>
+
+                                    {/* Camera OCR Button - Inline */}
+                                    <label
+                                        htmlFor="plate-image"
+                                        className={`
+                                            flex items-center gap-1.5 px-2 py-1 rounded-lg
+                                            text-slate-500 hover:text-cyan-400
+                                            cursor-pointer transition-colors duration-200
+                                            ${isOcrLoading ? 'opacity-50 cursor-wait' : ''}
+                                        `}
+                                    >
+                                        {isOcrLoading ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Camera className="w-4 h-4" />
+                                        )}
+                                        <span className="text-xs">
+                                            {isOcrLoading ? 'מזהה...' : 'סרוק לוחית'}
+                                        </span>
+                                    </label>
+                                    <input
+                                        type="file"
+                                        id="plate-image"
+                                        accept="image/*"
+                                        capture="environment"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                handleOcrExtraction(file);
+                                            }
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                </div>
+
+                                {/* License Plate Input */}
+                                <div
+                                    className="flex items-center overflow-hidden h-14 w-full rounded-xl"
+                                    style={{
+                                        border: '3px solid #1a1a1a',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                    }}
+                                >
+                                    {/* Blue IL Section - Israeli Standard */}
+                                    <div
+                                        className="flex flex-col items-center justify-center h-full px-2.5 shrink-0"
+                                        style={{
+                                            background: 'linear-gradient(180deg, #0047AB 0%, #003399 100%)',
+                                            minWidth: '44px'
+                                        }}
+                                    >
+                                        {/* Israeli Flag with Star of David */}
+                                        <div className="flex flex-col items-center mb-0.5">
+                                            <div
+                                                className="w-7 h-5 flex items-center justify-center relative"
+                                                style={{
+                                                    background: 'white',
+                                                    border: '1px solid rgba(0,0,0,0.1)'
+                                                }}
+                                            >
+                                                {/* Blue stripes */}
+                                                <div className="absolute top-0 left-0 right-0 h-[4px] bg-[#0038b8]" />
+                                                <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-[#0038b8]" />
+                                                {/* Star of David */}
+                                                <span className="text-[10px] text-[#0038b8] leading-none">✡</span>
+                                            </div>
+                                        </div>
+                                        {/* IL text */}
+                                        <span className="text-[12px] text-white font-black leading-none tracking-wider">IL</span>
+                                        {/* Hebrew & Arabic */}
+                                        <span className="text-[7px] text-white/90 leading-none mt-0.5">ישראל</span>
+                                        <span className="text-[6px] text-white/80 leading-none" style={{ fontFamily: 'Arial' }}>إسرائيل</span>
                                     </div>
                                     {/* Yellow Input Area */}
                                     <input
@@ -329,29 +451,33 @@ function AddVehicleContent() {
                                                 setLicensePlate(value);
                                             }
                                         }}
-                                        placeholder="1234567"
+                                        placeholder="הזן מספר רישוי"
+                                        dir="ltr"
                                         className="
-                                            flex-1 px-4 py-3.5 bg-[#FFCC00]
-                                            text-black text-center font-mono font-black text-2xl tracking-[0.15em]
-                                            placeholder:text-yellow-700/40 placeholder:font-normal placeholder:text-base placeholder:tracking-normal
+                                            flex-1 h-full px-4
+                                            text-center font-black text-xl tracking-[0.1em]
+                                            placeholder:text-yellow-700/40 placeholder:font-normal placeholder:text-sm placeholder:tracking-normal
                                             outline-none border-0
                                             focus:ring-0
                                         "
                                         style={{
-                                            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.12), inset 0 -1px 3px rgba(255,255,255,0.3)'
+                                            background: 'linear-gradient(180deg, #FFD700 0%, #FFCC00 50%, #FFB800 100%)',
+                                            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -2px 4px rgba(0,0,0,0.1)',
+                                            fontFamily: '"Arial Black", "Helvetica Neue", sans-serif',
+                                            color: '#1a1a1a'
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            {/* Summary Badge */}
+                            {/* Summary Badge - Shows when form is filled */}
                             {selectedManufacturer && selectedModel && selectedYear && (
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="text-center text-sm bg-cyan-500/10 text-cyan-300 p-4 rounded-xl border border-cyan-500/20 flex items-center justify-center gap-2"
+                                    className="text-center text-sm bg-emerald-500/10 text-emerald-300 p-4 rounded-xl border border-emerald-500/20 flex items-center justify-center gap-2"
                                 >
-                                    <Sparkles className="w-4 h-4" />
+                                    <Check className="w-4 h-4" />
                                     {selectedManufacturer} {selectedModel} ({selectedYear})
                                 </motion.div>
                             )}

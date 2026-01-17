@@ -413,6 +413,19 @@ html.dark body>*>* {
   animation: loading-bar 1.2s ease-in-out infinite;
 }
 
+/* AI Magic Button - Gradient Border Animation */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 /* Custom Modal Scrollbar - Dark Theme */
 .modal-scrollbar::-webkit-scrollbar {
   width: 6px;

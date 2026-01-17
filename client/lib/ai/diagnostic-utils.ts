@@ -362,19 +362,28 @@ export function generateDiagnosis(lightType: string, scenarioId: string, scores:
     const hasPositiveEvidence = (topCause?.score ?? 0) > 0;
     const scoreValue = topCause?.score ?? 0;
 
-    let baseConfidence: number, scoreBoost: number, confidenceLevel: string;
-    if (!hasPositiveEvidence) {
-        baseConfidence = 0.40; scoreBoost = 0; confidenceLevel = 'low';
-    } else if (scoreValue < 1.0) {
-        baseConfidence = 0.50; scoreBoost = scoreValue * 0.15; confidenceLevel = 'medium';
+    // Calculate probability for the top cause first
+    const topProbability = topCause
+        ? Math.min(0.92, hasPositiveEvidence ? (0.55 + scoreValue * 0.12) : 0.40)
+        : 0.40;
+
+    // Calculate confidence and confidence level BASED ON the probability
+    // This ensures consistency: high probability = high confidence level
+    let confidenceLevel: 'low' | 'medium' | 'high';
+    if (topProbability < 0.60) {
+        confidenceLevel = 'low';
+    } else if (topProbability < 0.75) {
+        confidenceLevel = 'medium';
     } else {
-        baseConfidence = isCritical ? 0.60 : 0.55; scoreBoost = Math.min(0.25, scoreValue * 0.12); confidenceLevel = scoreValue >= 1.5 ? 'high' : 'medium';
+        confidenceLevel = 'high';
     }
 
-    const answerBoost = hasPositiveEvidence ? Math.min(0.10, (answers?.length || 0) * 0.02) : Math.min(0.05, (answers?.length || 0) * 0.01);
-    const totalConfidence = Math.min(0.92, baseConfidence + scoreBoost + answerBoost);
+    // Total confidence for the diagnosis (used for display)
+    const baseConfidence = topProbability;
+    const answerBoost = hasPositiveEvidence ? Math.min(0.05, (answers?.length || 0) * 0.01) : 0;
+    const totalConfidence = Math.min(0.92, baseConfidence + answerBoost);
 
-    const results = topCause ? [{ issue: topCause.name, probability: Math.min(0.92, hasPositiveEvidence ? (0.55 + scoreValue * 0.12) : 0.40), explanation: generateResultExplanation(topCause, hasPositiveEvidence, scoreValue, positiveAnswers) }] : [{ issue: 'לא זוהתה סיבה חד-משמעית', probability: 0.40, explanation: 'נדרש מידע נוסף או בדיקה מקצועית במוסך.' }];
+    const results = topCause ? [{ issue: topCause.name, probability: topProbability, explanation: generateResultExplanation(topCause, hasPositiveEvidence, scoreValue, positiveAnswers) }] : [{ issue: 'לא זוהתה סיבה חד-משמעית', probability: 0.40, explanation: 'נדרש מידע נוסף או בדיקה מקצועית במוסך.' }];
 
     return {
         type: 'diagnosis_report',
@@ -508,8 +517,15 @@ export function generateMechanicSummary(lightType: string, scenarioId: string, c
 
 export function generateConversationSummaries(lightType: string, scenarioId: string, answers: UserAnswer[] | undefined, scores: Record<string, number>, vehicleInfo: VehicleInfo, topCause: { id: string; name: string; score: number } | null, additionalCauses: Array<{ id: string; name: string; score: number }>, recommendation: string, severity: 'critical' | 'high' | 'medium' | 'low', needsTow: boolean, instructionsShown?: string[]): ConversationSummaries {
     const conversationLog = buildConversationHistory(answers, instructionsShown);
-    const topDiagnosis = topCause ? { issue: topCause.name, probability: Math.min(0.92, 0.55 + (topCause.score * 0.12)), reasoning: '' } : { issue: 'לא זוהתה סיבה חד-משמעית', probability: 0.4, reasoning: 'נדרש אבחון מקצועי' };
-    const additionalSuspects = additionalCauses.map(c => ({ issue: c.name, probability: Math.min(0.85, 0.45 + (c.score * 0.10)) }));
+    // Use same formula as generateDiagnosis for consistency
+    const hasEvidence = topCause && topCause.score > 0;
+    const topProbability = topCause ? Math.min(0.92, hasEvidence ? (0.55 + (topCause.score * 0.12)) : 0.40) : 0.4;
+    const topDiagnosis = topCause ? { issue: topCause.name, probability: topProbability, reasoning: '' } : { issue: 'לא זוהתה סיבה חד-משמעית', probability: 0.4, reasoning: 'נדרש אבחון מקצועי' };
+    // Secondary causes: use remaining probability distributed proportionally, ensuring they're lower than top
+    const additionalSuspects = additionalCauses.map((c, idx) => ({
+        issue: c.name,
+        probability: Math.min(topProbability - 0.15, Math.max(0.15, 0.40 + (c.score * 0.08) - (idx * 0.05)))
+    }));
     const mechanic = generateMechanicSummary(lightType, scenarioId, conversationLog, scores, vehicleInfo, topDiagnosis, additionalSuspects, recommendation, severity, needsTow, instructionsShown);
     const user = generateUserSummary(lightType, scenarioId, conversationLog, topCause?.name || '', recommendation);
     return { mechanic, user };

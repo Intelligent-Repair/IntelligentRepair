@@ -129,21 +129,26 @@ export default function GaragesClient() {
     const [sendingTo, setSendingTo] = useState<string | null>(null);
     const [sentTo, setSentTo] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [activeFilter, setActiveFilter] = useState<string>("nearest");
+    const [activeFilter, setActiveFilter] = useState<string>("");
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [userCity, setUserCity] = useState<string | null>(null);
-    const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied" | "unavailable">("pending");
+    const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "granted" | "denied" | "unavailable">("idle");
 
-    // Request geolocation on mount
+    // Load user's registered city from localStorage (but don't request GPS yet)
     useEffect(() => {
-        // First try to get user's registered city from localStorage or API
         const storedCity = localStorage.getItem("user_city");
         if (storedCity) {
             setUserCity(storedCity);
         }
+    }, []);
 
-        // Request GPS location
+    // Request GPS location - called when user clicks "nearest" filter
+    const requestLocation = () => {
+        if (locationStatus === "granted" || locationStatus === "loading") return;
+
+        setLocationStatus("loading");
+
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -157,12 +162,12 @@ export default function GaragesClient() {
                     console.log("Geolocation error:", error.message);
                     setLocationStatus(error.code === 1 ? "denied" : "unavailable");
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
             );
         } else {
             setLocationStatus("unavailable");
         }
-    }, []);
+    };
 
     // Check if garage is currently open based on operating_hours
     const isGarageOpenNow = (hours: OperatingHours[] | null | undefined): boolean => {
@@ -392,7 +397,18 @@ export default function GaragesClient() {
                         {filterChips.map((chip) => (
                             <button
                                 key={chip.id}
-                                onClick={() => setActiveFilter(chip.id)}
+                                onClick={() => {
+                                    // Toggle behavior - click again to deselect
+                                    if (activeFilter === chip.id) {
+                                        setActiveFilter("");
+                                    } else {
+                                        setActiveFilter(chip.id);
+                                        // Request location when clicking "nearest"
+                                        if (chip.id === "nearest" && locationStatus === "idle") {
+                                            requestLocation();
+                                        }
+                                    }
+                                }}
                                 className={`
                                     flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
                                     ${activeFilter === chip.id
@@ -401,7 +417,11 @@ export default function GaragesClient() {
                                     }
                                 `}
                             >
-                                <span>{chip.icon}</span>
+                                {chip.id === "nearest" && locationStatus === "loading" ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                    <span>{chip.icon}</span>
+                                )}
                                 <span>{chip.label}</span>
                             </button>
                         ))}
@@ -411,10 +431,12 @@ export default function GaragesClient() {
 
             {/* Content */}
             <div className="max-w-4xl mx-auto px-4 py-6">
-                {loading ? (
+                {loading || (activeFilter === "nearest" && locationStatus === "loading") ? (
                     <div className="flex flex-col items-center justify-center py-20">
                         <Loader2 size={40} className="animate-spin text-blue-400" />
-                        <p className="mt-4 text-white/60">טוען מוסכים...</p>
+                        <p className="mt-4 text-white/60">
+                            {locationStatus === "loading" ? "מאתר מיקום..." : "טוען מוסכים..."}
+                        </p>
                     </div>
                 ) : error ? (
                     <div className="text-center py-20">
@@ -434,186 +456,177 @@ export default function GaragesClient() {
                         )}
                     </div>
                 ) : (
-                    <AnimatePresence mode="popLayout">
-                        <div className="space-y-4">
-                            {garages
-                                // Filter by search query
-                                .filter(garage => {
-                                    if (!searchQuery.trim()) return true;
-                                    const query = searchQuery.toLowerCase().trim();
-                                    return (
-                                        garage.garage_name?.toLowerCase().includes(query) ||
-                                        garage.City?.toLowerCase().includes(query) ||
-                                        garage.Street?.toLowerCase().includes(query)
-                                    );
-                                })
-                                // Filter by active filter
-                                .filter(garage => {
-                                    if (activeFilter === "open") {
-                                        return isGarageOpenNow(garage.operating_hours);
-                                    }
-                                    return true;
-                                })
-                                // Sort by distance if "nearest" filter
-                                .sort((a, b) => {
-                                    if (activeFilter === "nearest") {
-                                        const distA = getDistanceToGarage(a) ?? 9999;
-                                        const distB = getDistanceToGarage(b) ?? 9999;
-                                        return distA - distB;
-                                    }
-                                    return 0;
-                                })
-                                .map((garage, index) => {
-                                    const isSent = sentTo.includes(garage.id);
-                                    const isSending = sendingTo === garage.id;
-                                    const canSend = garage.hasOwner;  // Only garages with real owners can receive requests
-                                    const isOpen = isGarageOpenNow(garage.operating_hours);
-                                    const sameCity = isInUserCity(garage);
-                                    const distance = getDistanceToGarage(garage);
+                    <div className="space-y-4">
+                        {garages
+                            // Filter by search query
+                            .filter(garage => {
+                                if (!searchQuery.trim()) return true;
+                                const query = searchQuery.toLowerCase().trim();
+                                return (
+                                    garage.garage_name?.toLowerCase().includes(query) ||
+                                    garage.City?.toLowerCase().includes(query) ||
+                                    garage.Street?.toLowerCase().includes(query)
+                                );
+                            })
+                            // Filter by active filter
+                            .filter(garage => {
+                                if (activeFilter === "open") {
+                                    return isGarageOpenNow(garage.operating_hours);
+                                }
+                                return true;
+                            })
+                            // Sort by distance if "nearest" filter, otherwise alphabetically
+                            .sort((a, b) => {
+                                if (activeFilter === "nearest") {
+                                    const distA = getDistanceToGarage(a) ?? 9999;
+                                    const distB = getDistanceToGarage(b) ?? 9999;
+                                    return distA - distB;
+                                }
+                                // Default: sort alphabetically by name
+                                return (a.garage_name || "").localeCompare(b.garage_name || "", "he");
+                            })
+                            .map((garage) => {
+                                const isSent = sentTo.includes(garage.id);
+                                const isSending = sendingTo === garage.id;
+                                const canSend = garage.hasOwner;  // Only garages with real owners can receive requests
+                                const isOpen = isGarageOpenNow(garage.operating_hours);
+                                const sameCity = isInUserCity(garage);
+                                const distance = getDistanceToGarage(garage);
 
-                                    return (
-                                        <motion.div
-                                            key={garage.id}
-                                            initial={{ opacity: 0, y: 30 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -20 }}
-                                            transition={{ delay: index * 0.08, duration: 0.4 }}
-                                            className={`
-                                            relative overflow-hidden rounded-2xl backdrop-blur-xl
-                                            ${isSent
-                                                    ? "bg-emerald-500/10 border-2 border-emerald-500/40"
-                                                    : "bg-slate-900/60 border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
-                                                }
-                                            transition-all duration-300
+                                return (
+                                    <div
+                                        key={garage.id}
+                                        className={`
+                                        relative overflow-hidden rounded-2xl backdrop-blur-xl
+                                        ${isSent
+                                                ? "bg-emerald-500/10 border-2 border-emerald-500/40"
+                                                : "bg-slate-900/60 border border-slate-700/50 hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]"
+                                            }
+                                        transition-all duration-300
                                         `}
-                                        >
-                                            <div className="p-5">
-                                                {/* Header Row - Name + Badges */}
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-3 mb-2">
-                                                            <h3 className="text-xl font-bold text-white">
-                                                                {garage.garage_name}
-                                                            </h3>
-                                                            {garage.hasOwner && (
-                                                                <BadgeCheck size={18} className="text-cyan-400" />
-                                                            )}
-                                                        </div>
-
-                                                        {/* Same City Badge */}
-                                                        {sameCity && (
-                                                            <div className="flex items-center gap-1 mb-2">
-                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-400">
-                                                                    🏠 בעיר שלך
-                                                                </span>
-                                                            </div>
+                                    >
+                                        <div className="p-5">
+                                            {/* Header Row - Name + Badges */}
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="text-xl font-bold text-white">
+                                                            {garage.garage_name}
+                                                        </h3>
+                                                        {garage.hasOwner && (
+                                                            <BadgeCheck size={18} className="text-cyan-400" />
                                                         )}
                                                     </div>
 
-                                                    {/* Distance Badge + Status */}
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        {/* Distance/City Badge */}
-                                                        {garage.City && (
-                                                            <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-600/50 text-xs font-medium text-white/70">
-                                                                📍 {distance !== null ? `${distance.toFixed(1)} ק״מ` : garage.City}
+                                                    {/* Same City Badge */}
+                                                    {sameCity && (
+                                                        <div className="flex items-center gap-1 mb-2">
+                                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-400">
+                                                                🏠 בעיר שלך
                                                             </span>
-                                                        )}
-
-                                                        {/* Open/Closed Status - Real calculation */}
-                                                        {garage.hasOwner && garage.operating_hours && (
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]'}`} />
-                                                                <span className={`text-xs font-medium ${isOpen ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                                    {isOpen ? 'פתוח כעת' : 'סגור'}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                {/* Address */}
-                                                <div className="flex items-center gap-2 text-white/60 mb-3">
-                                                    <MapPin size={14} className="text-cyan-400/60 flex-shrink-0" />
-                                                    <span className="text-sm">{formatAddress(garage)}</span>
-                                                </div>
-
-                                                {/* Phone */}
-                                                {garage.phone && (
-                                                    <a
-                                                        href={formatPhoneLink(garage.phone)}
-                                                        className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors mb-3"
-                                                    >
-                                                        <Phone size={14} />
-                                                        <span className="text-sm font-medium" dir="ltr">
-                                                            {garage.phone}
+                                                {/* Distance Badge + Status */}
+                                                <div className="flex flex-col items-end gap-2">
+                                                    {/* Distance/City Badge */}
+                                                    {garage.City && (
+                                                        <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-600/50 text-xs font-medium text-white/70">
+                                                            📍 {distance !== null ? `${distance.toFixed(1)} ק״מ` : garage.City}
                                                         </span>
-                                                    </a>
-                                                )}
+                                                    )}
 
-                                                {/* Operating Hours */}
-                                                {garage.hasOwner && garage.operating_hours && (
-                                                    <div className="mb-4 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <Clock size={14} className="text-white/50" />
-                                                            <span className="text-sm text-white/70">
-                                                                {formatOperatingHours(garage.operating_hours)}
+                                                    {/* Open/Closed Status - Real calculation */}
+                                                    {garage.hasOwner && garage.operating_hours && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]'}`} />
+                                                            <span className={`text-xs font-medium ${isOpen ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                {isOpen ? 'פתוח כעת' : 'סגור'}
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Action Button - Gradient Pill Style */}
-                                                {canSend && (
-                                                    <div className="mt-4 flex justify-start">
-                                                        <button
-                                                            onClick={() => handleSendRequest(garage)}
-                                                            disabled={isSending || isSent || !requestId}
-                                                            className={`
-                                                            flex items-center gap-2 py-3 px-6 rounded-full font-bold transition-all
-                                                            ${isSent
-                                                                    ? "bg-emerald-500/20 text-emerald-400 cursor-default"
-                                                                    : isSending
-                                                                        ? "bg-blue-500/50 text-white cursor-wait"
-                                                                        : !requestId
-                                                                            ? "bg-white/5 text-white/30 cursor-not-allowed"
-                                                                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
-                                                                }
-                                                        `}
-                                                        >
-                                                            {isSent ? (
-                                                                <>
-                                                                    <CheckCircle2 size={18} />
-                                                                    <span>נשלח בהצלחה!</span>
-                                                                </>
-                                                            ) : isSending ? (
-                                                                <>
-                                                                    <Loader2 size={18} className="animate-spin" />
-                                                                    <span>שולח...</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Send size={18} />
-                                                                    <span>שלח פנייה</span>
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            {/* Success overlay */}
-                                            {isSent && (
-                                                <motion.div
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    className="absolute inset-0 bg-emerald-500/5 pointer-events-none"
-                                                />
+                                            {/* Address */}
+                                            <div className="flex items-center gap-2 text-white/60 mb-3">
+                                                <MapPin size={14} className="text-cyan-400/60 flex-shrink-0" />
+                                                <span className="text-sm">{formatAddress(garage)}</span>
+                                            </div>
+
+                                            {/* Phone */}
+                                            {garage.phone && (
+                                                <a
+                                                    href={formatPhoneLink(garage.phone)}
+                                                    className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors mb-3"
+                                                >
+                                                    <Phone size={14} />
+                                                    <span className="text-sm font-medium" dir="ltr">
+                                                        {garage.phone}
+                                                    </span>
+                                                </a>
                                             )}
-                                        </motion.div>
-                                    );
-                                })}
-                        </div>
-                    </AnimatePresence>
+
+                                            {/* Operating Hours */}
+                                            {garage.hasOwner && garage.operating_hours && (
+                                                <div className="mb-4 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Clock size={14} className="text-white/50" />
+                                                        <span className="text-sm text-white/70">
+                                                            {formatOperatingHours(garage.operating_hours)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action Button - Gradient Pill Style */}
+                                            {canSend && (
+                                                <div className="mt-4 flex justify-start">
+                                                    <button
+                                                        onClick={() => handleSendRequest(garage)}
+                                                        disabled={isSending || isSent || !requestId}
+                                                        className={`
+                                                            flex items-center gap-2 py-3 px-6 rounded-full font-bold transition-all
+                                                            ${isSent
+                                                                ? "bg-emerald-500/20 text-emerald-400 cursor-default"
+                                                                : isSending
+                                                                    ? "bg-blue-500/50 text-white cursor-wait"
+                                                                    : !requestId
+                                                                        ? "bg-white/5 text-white/30 cursor-not-allowed"
+                                                                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
+                                                            }
+                                                        `}
+                                                    >
+                                                        {isSent ? (
+                                                            <>
+                                                                <CheckCircle2 size={18} />
+                                                                <span>נשלח בהצלחה!</span>
+                                                            </>
+                                                        ) : isSending ? (
+                                                            <>
+                                                                <Loader2 size={18} className="animate-spin" />
+                                                                <span>שולח...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Send size={18} />
+                                                                <span>שלח פנייה</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Success overlay */}
+                                        {isSent && (
+                                            <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                    </div>
                 )}
             </div>
 

@@ -20,30 +20,14 @@ interface Vehicle {
     year: number | null;
 }
 
-// Brand Emblem Component - Etched Monogram Emblem style
-const BrandEmblem = ({ brand }: { brand: string }) => {
-    const getBrandInitial = (b: string) => {
-        const lowerBrand = b.toLowerCase();
-        if (lowerBrand.includes('toyota')) return 'T';
-        if (lowerBrand.includes('volkswagen') || lowerBrand.includes('vw')) return 'VW';
-        if (lowerBrand.includes('mazda')) return 'M';
-        if (lowerBrand.includes('honda')) return 'H';
-        if (lowerBrand.includes('hyundai')) return 'H';
-        if (lowerBrand.includes('kia')) return 'K';
-        if (lowerBrand.includes('mercedes')) return 'MB';
-        if (lowerBrand.includes('bmw')) return 'BMW';
-        if (lowerBrand.includes('audi')) return 'A';
-        if (lowerBrand.includes('ford')) return 'F';
-        if (lowerBrand.includes('chevrolet')) return 'C';
-        if (lowerBrand.includes('nissan')) return 'N';
-        if (lowerBrand.includes('subaru')) return 'S';
-        if (lowerBrand.includes('mitsubishi')) return 'M';
-        return b.charAt(0).toUpperCase();
-    };
+import { getCarBrandLogo } from "@/lib/data/car-brands";
 
-    const initial = getBrandInitial(brand);
-    // Adjust font size based on character count - larger for premium look
-    const fontSize = initial.length > 2 ? 'text-4xl' : initial.length > 1 ? 'text-5xl' : 'text-6xl';
+// Brand Emblem Component - Real Logo with Backlight Glow Effect
+const BrandEmblem = ({ brand }: { brand: string }) => {
+    const logoUrl = getCarBrandLogo(brand);
+
+    // Fallback to first letter if no logo found
+    const fallbackInitial = brand.charAt(0).toUpperCase();
 
     return (
         <div
@@ -52,7 +36,7 @@ const BrandEmblem = ({ brand }: { brand: string }) => {
         >
             {/* Large Emblem Container */}
             <div
-                className="w-32 h-32 rounded-full flex items-center justify-center"
+                className="w-32 h-32 rounded-full flex items-center justify-center relative"
                 style={{
                     background: 'radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%)',
                     border: '2px solid rgba(255,255,255,0.08)',
@@ -61,48 +45,126 @@ const BrandEmblem = ({ brand }: { brand: string }) => {
             >
                 {/* Inner decorative ring */}
                 <div
-                    className="w-28 h-28 rounded-full flex items-center justify-center"
+                    className="w-28 h-28 rounded-full flex items-center justify-center overflow-hidden relative"
                     style={{
                         border: '1px solid rgba(255,255,255,0.05)',
                         boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.4)'
                     }}
                 >
-                    {/* The Letter - Premium serif typography */}
-                    <span
-                        className={`${fontSize} font-black tracking-tight`}
-                        style={{
-                            fontFamily: 'Georgia, "Times New Roman", serif',
-                            color: 'rgba(255,255,255,0.08)',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 0 40px rgba(255,255,255,0.03)'
-                        }}
-                    >
-                        {initial}
-                    </span>
+                    {logoUrl ? (
+                        <>
+                            {/* Backlight Glow Effect */}
+                            <div
+                                className="absolute inset-0 rounded-full"
+                                style={{
+                                    background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 40%, transparent 70%)',
+                                    filter: 'blur(8px)'
+                                }}
+                            />
+                            {/* Logo - White/Light watermark style */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={logoUrl}
+                                alt={brand}
+                                className="w-16 h-16 object-contain relative z-10"
+                                style={{
+                                    opacity: 0.3,
+                                    filter: 'brightness(0) invert(1) drop-shadow(0 0 8px rgba(255,255,255,0.15))'
+                                }}
+                            />
+                        </>
+                    ) : (
+                        /* Fallback to letter */
+                        <span
+                            className="text-6xl font-black tracking-tight"
+                            style={{
+                                fontFamily: 'Georgia, "Times New Roman", serif',
+                                color: 'rgba(255,255,255,0.15)',
+                                textShadow: '0 0 20px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            {fallbackInitial}
+                        </span>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-// Israeli License Plate Component - Compact with inset shadow
-const LicensePlate = ({ number }: { number: string }) => (
-    <div className="flex items-stretch rounded overflow-hidden shadow-lg w-fit">
-        {/* Blue IL Strip */}
-        <div className="bg-[#003399] px-1.5 py-1 flex flex-col items-center justify-center">
-            <span className="text-[7px] text-white font-bold leading-none">🇮🇱</span>
-            <span className="text-[8px] text-white font-bold leading-none mt-0.5">IL</span>
-        </div>
-        {/* Yellow Plate with inset shadow */}
+// Israeli License Plate Component - Compact Realistic Style
+// Supports both 8-digit (XXX-XX-XXX) and 7-digit (XX-XXX-XX) formats
+const LicensePlate = ({ number }: { number: string }) => {
+    // Format the license plate number with dots
+    const formatPlateNumber = (num: string) => {
+        const digits = num.replace(/\D/g, ''); // Remove non-digits
+        if (digits.length === 8) {
+            // New format: XXX·XX·XXX
+            return `${digits.slice(0, 3)}·${digits.slice(3, 5)}·${digits.slice(5, 8)}`;
+        } else if (digits.length === 7) {
+            // Old format: XX·XXX·XX
+            return `${digits.slice(0, 2)}·${digits.slice(2, 5)}·${digits.slice(5, 7)}`;
+        }
+        return num; // Return as-is if different length
+    };
+
+    return (
         <div
-            className="bg-[#FFCC00] px-3 py-1.5 flex items-center justify-center"
-            style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.3)' }}
+            className="flex items-stretch overflow-hidden w-fit"
+            style={{
+                borderRadius: '4px',
+                border: '2px solid #1a1a1a',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+            }}
         >
-            <span className="text-black font-mono font-black text-base tracking-[0.12em]">
-                {number}
-            </span>
+            {/* Blue IL Section - Compact */}
+            <div
+                className="flex flex-col items-center justify-center px-1.5 py-1"
+                style={{
+                    background: 'linear-gradient(180deg, #0047AB 0%, #003399 100%)',
+                    minWidth: '28px'
+                }}
+            >
+                {/* Mini Israeli Flag */}
+                <div className="flex flex-col items-center mb-0.5">
+                    <div
+                        className="w-4 h-2.5 flex items-center justify-center relative"
+                        style={{
+                            background: 'white',
+                            border: '1px solid rgba(0,0,0,0.1)'
+                        }}
+                    >
+                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#0038b8]" />
+                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0038b8]" />
+                        <span className="text-[5px] text-[#0038b8] leading-none">✡</span>
+                    </div>
+                </div>
+                <span className="text-[8px] text-white font-black leading-none">IL</span>
+                <span className="text-[4px] text-white/80 leading-none mt-0.5">ישראל</span>
+            </div>
+
+            {/* Yellow Plate Area - Compact */}
+            <div
+                className="flex items-center justify-center px-2.5 py-1"
+                style={{
+                    background: 'linear-gradient(180deg, #FFD700 0%, #FFCC00 50%, #FFB800 100%)',
+                    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.4), inset 0 -1px 2px rgba(0,0,0,0.1)'
+                }}
+            >
+                <span
+                    className="font-black text-sm tracking-[0.05em]"
+                    style={{
+                        fontFamily: '"Arial Black", "Helvetica Neue", sans-serif',
+                        color: '#1a1a1a',
+                        textShadow: '0 1px 0 rgba(255,255,255,0.2)'
+                    }}
+                >
+                    {formatPlateNumber(number)}
+                </span>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export default function MaintenancePage() {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -193,16 +255,25 @@ export default function MaintenancePage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-10"
                 >
-                    <div className="flex items-center justify-center gap-3 mb-3">
-                        <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-500/30">
-                            <Car size={32} className="text-white" />
+                    <div className="flex flex-row-reverse items-center justify-center gap-3 mb-2">
+                        <div
+                            className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl"
+                            style={{
+                                boxShadow: '0 8px 32px rgba(6, 182, 212, 0.4), 0 0 20px rgba(6, 182, 212, 0.3)',
+                                filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))'
+                            }}
+                        >
+                            <Car size={32} className="text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
                         </div>
-                        <h1 className="text-4xl font-black bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                            המוסך שלי
+                        <h1 className="text-3xl md:text-4xl font-black text-white">
+                            המוסך של{' '}
+                            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-300 bg-clip-text text-transparent">
+                                {userName}
+                            </span>
                         </h1>
                     </div>
-                    <p className="text-slate-400 text-lg">
-                        שלום {userName}, כאן תוכל לנהל את הרכבים שלך
+                    <p className="text-slate-500 text-sm">
+                        ניהול חכם לכל הרכבים שלך
                     </p>
                 </motion.div>
 
@@ -280,16 +351,21 @@ export default function MaintenancePage() {
                     transition={{ delay: 0.3 }}
                 >
                     <Link href="/maintenance/add" className="block group">
-                        <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.02] hover:border-cyan-500/50 hover:bg-cyan-500/5 hover:shadow-[0_0_30px_rgba(6,182,212,0.08)] transition-all duration-300 p-6 flex flex-col items-center justify-center gap-3">
+                        <div className="rounded-2xl border-2 border-dashed border-slate-600/50 bg-white/[0.01] hover:border-cyan-400/60 hover:bg-cyan-500/5 hover:shadow-[0_0_40px_rgba(6,182,212,0.12)] transition-all duration-300 p-6 flex flex-col items-center justify-center gap-3">
 
                             {/* Plus Icon */}
-                            <div className="p-3 bg-slate-800/40 rounded-full group-hover:bg-cyan-500/15 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300">
+                            <div className="p-3 bg-slate-800/40 rounded-full group-hover:bg-cyan-500/15 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all duration-300">
                                 <Plus size={24} className="text-slate-500 group-hover:text-cyan-400 transition-colors" />
                             </div>
 
-                            {/* Text */}
-                            <span className="text-sm font-medium text-slate-500 group-hover:text-cyan-300 transition-colors">
-                                הוסף רכב חדש
+                            {/* Text with glow on hover */}
+                            <span
+                                className="text-sm font-medium text-slate-500 group-hover:text-cyan-300 transition-all duration-300"
+                                style={{ textShadow: 'none' }}
+                            >
+                                <span className="group-hover:[text-shadow:0_0_12px_rgba(6,182,212,0.5)]">
+                                    הוסף רכב חדש
+                                </span>
                             </span>
                         </div>
                     </Link>
