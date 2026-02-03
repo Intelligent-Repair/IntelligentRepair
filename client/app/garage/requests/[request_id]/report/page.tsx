@@ -4,7 +4,6 @@
 import { ArrowRight, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import RepairCompletionForm from '@/components/garage/RepairCompletionForm';
-import { createServerSupabase } from "@/lib/supabaseServer";
 
 interface PageProps {
     params: Promise<{ request_id: string }>;
@@ -21,40 +20,31 @@ interface GarageRequestData {
         year?: number;
         license_plate?: string;
     };
-    mechanic_summary?: {
-        diagnoses?: { issue: string; probability: number }[];
-        topDiagnosis?: { name: string }[];
-        originalComplaint?: string;
-        category?: string;
-    };
 }
 
 async function fetchAcceptedGarageRequest(requestId: string): Promise<{ garageRequest: GarageRequestData | null; error: string | null }> {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
     try {
-        const supabase = await createServerSupabase();
-
         // Fetch the accepted garage_request for this request
-        const { data: garageRequest, error } = await supabase
-            .from('garage_requests')
-            .select('*')
-            .eq('id', requestId)
-            .single();
+        const res = await fetch(`${baseUrl}/api/garage/requests/by-request/${requestId}`, {
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+        });
 
-        if (error) {
-            console.error('[ReportPage] DB error:', error);
-            if (error.code === 'PGRST116') {
-                return { garageRequest: null, error: 'לא נמצאה הצעה מאושרת לבקשה זו' };
-            }
-            return { garageRequest: null, error: 'שגיאה בטעינת הנתונים מהשרת' };
-        }
-
-        if (!garageRequest) {
+        if (res.status === 404) {
             return { garageRequest: null, error: 'לא נמצאה הצעה מאושרת לבקשה זו' };
         }
 
-        return { garageRequest, error: null };
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            return { garageRequest: null, error: data.error || `HTTP ${res.status}` };
+        }
+
+        const data = await res.json();
+        return { garageRequest: data.garageRequest || data, error: null };
     } catch (err) {
-        console.error('[ReportPage] Unexpected error:', err);
+        console.error('[ReportPage] Fetch error:', err);
         return { garageRequest: null, error: 'שגיאה בטעינת הנתונים' };
     }
 }
@@ -74,18 +64,16 @@ export default async function ReportPage({ params }: PageProps) {
             </div>
 
             <main dir="rtl" className="relative mx-auto w-full max-w-3xl px-6 pb-16 pt-8">
-                {/* Header Bar */}
-                <div className="relative flex items-center justify-center mb-8 pb-4 border-b border-white/5">
-                    {/* Back Button - Right side for RTL */}
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-8">
                     <Link
                         href="/garage/requests"
-                        className="absolute right-0 p-2 rounded-full hover:bg-white/10 transition"
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
                     >
                         <ArrowRight className="w-5 h-5" />
                     </Link>
-
-                    {/* Centered Title */}
-                    <h1 className="text-xl font-bold text-white">
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Wrench className="w-8 h-8 text-cyan-400" />
                         דיווח סיום טיפול
                     </h1>
                 </div>
@@ -111,30 +99,19 @@ export default async function ReportPage({ params }: PageProps) {
                             חזרה לרשימה
                         </Link>
                     </div>
-                ) : (() => {
-                    // Extract primary diagnosis from mechanic_summary
-                    const ms = garageRequest.mechanic_summary;
-                    const primaryDiagnosis =
-                        ms?.diagnoses?.[0]?.issue ||
-                        ms?.topDiagnosis?.[0]?.name ||
-                        ms?.category ||
-                        ms?.originalComplaint ||
-                        undefined;
-
-                    return (
-                        /* Main Form Card */
-                        <div className="rounded-2xl bg-slate-900/80 border border-slate-700/50 p-8 shadow-xl backdrop-blur-sm">
-                            <RepairCompletionForm
-                                requestId={garageRequest.request_id}
-                                garageId={garageRequest.garage_id}
-                                garageRequestId={garageRequest.id}
-                                vehicleInfo={garageRequest.vehicle_info}
-                                primaryDiagnosis={primaryDiagnosis}
-                            />
-                        </div>
-                    );
-                })()}
+                ) : (
+                    /* Main Form Card */
+                    <div className="rounded-2xl bg-slate-900/80 border border-slate-700 p-8 shadow-xl backdrop-blur-sm">
+                        <RepairCompletionForm
+                            requestId={garageRequest.request_id}
+                            garageId={garageRequest.garage_id}
+                            garageRequestId={garageRequest.id}
+                            vehicleInfo={garageRequest.vehicle_info}
+                        />
+                    </div>
+                )}
             </main>
         </div>
     );
 }
+

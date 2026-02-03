@@ -1,7 +1,7 @@
 // client/app/garage/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Filter, Car, Wrench, Bot, ChevronLeft, ChevronRight, Loader2, Home, Database, Globe, X, Clock } from 'lucide-react';
 
@@ -83,14 +83,15 @@ export default function GarageKnowledgeBasePage() {
   const [dateRange, setDateRange] = useState<string>("all");
   const [licensePlate, setLicensePlate] = useState<string>("");
 
-  // Fetch repairs
-  const fetchRepairs = useCallback(async () => {
+  // Fetch repairs - accepts optional offset override to avoid race conditions
+  const fetchRepairs = useCallback(async (overrideOffset?: number) => {
+    const effectiveOffset = overrideOffset !== undefined ? overrideOffset : offset;
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
       params.set("mode", mode);
-      params.set("offset", offset.toString());
+      params.set("offset", effectiveOffset.toString());
       if (selectedManufacturer) params.set("manufacturer", selectedManufacturer);
       if (selectedModel) params.set("model", selectedModel);
       if (selectedYear) params.set("year", selectedYear);
@@ -184,17 +185,41 @@ export default function GarageKnowledgeBasePage() {
     }
   }, [mode, dateRange]);
 
-  // Initial load and reload on filter change
-  useEffect(() => {
-    fetchRepairs();
-    fetchStats();
-    fetchFilters();
-  }, [fetchRepairs, fetchStats, fetchFilters]);
+  // Use ref to track previous filter values and detect filter vs pagination changes
+  const prevFiltersRef = useRef({
+    mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate
+  });
 
-  // Reset offset when filters change
+  // Single effect to handle both filter changes and initial load
   useEffect(() => {
-    setOffset(0);
-  }, [mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate]);
+    const prevFilters = prevFiltersRef.current;
+    const filtersChanged =
+      prevFilters.mode !== mode ||
+      prevFilters.selectedManufacturer !== selectedManufacturer ||
+      prevFilters.selectedModel !== selectedModel ||
+      prevFilters.selectedYear !== selectedYear ||
+      prevFilters.selectedIssueType !== selectedIssueType ||
+      prevFilters.dateRange !== dateRange ||
+      prevFilters.licensePlate !== licensePlate;
+
+    // Update ref with current values
+    prevFiltersRef.current = {
+      mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate
+    };
+
+    if (filtersChanged) {
+      // Filters changed - reset offset and fetch with offset 0
+      setOffset(0);
+      fetchRepairs(0); // Explicitly pass 0 to avoid race condition
+      fetchStats();
+      fetchFilters();
+    } else {
+      // Just pagination - fetch with current offset
+      fetchRepairs();
+      fetchStats();
+      fetchFilters();
+    }
+  }, [mode, selectedManufacturer, selectedModel, selectedYear, selectedIssueType, dateRange, licensePlate, offset, fetchRepairs, fetchStats, fetchFilters]);
 
   // Get available models based on selected manufacturer
   const availableModels = useMemo(() => {
